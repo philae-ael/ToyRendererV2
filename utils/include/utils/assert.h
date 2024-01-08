@@ -2,21 +2,26 @@
 
 #include <spdlog/spdlog.h>
 
+#include <source_location>
+
 #define TR_ASSERT(expr, format, ...) TR_ASSERT_INNER(expr, #expr, format, __VA_ARGS__)
 
-#define TR_ASSERT_INNER(expr, expr_str, format, ...)                                                              \
-  static_cast<bool>(expr) ? void(0)                                                                               \
-                          : utils::assert_fail(expr_str, __LINE__, __FILE__, static_cast<const char *>(__func__), \
-                                               format __VA_OPT__(, ) __VA_ARGS__)
+#define TR_ASSERT_INNER(expr, expr_str, format, ...) \
+  static_cast<bool>(expr) ? void(0) : utils::details::logger{}.fail(expr_str, format __VA_OPT__(, ) __VA_ARGS__)
 
-namespace utils {
-template <typename... Args>
-[[noreturn]] void assert_fail(const char *expr, unsigned int line, const char *file, const char *func,
-                              spdlog::format_string_t<Args...> fmt, Args &&...args) {
-  spdlog::critical("assertion failed: {}", expr);
-  spdlog::critical(fmt, std::forward<Args>(args)...);
-  spdlog::info("assertion occured in {}:{} in {}", func, line, file);
+namespace utils::details {
+struct logger {
+  std::source_location loc;
+  explicit logger(const std::source_location loc = std::source_location::current()) : loc(loc) {}
 
-  std::abort();
-}
-}  // namespace utils
+  template <typename... Args>
+  [[noreturn]] void fail(const char *expr, const std::format_string<Args...> fmt, Args &&...args) {
+    spdlog::critical("assertion failed: {}", expr);
+    spdlog::critical(fmt.get(), std::forward<Args>(args)...);
+    spdlog::info("assertion occured in {}:{} in {}", loc.function_name(), loc.line(), loc.file_name());
+
+    std::abort();
+  }
+};
+
+}  // namespace utils::details
