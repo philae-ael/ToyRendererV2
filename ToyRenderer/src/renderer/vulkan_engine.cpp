@@ -51,6 +51,9 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
 
   VK_UNWRAP(vkResetCommandPool, device.vk_device, graphic_command_pools[frame_id % MAX_FRAMES_IN_FLIGHT], 0);
 
+  frame.descriptor_allocator = frame_descriptor_allocators[frame_id % MAX_FRAMES_IN_FLIGHT];
+  frame.descriptor_allocator.reset(device.vk_device);
+
   frame.cmd = graphics_command_buffers[frame_id % MAX_FRAMES_IN_FLIGHT];
   VK_UNWRAP(frame.cmd.begin);
 
@@ -75,6 +78,13 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   auto cmd = frame.cmd.vk_cmd;
 
   debug_info.write_gpu_timestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
+
+  // HOW TO DO IT ONCE?!
+  for (const auto& mesh : meshes) {
+    for (auto& surface : mesh.surfaces) {
+      surface.material->base_color_texture.sync(cmd, SyncFragmentShaderReadOnly);
+    }
+  }
   passes.gbuffer.draw(cmd, rm, {{0, 0}, swapchain.extent}, [&] {
     {
       CameraMatrices* map = nullptr;
@@ -96,6 +106,21 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
                          &mesh.transform);
 
       for (auto& surface : mesh.surfaces) {
+        auto descriptor =
+            frame.descriptor_allocator.allocate(device.vk_device, passes.gbuffer.descriptor_set_layouts[1]);
+        DescriptorUpdater{descriptor, 0}
+            .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            .image_info({{
+                {
+                    .sampler = base_sampler,
+                    .imageView = surface.material->base_color_texture.view,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                },
+            }})
+            .write(device.vk_device);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.gbuffer.pipeline_layout, 1, 1, &descriptor,
+                                0, nullptr);
+
         if (mesh.buffers.indices) {
           vkCmdDrawIndexed(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0, 0);
         } else {
@@ -111,7 +136,7 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   {
     rm.fb0.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
     rm.fb1.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
-    auto descriptor = deferred_descriptors[frame_id % MAX_FRAMES_IN_FLIGHT];
+    auto descriptor = frame.descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
     DescriptorUpdater{descriptor, 0}
         .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
         .image_info({{
@@ -161,7 +186,6 @@ void tr::renderer::VulkanEngine::end_frame(Frame frame) {
   }
 
   // per frame cleanup
-  frame_descriptor_allocator.reset(device.vk_device);
   frame_deletion_stacks.device.cleanup(device.vk_device);
   frame_deletion_stacks.allocator.cleanup(allocator);
 
@@ -265,14 +289,14 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
                                                               {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
                                                           }});
   global_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
-  frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
-                                                         {{
-                                                             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4096},
-                                                         }});
-  frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
 
-  for (auto& descriptor : deferred_descriptors) {
-    descriptor = global_descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
+  for (auto& frame_descriptor_allocator : frame_descriptor_allocators) {
+    frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
+                                                           {{
+                                                               {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048},
+                                                               {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
+                                                           }});
+    frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
   }
 
   auto bb = buffer_builder();
@@ -304,9 +328,9 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
         .magFilter = VK_FILTER_NEAREST,
         .minFilter = VK_FILTER_NEAREST,
         .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .mipLodBias = 0,
         .anisotropyEnable = VK_FALSE,
         .maxAnisotropy = 0,

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "deletion_queue.h"
+#include "descriptors.h"
 #include "device.h"
 #include "queue.h"
 #include "surface.h"
@@ -60,6 +61,7 @@ struct Frame {
   std::uint32_t swapchain_image_index = 0;
   FrameSynchro synchro;
   OneTimeCommandBuffer cmd{};
+  DescriptorAllocator descriptor_allocator{};
 
   auto submitCmds(VkQueue queue) const -> VkResult {
     return QueueSubmit{}

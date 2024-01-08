@@ -17,6 +17,7 @@
             ]
         },
         "vulkan-memory-allocator",
-        "fastgltf"
+        "fastgltf",
+        "stb"
     ]
 }

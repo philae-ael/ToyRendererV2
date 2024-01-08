@@ -10,6 +10,7 @@
 #include <span>
 
 #include "deletion_queue.h"
+#include "ressources.h"
 
 namespace tr::renderer {
 struct Vertex {
@@ -37,6 +38,7 @@ struct StagingBuffer {
 
   auto consume(std::size_t size) -> std::span<std::byte>;
   auto commit(VkCommandBuffer, VkBuffer, uint32_t offset) -> StagingBuffer&;
+  auto commit_image(VkCommandBuffer cmd, const ImageRessource& image, VkRect2D r) -> StagingBuffer&;
   void reset();
 };
 

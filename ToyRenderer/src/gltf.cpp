@@ -1,8 +1,13 @@
 #include "gltf.h"
 
 #include <spdlog/spdlog.h>
+
+#include "renderer/synchronisation.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 #include <vulkan/vulkan_core.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
@@ -14,7 +19,9 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/mat4x4.hpp>
+#include <memory>
 #include <mutex>
+#include <span>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -24,7 +31,6 @@
 #include "renderer/ressources.h"
 #include "renderer/uploader.h"
 #include "renderer/vertex.h"
-#include "renderer/vulkan_engine.h"
 #include "utils/assert.h"
 #include "utils/cast.h"
 
@@ -32,17 +38,71 @@ template <typename... Ts>
 struct overloaded : Ts... {
   using Ts::operator()...;
 };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
 
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
 
-auto load(tr::renderer::ImageBuilder& /*ib*/, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
+auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
           const fastgltf::Asset& asset) -> std::vector<tr::renderer::Mesh> {
   {
     const auto err = fastgltf::validate(asset);
     TR_ASSERT(err == fastgltf::Error::None, "Invalid GLTF: {} {}", fastgltf::getErrorName(err),
               fastgltf::getErrorMessage(err));
+  }
+
+  // TODO: use an id rather than a pointer
+  std::vector<std::shared_ptr<tr::renderer::Material>> materials;
+  for (const auto& material : asset.materials) {
+    TR_ASSERT(material.pbrData.baseColorTexture, "no base color texture, not supported");
+    auto mat = std::make_shared<tr::renderer::Material>();
+    const auto& color_texture = asset.textures[material.pbrData.baseColorTexture->textureIndex];
+
+    TR_ASSERT(color_texture.imageIndex, "no image index, not supported");
+    const auto& color_image = asset.images[*color_texture.imageIndex];
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    std::span<const std::byte> image;
+
+    std::visit(overloaded{
+                   [&](const has_bytes auto& c) {
+                     const auto bytes = std::as_bytes(std::span(c.bytes));
+
+                     int x = 0;
+                     int y = 0;
+                     int channels = 0;
+                     const auto* im = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(bytes.data()),
+                                                            bytes.size_bytes(), &x, &y, &channels, 4);
+                     TR_ASSERT(im != nullptr, "Could not load image");
+
+                     width = x;
+                     height = y;
+                     image = std::span{reinterpret_cast<const std::byte*>(im), static_cast<size_t>(x * y * 4)};
+                   },
+                   [](const auto&) { TR_ASSERT(false, "MEH"); },
+               },
+               color_image.data);
+
+    mat->base_color_texture = ib.build_image(
+        tr::renderer::ImageDefinition{
+            .flags = tr::renderer::IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT |
+                     tr::renderer::IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT,
+            .usage = tr::renderer::IMAGE_USAGE_SAMPLED_BIT | tr::renderer::IMAGE_USAGE_TRANSFER_DST_BIT,
+            .size =
+                VkExtent2D{
+                    .width = width,
+                    .height = height,
+
+                },
+        },
+        "texture image");
+
+    mat->base_color_texture.sync(t.cmd.vk_cmd, tr::renderer::SyncImageTransfer);
+    t.upload_image(mat->base_color_texture, {{0, 0}, {width, height}}, image);
+
+    materials.push_back(std::move(mat));
   }
 
   std::vector<tr::renderer::Mesh> meshes{};
@@ -75,9 +135,12 @@ auto load(tr::renderer::ImageBuilder& /*ib*/, tr::renderer::BufferBuilder& bb, t
           TR_ASSERT(primitive.indicesAccessor, "index buffer");
           const auto& accessor = asset.accessors[*primitive.indicesAccessor];
           const auto start_i_idx = indices.size();
+
+          TR_ASSERT(primitive.materialIndex, "material needed");
           asset_mesh.surfaces.push_back({
               .start = utils::narrow_cast<uint32_t>(start_i_idx),
               .count = utils::narrow_cast<uint32_t>(accessor.count),
+              .material = materials[*primitive.materialIndex],
           });
 
           indices.reserve(indices.size() + accessor.count);
@@ -125,7 +188,7 @@ auto load(tr::renderer::ImageBuilder& /*ib*/, tr::renderer::BufferBuilder& bb, t
               .flags = 0,
           },
           std::format("vertex buffer for {}", mesh.name));
-      t.upload(asset_mesh.buffers.vertices.buffer, 0, vertices_bytes);
+      t.upload_buffer(asset_mesh.buffers.vertices.buffer, 0, vertices_bytes);
 
       auto indices_bytes = std::as_bytes(std::span(indices));
       asset_mesh.buffers.indices = bb.build_buffer(
@@ -135,7 +198,7 @@ auto load(tr::renderer::ImageBuilder& /*ib*/, tr::renderer::BufferBuilder& bb, t
               .flags = 0,
           },
           std::format("index buffer for {}", mesh.name));
-      t.upload(asset_mesh.buffers.indices->buffer, 0, indices_bytes);
+      t.upload_buffer(asset_mesh.buffers.indices->buffer, 0, indices_bytes);
 
       asset_mesh.transform = 0.1F * asset_mesh.transform;
       meshes.push_back(asset_mesh);
@@ -156,7 +219,8 @@ auto tr::Gltf::load_from_file(tr::renderer::ImageBuilder& ib, tr::renderer::Buff
 
   {
     auto loaded = [&] {
-      const auto options = fastgltf::Options::LoadGLBBuffers | fastgltf::Options::LoadExternalBuffers;
+      const auto options = fastgltf::Options::LoadGLBBuffers | fastgltf::Options::LoadExternalBuffers |
+                           fastgltf::Options::LoadExternalImages;
 
       switch (fastgltf::determineGltfFileType(&data)) {
         case fastgltf::GltfType::glTF:

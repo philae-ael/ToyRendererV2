@@ -114,6 +114,7 @@ enum ImageUsageBits {
   IMAGE_USAGE_COLOR_BIT = 1 << 1,
   IMAGE_USAGE_DEPTH_BIT = 1 << 2,
   IMAGE_USAGE_SAMPLED_BIT = 1 << 3,
+  IMAGE_USAGE_TRANSFER_DST_BIT = 1 << 4,
 };
 
 using ImageUsage = std::uint32_t;
@@ -138,6 +139,9 @@ struct ImageRessource {
     if (dst.layout != sync_info.layout || dst.queueFamilyIndex != sync_info.queueFamilyIndex) {
       VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
       if ((usage & ImageUsageBits::IMAGE_USAGE_COLOR_BIT) != 0) {
+        aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
+      }
+      if ((usage & ImageUsageBits::IMAGE_USAGE_SAMPLED_BIT) != 0) {
         aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
       }
       if ((usage & ImageUsageBits::IMAGE_USAGE_DEPTH_BIT) != 0) {
@@ -190,28 +194,30 @@ struct FrameRessourceManager {
 
 enum ImageOptionsFlagBits {
   IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT = 1 << 0,
-  IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT = 1 << 1,  // VK_FORMAT_R8G8B8A8_UINT
-  IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT = 1 << 2,
-  IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT = 1 << 3,  // VK_FORMAT_D32_SFLOAT
-  IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT = 1 << 4,
-  IMAGE_OPTION_FLAG_COLOR_ATTACHMENT_BIT = 1 << 5,
-  IMAGE_OPTION_FLAG_TEXTURE_ATTACHMENT_BIT = 1 << 6,
+  IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT = 1 << 1,
+  IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT = 1 << 2,  // VK_FORMAT_R8G8B8A8_UINT
+  IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT = 1 << 3,
+  IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT = 1 << 4,  // VK_FORMAT_D32_SFLOAT
+  IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT = 1 << 5,
+  IMAGE_OPTION_FLAG_COLOR_ATTACHMENT_BIT = 1 << 6,
+  IMAGE_OPTION_FLAG_TEXTURE_ATTACHMENT_BIT = 1 << 7,
 };
 using ImageOptionsFlags = std::uint32_t;
 
 struct ImageDefinition {
   ImageOptionsFlags flags;
   ImageUsage usage;
+  std::optional<VkExtent2D> size;
 
-  auto format(Swapchain& swapchain) const -> VkFormat {
+  [[nodiscard]] auto format(const Swapchain& swapchain) const -> VkFormat {
     TR_ASSERT(
         std::popcount(
-            (flags & (IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT | IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT |
+            (flags & (IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT | IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT |
                       IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT | IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT))) == 1,
         "exacly one format has to be specified");
 
-    if ((flags & IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT) != 0) {
-      return VK_FORMAT_B8G8R8A8_UNORM;
+    if ((flags & IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT) != 0) {
+      return VK_FORMAT_R8G8B8A8_UNORM;
     }
 
     if ((flags & IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT) != 0) {
@@ -240,6 +246,9 @@ struct ImageDefinition {
     if ((usage & IMAGE_USAGE_SAMPLED_BIT) != 0) {
       ret |= VK_IMAGE_USAGE_SAMPLED_BIT;
     }
+    if ((usage & IMAGE_USAGE_TRANSFER_DST_BIT) != 0) {
+      ret |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
     return ret;
   }
   [[nodiscard]] auto aspect_mask() const -> VkImageAspectFlags {
@@ -247,10 +256,33 @@ struct ImageDefinition {
     if ((usage & ImageUsageBits::IMAGE_USAGE_COLOR_BIT) != 0) {
       aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
     }
+    if ((usage & ImageUsageBits::IMAGE_USAGE_SAMPLED_BIT) != 0) {
+      aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
+    }
     if ((usage & ImageUsageBits::IMAGE_USAGE_DEPTH_BIT) != 0) {
       aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
     }
     return aspectMask;
+  }
+
+  [[nodiscard]] auto extent(const Swapchain& swapchain) const -> VkExtent3D {
+    if ((flags & IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT) != 0) {
+      return VkExtent3D{
+          .width = swapchain.extent.width,
+          .height = swapchain.extent.height,
+          .depth = 1,
+      };
+    }
+    if ((flags & IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT) != 0) {
+      TR_ASSERT(size, " IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT is set but size is not set");
+      return VkExtent3D{
+          .width = size->width,
+          .height = size->height,
+          .depth = 1,
+      };
+    }
+
+    TR_ASSERT(false, "No Flag for image size!");
   }
 };
 
@@ -262,6 +294,7 @@ class ImageBuilder {
   [[nodiscard]] auto build_image(ImageDefinition definition, std::string_view debug_name) const -> ImageRessource {
     const auto format = definition.format(*swapchain);
     const auto aspect_mask = definition.aspect_mask();
+    const auto extent = definition.extent(*swapchain);
 
     VkImageCreateInfo image_create_info{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -269,12 +302,7 @@ class ImageBuilder {
         .flags = 0,
         .imageType = VK_IMAGE_TYPE_2D,
         .format = format,
-        .extent =
-            VkExtent3D{
-                .width = swapchain->extent.width,
-                .height = swapchain->extent.height,
-                .depth = 1,
-            },
+        .extent = extent,
         .mipLevels = 1,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -331,7 +359,7 @@ class ImageBuilder {
  private:
   VkDevice device;
   VmaAllocator allocator;
-  Swapchain* swapchain;
+  const Swapchain* swapchain;
 };
 
 // Storage for ressources that are used based on frame_id

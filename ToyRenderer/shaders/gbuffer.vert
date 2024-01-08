@@ -7,6 +7,7 @@ layout(location = 3) in vec2 uv;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 fragNormal;
+layout(location = 2) out vec2 fragUV;
 
 layout(set = 0, binding = 0) uniform Global{
     mat4 projMat;
@@ -21,5 +22,6 @@ void main() {
     gl_Position = projMat * viewMat * modelMat * vec4(pos, 1.0);
 
     fragColor = vec3(1);
+    fragUV = uv;
     fragNormal = normal;
 }

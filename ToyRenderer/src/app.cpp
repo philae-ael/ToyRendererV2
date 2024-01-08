@@ -36,8 +36,8 @@ tr::App::App(tr::Options options) : options(options) {
     subsystems.imgui.init(subsystems.platform.window, subsystems.engine);
   }
 
-  auto t = subsystems.engine.start_transfer();
   {
+    auto t = subsystems.engine.start_transfer();
     auto bb = subsystems.engine.buffer_builder();
     auto ib = subsystems.engine.image_builder();
 
@@ -56,8 +56,8 @@ tr::App::App(tr::Options options) : options(options) {
     }
 
     subsystems.engine.end_transfer(std::move(t));
-    subsystems.engine.sync();
   }
+  subsystems.engine.sync();
 }
 
 void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input(event); }

@@ -63,6 +63,7 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
 
   const auto descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_0).build(device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_1).build(device),
   });
   const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
       {

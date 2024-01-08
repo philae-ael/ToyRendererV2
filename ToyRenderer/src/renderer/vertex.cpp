@@ -1,6 +1,7 @@
 
 #include "vertex.h"
 
+#include <utils/cast.h>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
@@ -9,8 +10,8 @@
 #include <cstdint>
 #include <cstring>
 #include <span>
-#include <utils/cast.h>
 
+#include "ressources.h"
 #include "utils.h"
 #include "utils/assert.h"
 
@@ -56,6 +57,29 @@ auto tr::renderer::StagingBuffer::commit(VkCommandBuffer cmd, VkBuffer dst, uint
       .size = to_upload,
   };
   vkCmdCopyBuffer(cmd, buffer, dst, 1, &region);
+
+  offset += to_upload;
+  used = false;
+  return *this;
+}
+auto tr::renderer::StagingBuffer::commit_image(VkCommandBuffer cmd, const ImageRessource &image, VkRect2D r)
+    -> StagingBuffer & {
+  VkBufferImageCopy region{
+      .bufferOffset = offset,
+      .bufferRowLength = 0,
+      .bufferImageHeight = 0,
+      .imageSubresource =
+          {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .mipLevel = 0,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+      .imageOffset = {r.offset.x, r.offset.y, 0},
+      .imageExtent = {r.extent.width, r.extent.height, 1},
+  };
+
+  vkCmdCopyBufferToImage(cmd, buffer, image.image, image.sync_info.layout, 1, &region);
 
   offset += to_upload;
   used = false;

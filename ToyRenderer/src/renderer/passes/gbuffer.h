@@ -12,7 +12,7 @@
 namespace tr::renderer {
 
 struct GBuffer {
-  std::array<VkDescriptorSetLayout, 1> descriptor_set_layouts{};
+  std::array<VkDescriptorSetLayout, 2> descriptor_set_layouts{};
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
 
@@ -28,27 +28,30 @@ struct GBuffer {
   static constexpr std::array set_1 = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
-          .descriptor_type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
           .descriptor_count(1)
-          .stages(VK_SHADER_STAGE_VERTEX_BIT)
+          .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(),
   });
 
   static constexpr std::array definitions = utils::to_array<ImageDefinition>({
       {
           // fb0
-          .flags = IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
+          .flags = IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
           .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
+          .size = {},
       },
       {
           // fb1
-          .flags = IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
+          .flags = IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
           .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
+          .size = {},
       },
       {
           // depth
           .flags = IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
           .usage = IMAGE_USAGE_DEPTH_BIT,
+          .size = {},
       },
   });
 

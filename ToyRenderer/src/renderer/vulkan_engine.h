@@ -7,8 +7,6 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <cstddef>
-#include <cstdlib>
 #include <optional>
 
 #include "../camera.h"
@@ -114,7 +112,7 @@ class VulkanEngine {
   Device device;
   VmaAllocator allocator = nullptr;
   DescriptorAllocator global_descriptor_allocator{};
-  DescriptorAllocator frame_descriptor_allocator{};
+  std::array<DescriptorAllocator, MAX_FRAMES_IN_FLIGHT> frame_descriptor_allocators{};
   std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> deferred_descriptors{};
   std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> camera_descriptors{};
   std::array<BufferRessource, MAX_FRAMES_IN_FLIGHT> gbuffer_camera_buffer{};

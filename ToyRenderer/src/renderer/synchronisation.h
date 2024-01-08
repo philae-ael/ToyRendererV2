@@ -92,4 +92,11 @@ static constexpr SyncInfo SyncPresent{
     .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 };
 
+static constexpr SyncInfo SyncImageTransfer{
+    .accessMask = 0,
+    .stageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+    .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+};
+
 }  // namespace tr::renderer

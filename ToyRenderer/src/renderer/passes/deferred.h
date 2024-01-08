@@ -34,6 +34,7 @@ struct Deferred {
           // swapchain
           .flags = IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
           .usage = IMAGE_USAGE_COLOR_BIT,
+          .size = {},
       },
   });
 
