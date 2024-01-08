@@ -117,7 +117,7 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
     }
 
     VK_UNWRAP(vkCreateInstance, &createInfo, nullptr, &instance.vk_instance);
-    load_extensions(instance.vk_instance, ExtensionFlags::DEBUG_UTILS);
+    load_extensions(instance.vk_instance, EXTENSION_FLAG_DEBUG_UTILS);
 
     if (options.debug.validations_layers) {
       VK_UNWRAP(vkCreateDebugUtilsMessengerEXT, instance.vk_instance, &createInfoDebugUtils, nullptr,
@@ -183,8 +183,7 @@ VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
                 "[{}] - ({}:{}): 1st object affected {} "
                 "(type: {}, name:\"{}\")",
                 reason, pCallbackData->pMessageIdName, pCallbackData->pMessageIdName,
-                pCallbackData->pObjects[0].objectHandle,
-                tr::renderer::vkObjectTypeName(pCallbackData->pObjects[0].objectType), objectName);
+                pCallbackData->pObjects[0].objectHandle, pCallbackData->pObjects[0].objectType, objectName);
   }
 
   return VK_FALSE;

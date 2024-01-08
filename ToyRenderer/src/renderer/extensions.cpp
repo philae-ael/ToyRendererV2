@@ -16,10 +16,12 @@
 // Quite unexpectedly, it works very well
 //
 // To add a function to load, juste add a
-// LOAD(nameofthefucntion, numberofarguments) and everything should be automatic
+// LOAD(ExtensionFlags, nameofthefucntion, numberofarguments) and everything should be automatic
 //
-// load_extensions(VkInstance instance) should be called before trying to call
+// load_extensions(VkInstance instance, ExtensionFlags flags) should be called before trying to call
 // any function, otherwise it wont work
+//
+// For extension flags see extensions.h
 //
 // I don't think i use any UB, except for the not_loaded function
 // (and it doesn't matter)
@@ -27,17 +29,17 @@
 // playing too much in this file may crash clangd (OOM) so be careful
 
 #define EXTENSIONS                                      \
-  LOAD(DEBUG_UTILS, vkSetDebugUtilsObjectNameEXT, 2)    \
-  LOAD(DEBUG_UTILS, vkSetDebugUtilsObjectTagEXT, 2)     \
-  LOAD(DEBUG_UTILS, vkQueueBeginDebugUtilsLabelEXT, 2)  \
-  LOAD(DEBUG_UTILS, vkQueueEndDebugUtilsLabelEXT, 1)    \
-  LOAD(DEBUG_UTILS, vkQueueInsertDebugUtilsLabelEXT, 2) \
-  LOAD(DEBUG_UTILS, vkCmdBeginDebugUtilsLabelEXT, 2)    \
-  LOAD(DEBUG_UTILS, vkCmdEndDebugUtilsLabelEXT, 1)      \
-  LOAD(DEBUG_UTILS, vkCmdInsertDebugUtilsLabelEXT, 2)   \
-  LOAD(DEBUG_UTILS, vkCreateDebugUtilsMessengerEXT, 4)  \
-  LOAD(DEBUG_UTILS, vkDestroyDebugUtilsMessengerEXT, 3) \
-  LOAD(DEBUG_UTILS, vkSubmitDebugUtilsMessageEXT, 4)
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkSetDebugUtilsObjectNameEXT, 2)    \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkSetDebugUtilsObjectTagEXT, 2)     \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkQueueBeginDebugUtilsLabelEXT, 2)  \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkQueueEndDebugUtilsLabelEXT, 1)    \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkQueueInsertDebugUtilsLabelEXT, 2) \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkCmdBeginDebugUtilsLabelEXT, 2)    \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkCmdEndDebugUtilsLabelEXT, 1)      \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkCmdInsertDebugUtilsLabelEXT, 2)   \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkCreateDebugUtilsMessengerEXT, 4)  \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkDestroyDebugUtilsMessengerEXT, 3) \
+  LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkSubmitDebugUtilsMessageEXT, 4)
 // NOLINTBEGIN
 
 #define EVAL(a) a
@@ -123,7 +125,7 @@ using arg_t = info_type<N, F>::arg_t;
 #define g1() g2
 #define g0() g1
 
-#define ARG(M) ar##M
+#define ARG(g) ar##g
 
 #define LOAD(section, name, N) \
   return_t<PFN_##name> name(ARG_LIST(PFN_##name, 0, g##0, M##N())) { return pfn_##name(CALL_LIST(g##0, M##N())); }

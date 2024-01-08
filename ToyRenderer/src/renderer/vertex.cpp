@@ -77,6 +77,12 @@ auto tr::renderer::TriangleVertexBuffer(tr::renderer::Device &device, VkCommandB
       .pQueueFamilyIndices = queues.data(),
   };
 
+  if (device.queues.graphics_family == device.queues.transfer_family) {
+    buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    buffer_create_info.queueFamilyIndexCount = 0;
+    buffer_create_info.pQueueFamilyIndices = nullptr;
+  }
+
   VK_UNWRAP(vkCreateBuffer, device.vk_device, &buffer_create_info, nullptr, &buf);
 
   VkMemoryRequirements memory_requirements{};

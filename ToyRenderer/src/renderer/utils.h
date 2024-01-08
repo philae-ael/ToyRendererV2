@@ -19,8 +19,6 @@ namespace tr::renderer {
 auto check_extensions(const char* kind, std::span<const char* const> required,
                       std::span<VkExtensionProperties> available_extensions) -> bool;
 
-auto vkObjectTypeName(VkObjectType) -> const char*;
-
 }  // namespace tr::renderer
 
 template <>
@@ -86,6 +84,7 @@ struct fmt::formatter<VkResult> : formatter<std::string_view> {
     return fmt::format_to(ctx.out(), "{}", value);
   }
 };
+
 template <>
 struct fmt::formatter<VkColorSpaceKHR> : formatter<std::string_view> {
   auto format(VkColorSpaceKHR result, format_context& ctx) const -> format_context::iterator {  // NOLINT
@@ -382,6 +381,73 @@ struct fmt::formatter<VkFormat> : formatter<std::string_view> {
       CASE(VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR)
       CASE(VK_FORMAT_A8_UNORM_KHR)
       CASE(VK_FORMAT_MAX_ENUM)
+    }
+#undef CASE
+    return fmt::format_to(ctx.out(), "{}", value);
+  }
+};
+
+template <>
+struct fmt::formatter<VkObjectType> : formatter<std::string_view> {
+  auto format(VkObjectType result, format_context& ctx) const -> format_context::iterator {  // NOLINT
+    string_view value = "unknown";
+
+#define CASE(name) \
+  case name:       \
+    value = #name; \
+    break;
+
+    switch (result) {
+      CASE(VK_OBJECT_TYPE_UNKNOWN)
+      CASE(VK_OBJECT_TYPE_INSTANCE)
+      CASE(VK_OBJECT_TYPE_PHYSICAL_DEVICE)
+      CASE(VK_OBJECT_TYPE_DEVICE)
+      CASE(VK_OBJECT_TYPE_QUEUE)
+      CASE(VK_OBJECT_TYPE_SEMAPHORE)
+      CASE(VK_OBJECT_TYPE_COMMAND_BUFFER)
+      CASE(VK_OBJECT_TYPE_FENCE)
+      CASE(VK_OBJECT_TYPE_DEVICE_MEMORY)
+      CASE(VK_OBJECT_TYPE_BUFFER)
+      CASE(VK_OBJECT_TYPE_IMAGE)
+      CASE(VK_OBJECT_TYPE_EVENT)
+      CASE(VK_OBJECT_TYPE_QUERY_POOL)
+      CASE(VK_OBJECT_TYPE_BUFFER_VIEW)
+      CASE(VK_OBJECT_TYPE_IMAGE_VIEW)
+      CASE(VK_OBJECT_TYPE_SHADER_MODULE)
+      CASE(VK_OBJECT_TYPE_PIPELINE_CACHE)
+      CASE(VK_OBJECT_TYPE_PIPELINE_LAYOUT)
+      CASE(VK_OBJECT_TYPE_RENDER_PASS)
+      CASE(VK_OBJECT_TYPE_PIPELINE)
+      CASE(VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT)
+      CASE(VK_OBJECT_TYPE_SAMPLER)
+      CASE(VK_OBJECT_TYPE_DESCRIPTOR_POOL)
+      CASE(VK_OBJECT_TYPE_DESCRIPTOR_SET)
+      CASE(VK_OBJECT_TYPE_FRAMEBUFFER)
+      CASE(VK_OBJECT_TYPE_COMMAND_POOL)
+      CASE(VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION)
+      CASE(VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE)
+      CASE(VK_OBJECT_TYPE_PRIVATE_DATA_SLOT)
+      CASE(VK_OBJECT_TYPE_SURFACE_KHR)
+      CASE(VK_OBJECT_TYPE_SWAPCHAIN_KHR)
+      CASE(VK_OBJECT_TYPE_DISPLAY_KHR)
+      CASE(VK_OBJECT_TYPE_DISPLAY_MODE_KHR)
+      CASE(VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT)
+      CASE(VK_OBJECT_TYPE_VIDEO_SESSION_KHR)
+      CASE(VK_OBJECT_TYPE_VIDEO_SESSION_PARAMETERS_KHR)
+      CASE(VK_OBJECT_TYPE_CU_MODULE_NVX)
+      CASE(VK_OBJECT_TYPE_CU_FUNCTION_NVX)
+      CASE(VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT)
+      CASE(VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR)
+      CASE(VK_OBJECT_TYPE_VALIDATION_CACHE_EXT)
+      CASE(VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV)
+      CASE(VK_OBJECT_TYPE_PERFORMANCE_CONFIGURATION_INTEL)
+      CASE(VK_OBJECT_TYPE_DEFERRED_OPERATION_KHR)
+      CASE(VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NV)
+      CASE(VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA)
+      CASE(VK_OBJECT_TYPE_MICROMAP_EXT)
+      CASE(VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV)
+      CASE(VK_OBJECT_TYPE_SHADER_EXT)
+      CASE(VK_OBJECT_TYPE_MAX_ENUM)
     }
 #undef CASE
     return fmt::format_to(ctx.out(), "{}", value);

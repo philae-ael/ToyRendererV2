@@ -1,6 +1,7 @@
 #include "platform.h"
 
 #include <GLFW/glfw3.h>
+#include <spdlog/spdlog.h>
 #include <utils/assert.h>
 
 #include <cstdint>
@@ -37,7 +38,7 @@ void tr::system::Platform::init(tr::App* new_app) {
   TR_ASSERT(glfwInit() != 0, "could not initializa GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
   this->app = new_app;
 

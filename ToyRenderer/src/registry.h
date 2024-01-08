@@ -1,9 +1,11 @@
 #pragma once
 
+#include <json/json.h>
+#include <json/reader.h>
+#include <json/writer.h>
 #include <spdlog/spdlog.h>
 
 #include <fstream>
-#include <json/json.h>
 
 namespace tr {
 class Registry {
@@ -17,16 +19,16 @@ class Registry {
 
   static void load() {
     std::ifstream i("registry.json");
-    try {
-      i >> global();
-    } catch (...) {
-      spdlog::error("invalid or empty json file, content will be discarded");
-      global() = {};
-    }
+    Json::parseFromStream(Json::CharReaderBuilder{}, i, &global(), nullptr);
   }
+
   static void save() {
+    Json::StreamWriterBuilder wbuilder;
+    wbuilder["indentation"] = "    ";
+
     std::ofstream o("registry.json");
-    o << std::setw(4) << global() << std::endl;
+    o << Json::writeString(wbuilder, global());
+    o.close();
   }
 };
 }  // namespace tr
