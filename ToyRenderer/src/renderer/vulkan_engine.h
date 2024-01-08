@@ -7,9 +7,9 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <chrono>
 #include <cstddef>
 #include <cstdlib>
+#include <optional>
 
 #include "debug.h"
 #include "deletion_queue.h"
@@ -19,11 +19,7 @@
 #include "renderpass.h"
 #include "surface.h"
 #include "swapchain.h"
-#include "timeline_info.h"
-#include "timestamp.h"
 #include "utils.h"
-#include "utils/math.h"
-#include "utils/timer.h"
 #include "vertex.h"
 
 namespace tr::system {
@@ -32,8 +28,6 @@ class Imgui;
 
 namespace tr::renderer {
 
-const std::size_t MAX_IN_FLIGHT = 1;
-
 class VulkanEngine {
  public:
   VulkanEngine() = default;
@@ -41,11 +35,12 @@ class VulkanEngine {
 
   void on_resize() { fb_resized = true; }
 
-  auto start_frame() -> std::pair<bool, Frame>;
+  auto start_frame() -> std::optional<Frame>;
   void draw(Frame);
   void end_frame(Frame);
 
-  void record_timeline();
+  void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
+  void rebuild_swapchain();
 
   ~VulkanEngine();
 
@@ -54,73 +49,53 @@ class VulkanEngine {
   auto operator=(const VulkanEngine&) -> VulkanEngine& = delete;
   auto operator=(VulkanEngine&&) -> VulkanEngine& = delete;
 
-  void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
-  void rebuild_swapchain();
-
-  void imgui();
+  friend VulkanEngineDebugInfo;
+  VulkanEngineDebugInfo debug_info;
 
  private:
-  friend system::Imgui;
-
   GLFWwindow* window{};
 
-  // Cleaned at exit
-  struct DeletionStacks {
+  // Lifetimes
+  struct {  // Cleaned at exit
     InstanceDeletionStack instance;
     DeviceDeletionStack device;
     VmaDeletionStack allocator;
   } global_deletion_stacks;
 
-  // Cleaned on swapchain recreation
-  DeviceDeletionStack swapchain_device_deletion_stack;
+  struct {  // Cleaned on swapchain recreation
+    DeviceDeletionStack device;
+  } swapchain_deletion_stacks;
 
-  // Cleaned every frame
-  DeviceDeletionStack frame_device_deletion_stack;
+  struct {
+    DeviceDeletionStack device;
+    VmaDeletionStack allocator;
+  } frame_deletion_stacks;
 
-  Renderdoc renderdoc;
   Instance instance;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   Device device;
+  VmaAllocator allocator = nullptr;
 
-  // Swapchain relataed
-  Renderpass renderpass;
-  Swapchain swapchain;
-  bool fb_resized = false;
-
-  std::array<FrameSynchro, MAX_IN_FLIGHT> frame_synchronisation_pool;
-
-  // Buffer should be moved i guess
   VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
-  std::array<VkCommandBuffer, MAX_IN_FLIGHT> main_command_buffer_pool{};
-
   VkCommandPool transfer_command_pool = VK_NULL_HANDLE;
   VkCommandBuffer transfer_command_buffer{};
 
+  // Swapchain related
+  Swapchain swapchain;
+  bool fb_resized = false;
+  Renderpass renderpass;
+
+  // FRAME STUFF
+  std::size_t frame_id{};
+  std::array<FrameSynchro, MAX_FRAMES_IN_FLIGHT> frame_synchronisation_pool;
+  std::array<VkCommandBuffer, MAX_FRAMES_IN_FLIGHT> main_command_buffer_pool{};
+
+  // Data shall be moved, one day
+  Pipeline pipeline;
   Buffer triangle_vertex_buffer;
   StagingBuffer staging_buffer;
 
-  Pipeline pipeline;
-
-  VmaAllocator allocator = nullptr;
-
-  // DEBUG AND TIMING
-  void write_gpu_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index);
-  void write_cpu_timestamp(tr::renderer::CPUTimestampIndex index);
-
-  Timestamp<MAX_IN_FLIGHT, GPU_TIMESTAMP_INDEX_MAX> gpu_timestamps;
-  using cpu_timestamp_clock = std::chrono::high_resolution_clock;
-  std::array<cpu_timestamp_clock::time_point, CPU_TIMESTAMP_INDEX_MAX> cpu_timestamps;
-
-  std::array<utils::Timeline<float, 500>, GPU_TIME_PERIODS.size()> gpu_timelines{};
-  std::array<utils::math::KalmanFilter<float>, GPU_TIME_PERIODS.size()> avg_gpu_timelines{};
-
-  std::array<utils::Timeline<float, 500>, CPU_TIME_PERIODS.size()> cpu_timelines{};
-  std::array<utils::math::KalmanFilter<float>, CPU_TIME_PERIODS.size()> avg_cpu_timelines{};
-
-  std::array<utils::Timeline<float, 500>, VK_MAX_MEMORY_HEAPS> gpu_heaps_usage{};
-  utils::Timeline<float, 500> gpu_memory_usage{};
-
-  std::size_t frame_id{};
+  friend system::Imgui;
 };
 
 }  // namespace tr::renderer

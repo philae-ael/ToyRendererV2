@@ -7,19 +7,13 @@
 #include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <set>
 #include <vector>
 
+#include "constants.h"
 #include "utils.h"
-
-const std::array<const char*, 3> device_extension{
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-    VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
-};
 
 void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkSurfaceKHR surface) {
   std::uint32_t device_count = 0;
@@ -57,9 +51,13 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
 
       std::vector<VkExtensionProperties> available_extensions(extension_count);
       vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, available_extensions.data());
-      if (!tr::renderer::check_extensions("devices", device_extension, available_extensions)) {
+      auto extensions = tr::renderer::check_extensions("devices", tr::renderer::REQUIRED_DEVICE_EXTENSIONS,
+                                                       tr::renderer::OPTIONAL_DEVICE_EXTENSIONS, available_extensions);
+      if (!extensions.has_value()) {
         continue;
       }
+
+      device.extensions = *extensions;
     }
     {
       std::uint32_t surface_format_count = 0;
@@ -110,7 +108,7 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
     }
 
     // We take the 1st one suitable
-    spdlog::debug("\tDevice is suitable!");
+    spdlog::debug("Device is suitable!");
     device.physical_device = physical_device;
     break;
   }
@@ -153,6 +151,12 @@ void init_device(tr::renderer::Device& device) {
 
   vulkan12_features.pNext = &dynamic_rendering_features;
 
+  std::vector<const char*> extensions;
+  extensions.reserve(device.extensions.size());
+  for (auto& extension : device.extensions) {
+    extensions.push_back(extension.c_str());
+  }
+
   VkDeviceCreateInfo device_create_info{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .pNext = &vulkan12_features,
@@ -161,8 +165,8 @@ void init_device(tr::renderer::Device& device) {
       .pQueueCreateInfos = queue_create_infos.data(),
       .enabledLayerCount = 0,
       .ppEnabledLayerNames = nullptr,
-      .enabledExtensionCount = utils::narrow_cast<std::uint32_t>(device_extension.size()),
-      .ppEnabledExtensionNames = device_extension.data(),
+      .enabledExtensionCount = utils::narrow_cast<std::uint32_t>(extensions.size()),
+      .ppEnabledExtensionNames = extensions.data(),
       .pEnabledFeatures = nullptr,
   };
 

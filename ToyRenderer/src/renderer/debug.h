@@ -3,7 +3,14 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
-#include "utils.h"
+#include <cstddef>
+
+#include "constants.h"
+#include "swapchain.h"
+#include "timeline_info.h"
+#include "timestamp.h"
+#include "utils/timer.h"
+
 namespace tr::renderer {
 
 class DebugCmdScope {
@@ -69,5 +76,33 @@ void set_debug_object_name(VkDevice device, VkObjectType type, T t, const char *
   };
   vkSetDebugUtilsObjectNameEXT(device, &name_info);
 }
+
+class VulkanEngine;
+
+struct VulkanEngineDebugInfo {
+  void set_frame(tr::renderer::Frame frame, std::size_t frame_id);
+  void write_gpu_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index);
+  void write_cpu_timestamp(tr::renderer::CPUTimestampIndex index);
+  void record_timeline(VulkanEngine &);
+  void imgui(VulkanEngine &);
+
+  Frame current_frame{};
+  std::size_t current_frame_id{};
+
+  GPUTimestamp<MAX_FRAMES_IN_FLIGHT, GPU_TIMESTAMP_INDEX_MAX> gpu_timestamps;
+  using cpu_timestamp_clock = std::chrono::high_resolution_clock;
+  std::array<cpu_timestamp_clock::time_point, CPU_TIMESTAMP_INDEX_MAX> cpu_timestamps;
+
+  std::array<utils::Timeline<float, 500>, GPU_TIME_PERIODS.size()> gpu_timelines{};
+  std::array<utils::math::KalmanFilter<float>, GPU_TIME_PERIODS.size()> avg_gpu_timelines{};
+
+  std::array<utils::Timeline<float, 500>, CPU_TIME_PERIODS.size()> cpu_timelines{};
+  std::array<utils::math::KalmanFilter<float>, CPU_TIME_PERIODS.size()> avg_cpu_timelines{};
+
+  std::array<utils::Timeline<float, 500>, VK_MAX_MEMORY_HEAPS> gpu_heaps_usage{};
+  utils::Timeline<float, 500> gpu_memory_usage{};
+
+  Renderdoc renderdoc;
+};
 
 }  // namespace tr::renderer

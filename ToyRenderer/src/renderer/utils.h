@@ -1,9 +1,10 @@
 #pragma once
 
-#include <fmt/core.h>
+#include <format>
 #include <vulkan/vulkan_core.h>
 
-#include <cstdint>
+#include <optional>
+#include <set>
 #include <span>
 #include <string_view>
 
@@ -16,13 +17,13 @@
 
 namespace tr::renderer {
 
-auto check_extensions(const char* kind, std::span<const char* const> required,
-                      std::span<VkExtensionProperties> available_extensions) -> bool;
+auto check_extensions(const char* kind, std::span<const char* const> required, std::span<const char* const> optional,
+                      std::span<VkExtensionProperties> available) -> std::optional<std::set<std::string>>;
 
 }  // namespace tr::renderer
 
 template <>
-struct fmt::formatter<VkResult> : formatter<std::string_view> {
+struct std::formatter<VkResult> : formatter<std::string_view> {
   auto format(VkResult result, format_context& ctx) const -> format_context::iterator {  // NOLINT
     string_view value = "unknown";
 
@@ -81,12 +82,12 @@ struct fmt::formatter<VkResult> : formatter<std::string_view> {
       CASE(VK_RESULT_MAX_ENUM)
     }
 #undef CASE
-    return fmt::format_to(ctx.out(), "{}", value);
+    return std::format_to(ctx.out(), "{}", value);
   }
 };
 
 template <>
-struct fmt::formatter<VkColorSpaceKHR> : formatter<std::string_view> {
+struct std::formatter<VkColorSpaceKHR> : formatter<std::string_view> {
   auto format(VkColorSpaceKHR result, format_context& ctx) const -> format_context::iterator {  // NOLINT
     string_view value = "unknown";
 
@@ -115,12 +116,12 @@ struct fmt::formatter<VkColorSpaceKHR> : formatter<std::string_view> {
       CASE(VK_COLOR_SPACE_MAX_ENUM_KHR)
     }
 #undef CASE
-    return fmt::format_to(ctx.out(), "{}", value);
+    return std::format_to(ctx.out(), "{}", value);
   }
 };
 
 template <>
-struct fmt::formatter<VkFormat> : formatter<std::string_view> {
+struct std::formatter<VkFormat> : formatter<std::string_view> {
   auto format(VkFormat result, format_context& ctx) const -> format_context::iterator {  // NOLINT
     string_view value = "unknown";
 
@@ -383,12 +384,12 @@ struct fmt::formatter<VkFormat> : formatter<std::string_view> {
       CASE(VK_FORMAT_MAX_ENUM)
     }
 #undef CASE
-    return fmt::format_to(ctx.out(), "{}", value);
+    return std::format_to(ctx.out(), "{}", value);
   }
 };
 
 template <>
-struct fmt::formatter<VkObjectType> : formatter<std::string_view> {
+struct std::formatter<VkObjectType> : formatter<std::string_view> {
   auto format(VkObjectType result, format_context& ctx) const -> format_context::iterator {  // NOLINT
     string_view value = "unknown";
 
@@ -450,6 +451,6 @@ struct fmt::formatter<VkObjectType> : formatter<std::string_view> {
       CASE(VK_OBJECT_TYPE_MAX_ENUM)
     }
 #undef CASE
-    return fmt::format_to(ctx.out(), "{}", value);
+    return std::format_to(ctx.out(), "{}", value);
   }
 };

@@ -3,11 +3,12 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
+#include <set>
 
 #include "deletion_queue.h"
 #include "utils/assert.h"
-#include "utils/types.h"
 #include "utils/cast.h"
+#include "utils/types.h"
 
 struct GLFWwindow;
 
@@ -21,6 +22,8 @@ struct Device : utils::types::threadsafe {
 
   VkPhysicalDevice physical_device = VK_NULL_HANDLE;
   VkDevice vk_device = VK_NULL_HANDLE;
+
+  std::set<std::string> extensions;
 
   VkPhysicalDeviceProperties device_properties{};
   VkPhysicalDeviceMemoryProperties memory_properties{};

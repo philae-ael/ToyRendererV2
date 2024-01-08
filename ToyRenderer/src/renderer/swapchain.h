@@ -8,8 +8,8 @@
 #include "../options.h"
 #include "deletion_queue.h"
 #include "device.h"
+#include "queue.h"
 #include "surface.h"
-#include "utils/cast.h"
 
 namespace tr::renderer {
 
@@ -47,22 +47,12 @@ struct Frame {
   FrameSynchro synchro;
   OneTimeCommandBuffer cmd{};
 
-  auto submitCmds(Device &device, std::span<VkCommandBuffer> cmds) const -> VkResult {
-    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-    VkSubmitInfo submit = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = nullptr,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &synchro.present_semaphore,
-        .pWaitDstStageMask = &wait_stage,
-        .commandBufferCount = utils::narrow_cast<std::uint32_t>(cmds.size()),
-        .pCommandBuffers = cmds.data(),
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &synchro.render_semaphore,
-    };
-
-    return vkQueueSubmit(device.queues.graphics_queue, 1, &submit, synchro.render_fence);
+  auto submitCmds(VkQueue queue) const -> VkResult {
+    return QueueSubmit{}
+        .wait_semaphores<1>({{synchro.present_semaphore}}, {{VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}})
+        .signal_semaphores({{synchro.render_semaphore}})
+        .command_buffers({{cmd.vk_cmd}})
+        .submit(queue, synchro.render_fence);
   }
 
   auto present(Device &device, VkSwapchainKHR swapchain) const -> VkResult {

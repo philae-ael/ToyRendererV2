@@ -42,10 +42,11 @@ void tr::App::run() {
 
     update();
 
-    if (auto [ok, frame] = subsystems.engine.start_frame(); ok) {
+    if (auto frame_opt = subsystems.engine.start_frame(); frame_opt.has_value()) {
+      auto frame = frame_opt.value();
       subsystems.engine.draw(frame);
       if (subsystems.imgui.start_frame()) {
-        subsystems.engine.imgui();
+        subsystems.engine.debug_info.imgui(subsystems.engine);
         subsystems.imgui.draw(subsystems.engine, frame);
       }
       subsystems.engine.end_frame(frame);
@@ -56,7 +57,7 @@ void tr::App::run() {
 
     auto elapsed = state.frame_timer.elapsed();
     spdlog::trace("Frame took {:.1f}us or {:.0f} FPS", elapsed * 1000, 1000. / elapsed);
-    subsystems.engine.record_timeline();
+    subsystems.engine.debug_info.record_timeline(subsystems.engine);
   }
 
   subsystems.engine.sync();

@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <set>
 #include <span>
 
 #include "../options.h"
@@ -16,5 +17,8 @@ struct Instance {
   }
   VkInstance vk_instance = VK_NULL_HANDLE;
   VkDebugUtilsMessengerEXT vk_debug_utils_messenger_ext = VK_NULL_HANDLE;
+
+  std::set<std::string> extensions;
+  std::set<std::string> validation_layers;
 };
 }  // namespace tr::renderer

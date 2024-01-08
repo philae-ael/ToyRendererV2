@@ -3,7 +3,6 @@
         "jsoncpp",
         "vulkan",
         "spdlog",
-        "fmt",
         "glfw3",
         "glm",
         {

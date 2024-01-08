@@ -11,9 +11,9 @@
 namespace tr::renderer {
 
 template <const size_t FRAMES, const size_t QUERY_COUNT>
-struct Timestamp {
-  static auto init(Device &device) -> Timestamp {
-    Timestamp t{};
+struct GPUTimestamp {
+  static auto init(Device &device) -> GPUTimestamp {
+    GPUTimestamp t{};
     VkQueryPoolCreateInfo create_info{
         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
         .pNext = nullptr,

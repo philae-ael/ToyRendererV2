@@ -1,22 +1,18 @@
 #include "instance.h"
 
+#include <spdlog/spdlog.h>
 #include <utils/assert.h>
+#include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
-#include <array>
+#include <algorithm>
 #include <iterator>
+#include <string>
+#include <vector>
 
+#include "constants.h"
 #include "extensions.h"
 #include "utils.h"
-#include "utils/cast.h"
-
-const std::array<std::string, 1> wanted_validation_layers{
-    "VK_LAYER_KHRONOS_validation",
-};
-
-const std::array<const char*, 1> REQUIRED_EXTENSIONS{
-    VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-};
 
 VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                           VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -27,55 +23,55 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
     -> tr::renderer::Instance {
   Instance instance;
 
-  std::vector<const char*> required_extensions{
-      REQUIRED_EXTENSIONS.begin(),
-      REQUIRED_EXTENSIONS.end(),
-  };
+  {
+    std::vector<const char*> required_extensions{
+        REQUIRED_INSTANCE_EXTENSIONS.begin(),
+        REQUIRED_INSTANCE_EXTENSIONS.end(),
+    };
 
-  std::copy(required_wsi_extensions.begin(), required_wsi_extensions.end(), std::back_inserter(required_extensions));
+    std::copy(required_wsi_extensions.begin(), required_wsi_extensions.end(), std::back_inserter(required_extensions));
 
-  std::vector<const char*> validation_layers{};
-  if (options.debug.validations_layers) {
-    required_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    if (options.debug.validations_layers) {
+      required_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-    std::uint32_t layer_count = 0;
-    vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
+      std::uint32_t layer_count = 0;
+      vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-    std::vector<VkLayerProperties> layers(layer_count);
-    vkEnumerateInstanceLayerProperties(&layer_count, layers.data());
+      std::vector<VkLayerProperties> layers(layer_count);
+      vkEnumerateInstanceLayerProperties(&layer_count, layers.data());
 
-    std::size_t satisfied_layer_count = 0;
-    spdlog::trace("Available layers:");
-    for (const auto& layer : layers) {
-      spdlog::trace("\t{}", layer.layerName);
+      spdlog::debug("Available layers:");
+      std::set<std::string> layers_set;
+      for (const auto& layer : layers) {
+        spdlog::debug("\t{}", layer.layerName);
+        layers_set.insert(layer.layerName);
+      }
 
-      for (const auto& wanted_layer : wanted_validation_layers) {
-        if (wanted_layer == layer.layerName) {
-          satisfied_layer_count += 1;
-          validation_layers.push_back(wanted_layer.c_str());
-        }
+      spdlog::debug("Wanted layers:");
+      for (const auto& wanted_layer : OPTIONAL_VALIDATION_LAYERS) {
+        spdlog::debug("\t{}", wanted_layer);
+      }
+      std::set<std::string> wanted_set{OPTIONAL_VALIDATION_LAYERS.begin(), OPTIONAL_VALIDATION_LAYERS.end()};
+
+      std::set_intersection(wanted_set.begin(), wanted_set.end(), layers_set.begin(), layers_set.end(),
+                            std::inserter(instance.validation_layers, instance.validation_layers.begin()));
+
+      if (OPTIONAL_VALIDATION_LAYERS.size() != instance.validation_layers.size()) {
+        spdlog::warn("{} wanted layers are satisfied out of {}", instance.validation_layers.size(),
+                     OPTIONAL_VALIDATION_LAYERS.size());
       }
     }
 
-    spdlog::trace("Wanted layers:");
-    for (const auto& wanted_layer : wanted_validation_layers) {
-      spdlog::trace("\t{}", wanted_layer);
-    }
-
-    if (wanted_validation_layers.size() != satisfied_layer_count) {
-      spdlog::warn("{} wanted layers are satisfied out of {}", satisfied_layer_count, wanted_validation_layers.size());
-    }
-  }
-
-  {
     std::uint32_t extension_count = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
 
     std::vector<VkExtensionProperties> available_extensions(extension_count);
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.data());
 
-    TR_ASSERT(check_extensions("instance", required_extensions, available_extensions),
-              "Required extensions are not satisfied");
+    auto extensions =
+        check_extensions("instance", required_extensions, OPTIONAL_INSTANCE_EXTENSIONS, available_extensions);
+    TR_ASSERT(extensions.has_value(), "Required extensions are not satisfied");
+    instance.extensions = *extensions;
   }
 
   {
@@ -103,6 +99,16 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
         .apiVersion = VK_API_VERSION_1_3,
     };
 
+    std::vector<const char*> extensions;
+    extensions.reserve(instance.extensions.size());
+    for (auto& extension : instance.extensions) {
+      extensions.push_back(extension.c_str());
+    }
+    std::vector<const char*> validation_layers;
+    validation_layers.reserve(instance.extensions.size());
+for (auto& layer : instance.validation_layers) {
+      validation_layers.push_back(layer.c_str());
+    }
     VkInstanceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = nullptr,
@@ -110,8 +116,8 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
         .pApplicationInfo = &appInfo,
         .enabledLayerCount = utils::narrow_cast<std::uint32_t>(validation_layers.size()),
         .ppEnabledLayerNames = validation_layers.data(),
-        .enabledExtensionCount = utils::narrow_cast<std::uint32_t>(required_extensions.size()),
-        .ppEnabledExtensionNames = required_extensions.data(),
+        .enabledExtensionCount = utils::narrow_cast<std::uint32_t>(extensions.size()),
+        .ppEnabledExtensionNames = extensions.data(),
     };
 
     if (options.debug.validations_layers) {

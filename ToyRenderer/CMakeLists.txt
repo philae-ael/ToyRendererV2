@@ -39,6 +39,8 @@ add_executable(ToyRenderer
     src/renderer/vertex.cpp
     src/renderer/vertex.h
     src/renderer/vma.cpp
+    src/renderer/queue.h
+    src/renderer/constants.h
     src/system/platform.h
     src/system/platform.cpp
     src/system/input.h

@@ -1,7 +1,5 @@
 #include "options.h"
 
-#include <fmt/core.h>
-#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include <utils/types.h>
 #include <vulkan/vulkan_core.h>
@@ -10,6 +8,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdlib>
+#include <format>
+#include <iostream>
 #include <list>
 #include <map>
 #include <ranges>
@@ -176,8 +176,42 @@ auto CliParser::parse(std::span<const char *> args) -> ParseResult {
 
 const std::size_t MAX_ARGS_SPACE = 20;
 
+void entry_usage(const Entry *entry, std::size_t args_space) {
+  std::string first_part{};
+  if (entry->info.short_name != 0) {
+    first_part = std::format("-{},", entry->info.short_name);
+  }
+
+  std::string description{entry->info.description};
+  if (entry->info.long_name.size() > MAX_ARGS_SPACE) {
+    description = std::format("\n{0: ^{1}} {2}", "", args_space + 8, description);
+  }
+  std::cout << std::format("  {0: ^3} --{1: <{2}} {3}", first_part, entry->info.long_name, args_space, description);
+
+  switch (entry->kind) {
+    case Entry::Kind::Count:
+      std::cout << std::format(" (can be repeated)");
+      break;
+    case Entry::Kind::Choice: {
+      std::string s;
+      for (std::size_t i = 0; i < entry->choice_entry.choices.size(); i++) {
+        auto &choice = entry->choice_entry.choices[i];
+
+        s += choice.first;
+        if (i != entry->choice_entry.choices.size() - 1) {
+          s += ", ";
+        }
+      }
+      std::cout << std::format(" (allowed values: {})", s);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 void usage(CliParser &parser, void * /*unused*/) {
-  fmt::print("Usage: {} [OPTION...]\n", parser.program_name);
+  std::cout << std::format("Usage: {} [OPTION...]\n", parser.program_name);
 
   std::map<std::string_view, std::list<const Entry *>> entries_per_section;
 
@@ -192,38 +226,17 @@ void usage(CliParser &parser, void * /*unused*/) {
 
   for (auto &[section, entries] : entries_per_section) {
     if (!section.empty()) {
-      fmt::print("\n{}:\n", section);
+      std::cout << std::format("\n{}:\n", section);
     }
 
-    for (const auto &entry : entries) {
-      std::string first_part{};
-      if (entry->info.short_name != 0) {
-        first_part = fmt::format("-{},", entry->info.short_name);
-      }
-
-      std::string description{entry->info.description};
-      if (entry->info.long_name.size() > MAX_ARGS_SPACE) {
-        description = fmt::format("\n{0: ^{1}} {2}", "", args_space + 8, description);
-      }
-      fmt::print("  {0: ^3} --{1: <{2}} {3}", first_part, entry->info.long_name, args_space, description);
-
-      switch (entry->kind) {
-        case Entry::Kind::Count:
-          fmt::print(" (can be repeated)");
-          break;
-        case Entry::Kind::Choice:
-          fmt::print(
-              " (allowed values: {})",
-              fmt::join(entry->choice_entry.choices | std::views::transform([](auto &c) { return c.first; }), ", "));
-          break;
-        default:
-          break;
-      }
-      fmt::print("\n");
+    for (const auto entry : entries) {
+      entry_usage(entry, args_space);
+      std::cout << std::format("\n");
     }
   }
+
   if (!parser.message.empty()) {
-    fmt::print("\n{}\n", parser.message);
+    std::cout << std::format("\n{}\n", parser.message);
   }
   std::exit(0);
 }
