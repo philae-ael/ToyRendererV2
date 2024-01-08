@@ -12,6 +12,7 @@ concept trivially_copiable = std::is_trivially_copyable_v<T>;
 template <class T>
 struct Extent2d {
   T width, height;
+  auto aspect_ratio() -> float { return static_cast<float>(width) / static_cast<float>(height); }
 };
 
 struct threadsafe {};

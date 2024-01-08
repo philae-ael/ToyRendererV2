@@ -25,9 +25,9 @@ void CameraController::update(CameraInput input, float Dt) {
       (static_cast<float>(input.Down) - static_cast<float>(input.Up)) * glm::vec3(0.0, 1.0, 0.0);
 
   const float RotX =
-      static_cast<float>(input.RotDown) - static_cast<float>(input.RotUp) - mouseSpeed * input.MouseDelta.y;
+      static_cast<float>(input.RotDown) - static_cast<float>(input.RotUp) + mouseSpeed * input.MouseDelta.y;
   const float RotY =
-      static_cast<float>(input.RotRight) - static_cast<float>(input.RotLeft) - mouseSpeed * input.MouseDelta.x;
+      static_cast<float>(input.RotRight) - static_cast<float>(input.RotLeft) + mouseSpeed * input.MouseDelta.x;
 
   const glm::vec3 RotVelocity = glm::vec3{rotSpeed * RotX, rotSpeed * RotY, 0.0};
   camera.eulerAngles += Dt * RotVelocity;

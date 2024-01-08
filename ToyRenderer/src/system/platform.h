@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+
+#include "utils/types.h"
 struct GLFWwindow;
 namespace tr {
 class App;
@@ -10,7 +12,7 @@ namespace tr::system {
 class Platform {
  public:
   Platform() = default;
-  void init(tr::App *);
+  auto init(tr::App *)->utils::types::Extent2d<int>;
 
   ~Platform() { destroy(); }
   void destroy();
@@ -30,6 +32,7 @@ class Platform {
   auto operator=(const Platform &) -> Platform & = delete;
 
   GLFWwindow *window = nullptr;
+
  private:
   bool minimized = false;
   App *app = nullptr;

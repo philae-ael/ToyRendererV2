@@ -45,7 +45,9 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
       PipelineColorBlendStateAllColorNoBlend.build(),
   });
 
-  const auto color_formats = std::to_array<VkFormat>({attachments_definitions[0].format(swapchain)});
+  const auto color_formats = std::to_array<VkFormat>({
+      attachments_definitions[0].format(swapchain),
+  });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   const auto pipeline_rendering_create_info =

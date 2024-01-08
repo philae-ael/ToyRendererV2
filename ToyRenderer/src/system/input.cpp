@@ -8,8 +8,14 @@
 void tr::system::Input::on_input(tr::system::InputEvent event) {
   switch (event.kind) {
     case InputEventKind::Key: {
-      bool pressed = event.key_event.action == GLFW_RELEASE;
+      bool pressed = event.key_event.action != GLFW_RELEASE;
       switch (event.key_event.key) {
+        case GLFW_KEY_SPACE:
+          state.camera_input.Up = pressed;
+          break;
+        case GLFW_KEY_LEFT_SHIFT:
+          state.camera_input.Down = pressed;
+          break;
         case GLFW_KEY_W:
           state.camera_input.Forward = pressed;
           break;
@@ -40,11 +46,12 @@ void tr::system::Input::on_input(tr::system::InputEvent event) {
       break;
     }
     case InputEventKind::CursorPos: {
-      const auto old_cursor_pos = state.cursor_pos;
       state.cursor_pos.x = utils::narrow_cast<float>(event.cursor_pos_event.x);
-      state.cursor_pos.y = utils::narrow_cast<float>(event.cursor_pos_event.x);
+      state.cursor_pos.y = utils::narrow_cast<float>(event.cursor_pos_event.y);
 
-      state.camera_input.MouseDelta = state.cursor_pos - old_cursor_pos;
+      // Doesn't work well mouse is not supported i guess
+      /* const auto old_cursor_pos = state.cursor_pos; */
+      /* state.camera_input.MouseDelta += state.cursor_pos - old_cursor_pos; */
       break;
     }
     case InputEventKind::MouseButton:

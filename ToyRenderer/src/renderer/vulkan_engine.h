@@ -23,6 +23,7 @@
 #include "surface.h"
 #include "swapchain.h"
 #include "utils.h"
+#include "../camera.h"
 
 namespace tr::system {
 class Imgui;
@@ -52,6 +53,8 @@ class VulkanEngine {
 
   friend VulkanEngineDebugInfo;
   VulkanEngineDebugInfo debug_info;
+
+  CameraMatrices matrices{};
 
  private:
   void rebuild_swapchain();
@@ -103,7 +106,9 @@ class VulkanEngine {
   Device device;
   VmaAllocator allocator = nullptr;
   DescriptorAllocator descriptor_allocator{};
-  std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> main_descriptors{};
+  std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> deferred_descriptors{};
+  std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> gbuffer_descriptors{};
+  std::array<BufferRessource, MAX_FRAMES_IN_FLIGHT> gbuffer_camera_buffer{};
   VkSampler base_sampler{};
 
   // Swapchain related

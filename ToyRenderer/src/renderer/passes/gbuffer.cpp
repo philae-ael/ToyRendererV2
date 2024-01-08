@@ -1,5 +1,7 @@
 #include "gbuffer.h"
 
+#include <vulkan/vulkan_core.h>
+
 #include <array>
 #include <cstdint>
 
@@ -38,7 +40,7 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const auto input_assembly_state =
       PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
   const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
-  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.build();
+  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.cull_mode(VK_CULL_MODE_FRONT_BIT).build();
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
@@ -58,7 +60,10 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
                                                   .depth_attachment(definitions[2].format(swapchain))
                                                   .build();
 
-  const auto layout = PipelineLayoutBuilder{}.build(device);
+  const auto descriptor_set_layouts = std::to_array({
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::bindings).build(device),
+  });
+  const auto layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
                             .layout_(layout)
@@ -73,7 +78,5 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
                             .dynamic_state(&dynamic_state_state)
                             .build(device);
 
-  device_deletion_stack.defer_deletion(DeviceHandle::PipelineLayout, layout);
-
-  return {pipeline};
+  return {descriptor_set_layouts, layout, pipeline};
 }

@@ -10,6 +10,7 @@
 #include "../app.h"
 #include "../registry.h"
 #include "utils/misc.h"
+#include "utils/types.h"
 
 const auto WinWidthInitial = 1080;
 const auto WinHeightInitial = 720;
@@ -34,7 +35,7 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
   glfw_extract_platform(window)->on_mouse_move(xpos, ypos);
 }
 
-void tr::system::Platform::init(tr::App* new_app) {
+auto tr::system::Platform::init(tr::App* new_app) -> utils::types::Extent2d<int> {
   TR_ASSERT(glfwInit() != 0, "could not initializa GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -53,6 +54,8 @@ void tr::system::Platform::init(tr::App* new_app) {
   glfwSetKeyCallback(window, key_callback);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
   glfwSetCursorPosCallback(window, cursor_pos_callback);
+
+  return {width, height};
 }
 
 void tr::system::Platform::required_vulkan_extensions(std::vector<const char*>& extensions) {

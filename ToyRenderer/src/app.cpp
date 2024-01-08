@@ -15,12 +15,14 @@
 #include "utils/types.h"
 
 void tr::App::update() {
-  const auto dt = state.frame_timer.elapsed();
-  state.camera_controller.update(subsystems.input.consume_camera_input(), dt);
+  const auto dt = state.frame_timer.elapsed();  // millis
+  state.camera_controller.update(subsystems.input.consume_camera_input(), dt / 1000);
+  subsystems.engine.matrices = state.camera_controller.camera.cameraMatrices();
 }
 
 tr::App::App(tr::Options options) : options(options) {
-  subsystems.platform.init(this);
+  auto win_size = subsystems.platform.init(this);
+  state.camera_controller.camera.aspectRatio = win_size.aspect_ratio();
 
   std::vector<const char*> required_vulkan_extensions;
   subsystems.platform.required_vulkan_extensions(required_vulkan_extensions);
@@ -35,6 +37,7 @@ void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input
 void tr::App::on_resize(utils::types::Extent2d<std::uint32_t> new_size) {
   utils::ignore_unused(new_size);
   subsystems.engine.on_resize();
+  state.camera_controller.camera.aspectRatio = new_size.aspect_ratio();
 }
 
 void tr::App::run() {
