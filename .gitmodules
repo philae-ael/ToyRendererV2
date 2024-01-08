@@ -1,7 +1,0 @@
-[submodule "libs/imgui/imgui"]
-	path = libs/imgui/imgui
-	url = https://github.com/ocornut/imgui
-	branch = docking
-[submodule "jsoncpp"]
-	path = libs/jsoncpp
-	url = https://github.com/open-source-parsers/jsoncpp

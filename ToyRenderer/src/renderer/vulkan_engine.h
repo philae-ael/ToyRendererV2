@@ -30,9 +30,6 @@
 namespace tr::system {
 class Imgui;
 }
-namespace tr {
-class Gltf;
-}
 
 namespace tr::renderer {
 
@@ -128,7 +125,7 @@ class VulkanEngine {
   bool swapchain_need_to_be_rebuilt = false;
 
   // FRAME STUFF
-  std::size_t frame_id{};
+  std::uint32_t frame_id{};
   std::array<FrameSynchro, MAX_FRAMES_IN_FLIGHT> frame_synchronisation_pool;
   std::array<VkCommandPool, MAX_FRAMES_IN_FLIGHT> graphic_command_pools{};
   std::array<OneTimeCommandBuffer, MAX_FRAMES_IN_FLIGHT> graphics_command_buffers{};

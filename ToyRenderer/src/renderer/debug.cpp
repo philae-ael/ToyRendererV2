@@ -97,18 +97,20 @@ void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine
       ImGui::TableNextRow();
       ImGui::TableNextColumn();
 
-      auto history = gpu_memory_usage.history();
-      ImGui::PlotLines("Global GPU memory usage", history.data(), utils::narrow_cast<int>(history.size()));
+      {
+        auto history = gpu_memory_usage.history();
+        ImGui::PlotLines("Global GPU memory usage", history.data(), utils::narrow_cast<int>(history.size()));
 
-      ImGui::TableNextColumn();
-      ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
+        ImGui::TableNextColumn();
+        ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
+      }
 
       for (std::size_t i = 0; i < engine.device.memory_properties.memoryHeapCount; i++) {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
 
-        auto history = gpu_heaps_usage[i].history();
-        auto label = std::format("Heap number {}", i);
+        const auto history = gpu_heaps_usage[i].history();
+        const auto label = std::format("Heap number {}", i);
         ImGui::PlotLines(label.c_str(), history.data(), utils::narrow_cast<int>(history.size()));
 
         ImGui::TableNextColumn();
@@ -207,18 +209,18 @@ void tr::renderer::VulkanEngineDebugInfo::imgui(tr::renderer::VulkanEngine& engi
 }
 
 void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEngine& engine) {
-  if (gpu_timestamps.get(engine.device.vk_device, current_frame_id - 1)) {
+  {
+    gpu_timestamps.get(engine.device.vk_device, current_frame_id - 1);
     for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
       auto& period = GPU_TIME_PERIODS[i];
       auto dt = gpu_timestamps.fetch_elsapsed(current_frame_id - 1, period.from, period.to);
-      if (!dt) {
-        continue;
+
+      if (dt) {
+        avg_gpu_timelines[i].update(*dt);
       }
-      avg_gpu_timelines[i].update(*dt);
       gpu_timelines[i].push(avg_gpu_timelines[i].state);
 
-      spdlog::trace("GPU Took {:.3f}us (smoothed {:3f}us) for period {}", 1000. * *dt,
-                    1000. * avg_gpu_timelines[i].state, period.name);
+      spdlog::trace("GPU Took {:3f}us for period {}", 1000. * avg_gpu_timelines[i].state, period.name);
     }
   }
 

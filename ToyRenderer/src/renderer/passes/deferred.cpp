@@ -89,7 +89,7 @@ void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm
       .renderArea = render_area,
       .layerCount = 1,
       .viewMask = 0,
-      .colorAttachmentCount = attachments.size(),
+      .colorAttachmentCount = utils::narrow_cast<uint32_t>(attachments.size()),
       .pColorAttachments = attachments.data(),
       .pDepthAttachment = nullptr,
       .pStencilAttachment = nullptr,

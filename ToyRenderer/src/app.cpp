@@ -62,7 +62,6 @@ tr::App::App(tr::Options options) : options(options) {
 
 void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input(event); }
 void tr::App::on_resize(utils::types::Extent2d<std::uint32_t> new_size) {
-  utils::ignore_unused(new_size);
   subsystems.engine.on_resize();
   state.camera_controller.camera.aspectRatio = new_size.aspect_ratio();
 }

@@ -10,7 +10,7 @@
 #include "utils.h"
 
 auto tr::renderer::Shader::init_from_filename(VkDevice device, const std::filesystem::path& path) -> Shader {
-  auto data = read_file<uint32_t>(path);
+  const auto data = read_file<uint32_t>(path.string());
   return init_from_src(device, data);
 }
 auto tr::renderer::Shader::init_from_src(VkDevice device, std::span<const uint32_t> module) -> Shader {

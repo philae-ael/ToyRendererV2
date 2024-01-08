@@ -4,10 +4,12 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
+#include <utils/cast.h>
 
 #include "utils.h"
 #include "utils/assert.h"
@@ -66,7 +68,7 @@ auto tr::renderer::StagingBuffer::consume(std::size_t size) -> std::span<std::by
   TR_ASSERT(!out.empty(), "StagingBuffer full");
   TR_ASSERT(!used, "StagingBuffer already used");
   used = true;
-  to_upload = size;
+  to_upload = utils::narrow_cast<uint32_t>(size);
   return out;
 }
 

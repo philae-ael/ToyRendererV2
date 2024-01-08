@@ -15,9 +15,9 @@ struct logger {
   explicit logger(const std::source_location loc = std::source_location::current()) : loc(loc) {}
 
   template <typename... Args>
-  [[noreturn]] void fail(const char *expr, const std::format_string<Args...> fmt, Args &&...args) {
+  [[noreturn]] void fail(const char *expr, std::format_string<Args...> fmt, Args &&...args) {
     spdlog::critical("assertion failed: {}", expr);
-    spdlog::critical(fmt.get(), std::forward<Args>(args)...);
+    spdlog::critical(fmt, std::forward<Args>(args)...);
     spdlog::info("assertion occured in {}:{} in {}", loc.function_name(), loc.line(), loc.file_name());
 
     std::abort();

@@ -13,9 +13,9 @@ struct CameraMatrices {
 };
 
 struct CameraInput {
-  bool Forward, Backward, Left, Right, Up, Down;
-  bool RotUp, RotDown, RotLeft, RotRight;
-  glm::vec2 MouseDelta;
+  bool Forward = false, Backward = false, Left = false, Right = false, Up = false, Down = false;
+  bool RotUp = false, RotDown = false, RotLeft = false, RotRight = false;
+  glm::vec2 MouseDelta{0.0F, 0.0F};
 };
 
 struct Camera {
@@ -33,11 +33,11 @@ struct Camera {
 struct CameraController {
   CameraController()
       : camera{
-            .position = glm::vec3(0.0, 0.0, -3.0),
+            .position = glm::vec3(0.0F, 0.0F, -3.0F),
             .fov = utils::math::PI_4,
-            .aspectRatio = 1.0,
-            .zNear = 0.1,
-            .zFar = 100.0,
+            .aspectRatio = 1.0F,
+            .zNear = 0.1F,
+            .zFar = 100.0F,
         } {}
   Camera camera;
 

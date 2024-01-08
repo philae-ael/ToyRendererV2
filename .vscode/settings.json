@@ -7,6 +7,23 @@
         "span": "cpp",
         "vector": "cpp",
         "xstring": "cpp",
-        "xutility": "cpp"
-    }
+        "xutility": "cpp",
+        "format": "cpp",
+        "chrono": "cpp",
+        "deque": "cpp",
+        "functional": "cpp",
+        "list": "cpp",
+        "memory": "cpp",
+        "memory_resource": "cpp",
+        "regex": "cpp",
+        "sstream": "cpp",
+        "xhash": "cpp",
+        "xiosbase": "cpp",
+        "xlocale": "cpp",
+        "xmemory": "cpp",
+        "xtree": "cpp"
+    },
+    "cmake.debugConfig": {
+        "cwd": "${workspaceFolder}"
+    },
 }

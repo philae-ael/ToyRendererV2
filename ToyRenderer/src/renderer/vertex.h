@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <span>
 
 #include "deletion_queue.h"
 

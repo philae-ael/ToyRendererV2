@@ -259,10 +259,10 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   passes.deferred = Deferred::init(device.vk_device, swapchain, setup_device_deletion_stack);
   passes.deferred.defer_deletion(global_deletion_stacks.device);
 
-  global_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4,
+  global_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
                                                           {{
-                                                              {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2},
-                                                              {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2},
+                                                              {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048},
+                                                              {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
                                                           }});
   global_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
   frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,

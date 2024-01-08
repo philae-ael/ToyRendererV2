@@ -29,14 +29,14 @@ struct QueueSubmit {
   }
 
   auto signal_semaphores(std::span<const VkSemaphore> semaphores) -> QueueSubmit& {
-    submit_info.signalSemaphoreCount = semaphores.size();
+    submit_info.signalSemaphoreCount = utils::narrow_cast<uint32_t>(semaphores.size());
     submit_info.pSignalSemaphores = semaphores.data();
     return *this;
   }
 
   auto command_buffers(std::span<const VkCommandBuffer> buffers) -> QueueSubmit& {
     submit_info.pCommandBuffers = buffers.data();
-    submit_info.commandBufferCount = buffers.size();
+    submit_info.commandBufferCount =  utils::narrow_cast<uint32_t>(buffers.size());
     return *this;
   }
 

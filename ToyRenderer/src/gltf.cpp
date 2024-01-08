@@ -32,6 +32,7 @@ template <typename... Ts>
 struct overloaded : Ts... {
   using Ts::operator()...;
 };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
@@ -80,8 +81,9 @@ auto load(tr::renderer::ImageBuilder& /*ib*/, tr::renderer::BufferBuilder& bb, t
           });
 
           indices.reserve(indices.size() + accessor.count);
-          fastgltf::iterateAccessor<uint32_t>(asset, accessor,
-                                              [&](uint32_t idx) { indices.push_back(start_v_idx + idx); });
+          fastgltf::iterateAccessor<uint32_t>(asset, accessor, [&](uint32_t idx) {
+            indices.push_back(utils::narrow_cast<uint32_t>(start_v_idx) + idx);
+          });
         }
 
         for (const auto& [attribute, accessor_index] : primitive.attributes) {

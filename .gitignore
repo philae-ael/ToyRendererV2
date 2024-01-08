@@ -43,3 +43,4 @@ out/
 /cmake-build-debug-event-trace/
 /build/
 /.cache/
+/CMakeSettings.json

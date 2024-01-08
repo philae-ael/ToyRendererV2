@@ -76,6 +76,9 @@ add_executable(ToyRenderer
     src/system/input.cpp
     src/system/imgui.h
 )
+set_target_properties(
+    ToyRenderer PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 
 target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator fastgltf::fastgltf)
 

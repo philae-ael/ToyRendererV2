@@ -125,7 +125,7 @@ struct ImageRessource {
   VmaAllocation alloc;
   ImageUsage usage;
 
-  static auto from_external_image(VkImage image, VkImageView view, ImageUsageBits usage,
+  static auto from_external_image(VkImage image, VkImageView view, ImageUsage usage,
                                   SyncInfo sync_info = SrcImageMemoryBarrierUndefined) -> ImageRessource {
     return {image, view, sync_info, nullptr, usage};
   }

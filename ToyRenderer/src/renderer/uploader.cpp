@@ -20,6 +20,6 @@ auto tr::renderer::Uploader::map(std::size_t size_hint) -> MappedMemoryRange {
 
 void tr::renderer::Uploader::commit(VkCommandBuffer cmd, MappedMemoryRange /*mapped*/, VkBuffer buf, std::size_t size,
                                     std::size_t offset) {
-  staging_buffers[0].to_upload = size;
-  staging_buffers[0].commit(cmd, buf, offset);
+  staging_buffers[0].to_upload = utils::narrow_cast<uint32_t>(size);
+  staging_buffers[0].commit(cmd, buf, utils::narrow_cast<uint32_t>(offset));
 }
