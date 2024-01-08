@@ -2,6 +2,8 @@
 #include <renderdoc.h>
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
+
+#include "utils.h"
 namespace tr::renderer {
 
 class DebugCmdScope {
@@ -55,4 +57,17 @@ struct Renderdoc {
 
   RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 };
+
+template <class T>
+void set_debug_object_name(VkDevice device, VkObjectType type, T t, const char *name) {
+  VkDebugUtilsObjectNameInfoEXT name_info{
+      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+      .pNext = nullptr,
+      .objectType = type,
+      .objectHandle = reinterpret_cast<uint64_t>(t),
+      .pObjectName = name,
+  };
+  vkSetDebugUtilsObjectNameEXT(device, &name_info);
+}
+
 }  // namespace tr::renderer

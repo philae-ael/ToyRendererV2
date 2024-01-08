@@ -8,7 +8,7 @@
 namespace tr::renderer {
 
 struct CommandPool {
-  enum class TargetQueue { Graphics, Present };
+  enum class TargetQueue { Graphics, Present, Transfer };
 
   static auto init(Device& device, CommandPool::TargetQueue target_queue) -> VkCommandPool;
   static auto defer_deletion(VkCommandPool commandPool, DeviceDeletionStack& device_deletion_stack) {

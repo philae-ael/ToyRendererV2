@@ -19,13 +19,13 @@ auto tr::renderer::check_extensions(const char* kind, std::span<const char* cons
     available_set.insert(extension.extensionName);
   }
 
-  std::set<const char*> required_set{required.begin(), required.end()};
+  std::set<std::string> required_set{required.begin(), required.end()};
   spdlog::trace("Required {} extensions:", kind);
   for (const auto& required_extension : required) {
     spdlog::trace("\t{}", required_extension);
   }
 
-  std::vector<const char*> out;
+  std::vector<std::string> out;
   std::set_difference(required_set.begin(), required_set.end(), available_set.begin(), available_set.end(),
                       std::back_inserter(out));
 

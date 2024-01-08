@@ -7,6 +7,7 @@
 
 #include "options.h"
 #include "renderer/vulkan_engine.h"
+#include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
 
@@ -28,6 +29,7 @@ class App {
     system::Platform platform;
     system::Input input;
     renderer::VulkanEngine engine;
+    system::Imgui imgui;
   } subsystems;
 
   struct State {

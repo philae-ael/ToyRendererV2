@@ -6,7 +6,7 @@ set(IMGUI_HEADERS
     imgui/imstb_rectpack.h
     imgui/imstb_truetype.h
     imgui/backends/imgui_impl_glfw.h
-    imgui/backends/imgui_impl_wgpu.h
+    imgui/backends/imgui_impl_vulkan.h
     imgui/misc/cpp/imgui_stdlib.h
     imgui/imconfig.h
 )

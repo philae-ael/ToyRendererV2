@@ -13,6 +13,7 @@
 #include "deletion_queue.h"
 #include "device.h"
 #include "instance.h"
+#include "pipeline.h"
 #include "renderpass.h"
 #include "surface.h"
 #include "swapchain.h"
@@ -21,10 +22,11 @@
 #include "utils.h"
 #include "utils/math.h"
 #include "utils/timer.h"
+#include "vertex.h"
 
 namespace tr::renderer {
 
-const std::size_t MAX_IN_FLIGHT = 2;
+const std::size_t MAX_IN_FLIGHT = 1;
 
 class VulkanEngine {
  public:
@@ -33,8 +35,9 @@ class VulkanEngine {
 
   void on_resize() { fb_resized = true; }
 
-  void start_frame() { frame_id += 1; }
-  void draw();
+  auto start_frame() -> std::pair<bool, Frame>;
+  void draw(Frame);
+  void end_frame(Frame);
 
   void record_timeline() {
     if (gpu_timestamps.get(device.vk_device, frame_id - 1)) {
@@ -68,7 +71,6 @@ class VulkanEngine {
   auto operator=(const VulkanEngine&) -> VulkanEngine& = delete;
   auto operator=(VulkanEngine&&) -> VulkanEngine& = delete;
 
- private:
   void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
   void rebuild_swapchain();
 
@@ -101,6 +103,14 @@ class VulkanEngine {
   // Buffer should be moved i guess
   VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
   std::array<VkCommandBuffer, MAX_IN_FLIGHT> main_command_buffer_pool{};
+
+  VkCommandPool transfer_command_pool = VK_NULL_HANDLE;
+  VkCommandBuffer transfer_command_buffer{};
+
+  Buffer triangle_vertex_buffer;
+  StagingBuffer staging_buffer;
+
+  Pipeline pipeline;
 
   // DEBUG AND TIMING
   void write_gpu_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index);

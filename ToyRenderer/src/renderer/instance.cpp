@@ -97,7 +97,7 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .pEngineName = "ToyRenderer",
         .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_2,
+        .apiVersion = VK_API_VERSION_1_3,
     };
 
     VkInstanceCreateInfo createInfo{

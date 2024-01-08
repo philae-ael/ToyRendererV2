@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "options.h"
+#include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
 #include "utils/types.h"
@@ -20,6 +21,8 @@ tr::App::App(tr::Options options) : options(options) {
   std::vector<const char*> required_vulkan_extensions;
   subsystems.platform.required_vulkan_extensions(required_vulkan_extensions);
   subsystems.engine.init(options, required_vulkan_extensions, subsystems.platform.window);
+
+  subsystems.imgui = system::Imgui::init(subsystems.platform.window, subsystems.engine);
 }
 
 void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input(event); }
@@ -31,14 +34,19 @@ void tr::App::on_resize(utils::types::Extent2d<std::uint32_t> new_size) {
 void tr::App::run() {
   while (true) {
     state.frame_timer.start();
-    subsystems.engine.start_frame();
     if (!subsystems.platform.start_frame()) {
       break;
     }
 
-    subsystems.engine.draw();
-
     update();
+
+    if (auto [ok, frame] = subsystems.engine.start_frame(); ok) {
+      system::Imgui::start_frame();
+
+      subsystems.engine.draw(frame);
+      system::Imgui::draw(subsystems.engine.swapchain, frame);
+      subsystems.engine.end_frame(frame);
+    }
 
     state.frame_timer.stop();
     state.timeline.push(state.frame_timer.elapsed_raw());
@@ -47,4 +55,6 @@ void tr::App::run() {
     spdlog::trace("Frame took {:.1f}us or {:.0f} FPS", elapsed * 1000, 1000. / elapsed);
     subsystems.engine.record_timeline();
   }
+
+  subsystems.engine.sync();
 }

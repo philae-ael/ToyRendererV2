@@ -17,6 +17,9 @@ auto tr::renderer::CommandPool::init(Device &device, CommandPool::TargetQueue ta
     case TargetQueue::Present:
       queue_family_index = device.queues.present_family;
       break;
+    case TargetQueue::Transfer:
+      queue_family_index = device.queues.transfer_family;
+      break;
   }
   VkCommandPoolCreateInfo command_pool_create_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,

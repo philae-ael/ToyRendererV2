@@ -6,6 +6,7 @@
 
 #include <cstdint>
 
+#include "debug.h"
 #include "device.h"
 #include "utils.h"
 
@@ -171,5 +172,8 @@ auto tr::renderer::FrameSynchro::init(VkDevice device) -> FrameSynchro {
   };
   VK_UNWRAP(vkCreateSemaphore, device, &semaphore_create_info, nullptr, &synchro.render_semaphore);
   VK_UNWRAP(vkCreateSemaphore, device, &semaphore_create_info, nullptr, &synchro.present_semaphore);
+
+  set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore," render_semaphore");
+  set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore," present_semaphore");
   return synchro;
 }

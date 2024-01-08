@@ -48,6 +48,10 @@ enum class DeviceHandle {
   Fence,
   Semaphore,
   QueryPool,
+  Pipeline,
+  PipelineLayout,
+  Buffer,
+  DescriptorPool,
 };
 
 class DeviceDeletionStack : public DeletionStack<DeviceHandle> {

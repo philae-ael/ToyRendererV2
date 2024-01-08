@@ -15,8 +15,9 @@
 
 #include "utils.h"
 
-const std::array<const char*, 1> device_extension{
+const std::array<const char*, 2> device_extension{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 };
 
 void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkSurfaceKHR surface) {
@@ -55,7 +56,7 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
 
       std::vector<VkExtensionProperties> available_extensions(extension_count);
       vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, available_extensions.data());
-      if (!tr::renderer::check_extensions("extensions", device_extension, available_extensions)) {
+      if (!tr::renderer::check_extensions("devices", device_extension, available_extensions)) {
         continue;
       }
     }
@@ -76,11 +77,16 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
       vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.data());
       std::optional<std::size_t> graphics_family;
       std::optional<std::size_t> present_family;
+      std::optional<std::size_t> transfert_family;
       for (std::size_t i = 0; i < queue_family_count; i++) {
         const auto& queue_family = queue_families[i];
 
         if ((queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
           graphics_family = i;
+        }
+
+        if ((queue_family.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0) {
+          transfert_family = i;
         }
 
         auto present_support = VK_FALSE;
@@ -89,7 +95,7 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
           present_family = i;
         }
       }
-      if (!graphics_family.has_value() || !present_family.has_value()) {
+      if (!(graphics_family.has_value() && present_family.has_value() && transfert_family.has_value())) {
         continue;
       }
 
@@ -97,22 +103,27 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
       device.queues.graphics_family_properties = queue_families[*graphics_family];
       device.queues.present_family = utils::narrow_cast<std::uint32_t>(*present_family);
       device.queues.present_family_properties = queue_families[*present_family];
+      device.queues.transfer_family = utils::narrow_cast<std::uint32_t>(*transfert_family);
+      device.queues.transfer_family_properties = queue_families[*transfert_family];
     }
 
     // We take the 1st one suitable
     spdlog::debug("\tDevice is suitable!");
     device.physical_device = physical_device;
-    vkGetPhysicalDeviceProperties(device.physical_device, &device.device_properties);
     break;
   }
 
   TR_ASSERT(device.physical_device != VK_NULL_HANDLE, "could not find any suitable physical device");
+
+  vkGetPhysicalDeviceProperties(device.physical_device, &device.device_properties);
+  vkGetPhysicalDeviceMemoryProperties(device.physical_device, &device.memory_properties);
 }
 
 void init_device(tr::renderer::Device& device) {
   std::set<std::uint32_t> queue_families{
       device.queues.graphics_family,
       device.queues.present_family,
+      device.queues.transfer_family,
   };
 
   std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
@@ -128,13 +139,21 @@ void init_device(tr::renderer::Device& device) {
     });
   }
 
-  VkPhysicalDeviceVulkan12Features enabled_features12{};
-  enabled_features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-  enabled_features12.hostQueryReset = VK_TRUE;
+  VkPhysicalDeviceVulkan12Features vulkan12_features{};
+  vulkan12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+  vulkan12_features.hostQueryReset = VK_TRUE;
+
+  VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+      .pNext = nullptr,
+      .dynamicRendering = VK_TRUE,
+  };
+
+  vulkan12_features.pNext = &dynamic_rendering_features;
 
   VkDeviceCreateInfo device_create_info{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = &enabled_features12,
+      .pNext = &vulkan12_features,
       .flags = 0,
       .queueCreateInfoCount = utils::narrow_cast<std::uint32_t>(queue_create_infos.size()),
       .pQueueCreateInfos = queue_create_infos.data(),
@@ -148,8 +167,10 @@ void init_device(tr::renderer::Device& device) {
   VkResult result = vkCreateDevice(device.physical_device, &device_create_info, nullptr, &device.vk_device);
   TR_ASSERT(result == VkResult::VK_SUCCESS, "failed to create logical device, got error code {}", result);
 
+  // WHEN graphics_queue / present_queue or transfert_family are the same we should use multiple queue indexes?
   vkGetDeviceQueue(device.vk_device, device.queues.graphics_family, 0, &device.queues.graphics_queue);
   vkGetDeviceQueue(device.vk_device, device.queues.present_family, 0, &device.queues.present_queue);
+  vkGetDeviceQueue(device.vk_device, device.queues.transfer_family, 0, &device.queues.transfer_queue);
 }
 
 auto tr::renderer::Device::init(VkInstance instance, VkSurfaceKHR surface) -> Device {

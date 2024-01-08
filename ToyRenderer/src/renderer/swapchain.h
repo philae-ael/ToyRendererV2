@@ -13,6 +13,23 @@
 
 namespace tr::renderer {
 
+// TODO: MOVE THAT
+struct OneTimeCommandBuffer {
+  VkCommandBuffer vk_cmd = VK_NULL_HANDLE;
+
+  [[nodiscard]] auto begin() const -> VkResult {
+    VkCommandBufferBeginInfo cmd_begin_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = nullptr,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .pInheritanceInfo = nullptr,
+    };
+    return vkBeginCommandBuffer(vk_cmd, &cmd_begin_info);
+  }
+
+  [[nodiscard]] auto end() const -> VkResult { return vkEndCommandBuffer(vk_cmd); }
+};
+
 struct FrameSynchro {
   static auto init(VkDevice device) -> FrameSynchro;
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {
@@ -25,41 +42,10 @@ struct FrameSynchro {
   VkSemaphore present_semaphore = VK_NULL_HANDLE;
 };
 
-struct FrameSynchroPool {
-  // this may be awful, idk yet
-  auto pop(VkDevice device) -> FrameSynchro {
-    if (frame_synchronisation_storage.empty()) {
-      auto synchro = FrameSynchro::init(device);
-      return synchro;
-    }
-
-    auto synchro = frame_synchronisation_storage.front();
-    frame_synchronisation_storage.pop_front();
-
-    return synchro;
-  }
-  void push_frame_synchro(DeviceDeletionStack &device_deletion_stack, FrameSynchro synchro) {
-    if (frame_synchronisation_storage.size() > 5) {
-      synchro.defer_deletion(device_deletion_stack);
-    } else {
-      frame_synchronisation_storage.push_back(synchro);
-    }
-  }
-
-  void cleanup(DeviceDeletionStack &device_deletion_stack) {
-    for (auto synchro : frame_synchronisation_storage) {
-      synchro.defer_deletion(device_deletion_stack);
-    }
-    frame_synchronisation_storage.clear();
-  }
-
- private:
-  std::deque<FrameSynchro> frame_synchronisation_storage;
-};
-
 struct Frame {
   std::uint32_t swapchain_image_index = 0;
   FrameSynchro synchro;
+  OneTimeCommandBuffer cmd{};
 
   auto submitCmds(Device &device, std::span<VkCommandBuffer> cmds) const -> VkResult {
     VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

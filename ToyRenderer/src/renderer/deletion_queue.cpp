@@ -45,6 +45,10 @@ void tr::renderer::DeviceDeletionStack::cleanup(VkDevice device) {
       DESTROY_WITH_DEVICE(Fence)
       DESTROY_WITH_DEVICE(Semaphore)
       DESTROY_WITH_DEVICE(QueryPool)
+      DESTROY_WITH_DEVICE(Pipeline)
+      DESTROY_WITH_DEVICE(PipelineLayout)
+      DESTROY_WITH_DEVICE(Buffer)
+      DESTROY_WITH_DEVICE(DescriptorPool)
     }
     // NOLINTEND(performance-no-int-to-ptr)
   }

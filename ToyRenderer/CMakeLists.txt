@@ -25,10 +25,16 @@
     src/renderer/debug.h
     src/renderer/debug.cpp
     src/renderer/extensions.cpp
+    src/renderer/extensions.h
+    src/renderer/pipeline.cpp
+    src/renderer/pipeline.h
+    src/renderer/vertex.cpp
+    src/renderer/vertex.h
     src/system/platform.h
     src/system/platform.cpp
     src/system/input.h
     src/system/input.cpp
+    src/system/imgui.h
 )
 target_link_libraries(ToyRenderer PRIVATE glfw vulkan imgui_glfw_vulkan spdlog glm utils renderdoc)
 
