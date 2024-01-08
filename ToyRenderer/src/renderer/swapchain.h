@@ -5,11 +5,11 @@
 
 #include <vector>
 
-#include "../options.h"
 #include "deletion_queue.h"
 #include "device.h"
 #include "queue.h"
 #include "surface.h"
+#include "utils.h"
 
 namespace tr::renderer {
 
@@ -28,6 +28,20 @@ struct OneTimeCommandBuffer {
   }
 
   [[nodiscard]] auto end() const -> VkResult { return vkEndCommandBuffer(vk_cmd); }
+
+  static auto allocate(VkDevice device, VkCommandPool command_pool) -> OneTimeCommandBuffer {
+    OneTimeCommandBuffer cmd;
+    VkCommandBufferAllocateInfo transfer_cmd_alloc_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .commandPool = command_pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+
+    VK_UNWRAP(vkAllocateCommandBuffers, device, &transfer_cmd_alloc_info, &cmd.vk_cmd);
+    return cmd;
+  }
 };
 
 struct FrameSynchro {
@@ -72,7 +86,9 @@ struct Frame {
 
 struct Swapchain {
   struct SwapchainConfig;
-  static auto init(tr::Options &options, Device &device, VkSurfaceKHR surface, GLFWwindow *window) -> Swapchain;
+  void reinit(Device &device, VkSurfaceKHR surface, GLFWwindow *window) {
+    *this = init_with_config(config, device, surface, window);
+  }
   static auto init_with_config(SwapchainConfig config, Device &device, VkSurfaceKHR surface, GLFWwindow *window)
       -> Swapchain;
 

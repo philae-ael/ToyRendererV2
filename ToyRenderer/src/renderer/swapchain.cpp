@@ -165,11 +165,6 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
   return s;
 }
 
-auto tr::renderer::Swapchain::init(tr::Options& options, tr::renderer::Device& device, VkSurfaceKHR surface,
-                                   GLFWwindow* window) -> Swapchain {
-  return init_with_config({options.config.prefered_present_mode}, device, surface, window);
-}
-
 auto tr::renderer::Swapchain::acquire_next_frame(tr::renderer::Device& device, Frame* frame) const -> VkResult {
   return vkAcquireNextImageKHR(device.vk_device, vk_swapchain, 1000000000, frame->synchro.present_semaphore,
                                VK_NULL_HANDLE, &frame->swapchain_image_index);

@@ -16,8 +16,65 @@
 #include "swapchain.h"
 #include "synchronisation.h"
 #include "utils.h"
+#include "vertex.h"
 
 namespace tr::renderer {
+
+struct BufferRessource {
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation alloc = nullptr;
+
+  VkBufferUsageFlags usage = 0;
+  uint32_t size = 0;
+
+  void defer_deletion(VmaDeletionStack& vma_deletion_stack) const {
+    vma_deletion_stack.defer_deletion(VmaHandle::Buffer, buffer, alloc);
+  }
+};
+
+struct BufferDefinition {
+  VkBufferUsageFlags usage;
+  uint32_t size;
+};
+
+struct BufferBuilder {
+  VkDevice device;
+  VmaAllocator allocator;
+
+  [[nodiscard]] auto build_buffer(BufferDefinition definition, std::string_view debug_name) const -> BufferRessource {
+    BufferRessource res{
+        .usage = definition.usage,
+        .size = definition.size,
+    };
+
+    VkBufferCreateInfo buffer_create_info{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .size = 3 * sizeof(tr::renderer::Vertex),
+        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = nullptr,
+    };
+
+    VmaAllocationCreateInfo allocation_create_info{
+        .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+        .usage = VMA_MEMORY_USAGE_AUTO,
+        .requiredFlags = 0,
+        .preferredFlags = 0,
+        .memoryTypeBits = 0,
+        .pool = VK_NULL_HANDLE,
+        .pUserData = nullptr,
+        .priority = 1.0F,
+    };
+    VK_UNWRAP(vmaCreateBuffer, allocator, &buffer_create_info, &allocation_create_info, &res.buffer, &res.alloc,
+              nullptr);
+    set_debug_object_name(device, VK_OBJECT_TYPE_BUFFER, res.buffer, std::format("{} buffer", debug_name));
+
+    return res;
+  }
+};
 
 enum class ImageUsage {
   Color,

@@ -22,7 +22,6 @@
 #include "surface.h"
 #include "swapchain.h"
 #include "utils.h"
-#include "vertex.h"
 
 namespace tr::system {
 class Imgui;
@@ -42,7 +41,6 @@ class VulkanEngine {
   void end_frame(Frame);
 
   void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
-  void rebuild_swapchain();
 
   ~VulkanEngine();
 
@@ -72,7 +70,10 @@ class VulkanEngine {
   };
 
  private:
+  void rebuild_swapchain();
+  void build_ressources();
   void upload(DeviceDeletionStack&, VmaDeletionStack&);
+
   GLFWwindow* window{};
 
   struct {
@@ -109,10 +110,10 @@ class VulkanEngine {
   std::size_t frame_id{};
   std::array<FrameSynchro, MAX_FRAMES_IN_FLIGHT> frame_synchronisation_pool;
   std::array<VkCommandPool, MAX_FRAMES_IN_FLIGHT> graphic_command_pools{};
-  std::array<VkCommandBuffer, MAX_FRAMES_IN_FLIGHT> graphics_command_buffers{};
+  std::array<OneTimeCommandBuffer, MAX_FRAMES_IN_FLIGHT> graphics_command_buffers{};
 
   // Data shall be moved, one day
-  Buffer triangle_vertex_buffer;
+  BufferRessource triangle_vertex_buffer;
 
   friend system::Imgui;
 };

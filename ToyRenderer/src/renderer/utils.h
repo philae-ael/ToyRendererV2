@@ -9,10 +9,10 @@
 #include <string_view>
 
 #define VK_UNWRAP(f, ...) VK_CHECK(f(__VA_ARGS__), f)
-#define VK_CHECK(result, name)                                                                           \
-  do {                                                                                                   \
-    VkResult res = (result);                                                                             \
-    TR_ASSERT(res == VK_SUCCESS, "error while calling " #name " got error code {}", (std::uint32_t)res); \
+#define VK_CHECK(result, name)                                                                               \
+  do {                                                                                                       \
+    VkResult __res = (result);                                                                               \
+    TR_ASSERT(__res == VK_SUCCESS, "error while calling " #name " got error code {}", (std::uint32_t)__res); \
   } while (false)
 
 namespace tr::renderer {

@@ -60,6 +60,8 @@ add_executable(ToyRenderer
     src/renderer/passes/gbuffer.h
     src/renderer/passes/gbuffer.cpp
     src/renderer/constants.h
+    src/renderer/uploader.h
+    src/renderer/uploader.cpp
     src/system/platform.h
     src/system/platform.cpp
     src/system/input.h

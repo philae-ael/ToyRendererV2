@@ -1,7 +1,6 @@
 #include "deferred.h"
 
 #include "../pipeline.h"
-#include "../vertex.h"
 
 const std::array triangle_vert_bin = std::to_array<uint32_t>({
 #include "shaders/deferred.vert.inc"
@@ -29,9 +28,7 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
   };
   const auto dynamic_state_state = PipelineDynamicState{}.dynamic_state(dynamic_states).build();
 
-  const auto vertex_input_state =
-      PipelineVertexInputStateBuilder{}.vertex_attributes(Vertex::attributes).vertex_bindings(Vertex::bindings).build();
-
+  const auto vertex_input_state = PipelineVertexInputStateBuilder{}.build();
   const auto input_assembly_state =
       PipelineInputAssemblyBuilder{}.topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
   const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
