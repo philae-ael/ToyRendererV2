@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <glm/mat4x4.hpp>
 
 #include "../pipeline.h"
 #include "../vertex.h"
@@ -40,7 +41,7 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const auto input_assembly_state =
       PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
   const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
-  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.cull_mode(VK_CULL_MODE_FRONT_BIT).build();
+  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.cull_mode(VK_CULL_MODE_BACK_BIT).build();
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
@@ -61,9 +62,20 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
                                                   .build();
 
   const auto descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::bindings).build(device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_0).build(device),
   });
-  const auto layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(device);
+  const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
+      {
+          .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+          .offset = 0,
+          .size = sizeof(glm::mat4x4),
+      },
+  });
+
+  const auto layout = PipelineLayoutBuilder{}
+                          .set_layouts(descriptor_set_layouts)
+                          .push_constant_ranges(push_constant_ranges)
+                          .build(device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
                             .layout_(layout)

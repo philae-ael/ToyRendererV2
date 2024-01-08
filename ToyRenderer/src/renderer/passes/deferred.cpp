@@ -73,3 +73,36 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
 
   return {descriptor_set_layouts, layout, pipeline};
 }
+void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
+  DebugCmdScope scope(cmd, "Deferred");
+
+  std::array<VkRenderingAttachmentInfo, 1> attachments{
+      rm.swapchain.invalidate()
+          .sync(cmd, SyncColorAttachment)
+          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 1.0, 1.0}}}),
+  };
+
+  VkRenderingInfo render_info{
+      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .renderArea = render_area,
+      .layerCount = 1,
+      .viewMask = 0,
+      .colorAttachmentCount = attachments.size(),
+      .pColorAttachments = attachments.data(),
+      .pDepthAttachment = nullptr,
+      .pStencilAttachment = nullptr,
+  };
+  vkCmdBeginRendering(cmd, &render_info);
+
+  VkViewport viewport{
+      0, 0, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0, 1.0,
+  };
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  vkCmdSetScissor(cmd, 0, 1, &render_area);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vkCmdDraw(cmd, 3, 1, 0, 0);
+  vkCmdEndRendering(cmd);
+}
+

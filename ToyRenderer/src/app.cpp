@@ -3,12 +3,16 @@
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
 #include <utils/misc.h>
+#include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "camera.h"
+#include "gltf.h"
 #include "options.h"
+#include "renderer/mesh.h"
 #include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
@@ -31,6 +35,29 @@ tr::App::App(tr::Options options) : options(options) {
   if (options.debug.imgui) {
     subsystems.imgui.init(subsystems.platform.window, subsystems.engine);
   }
+
+  auto t = subsystems.engine.start_transfer();
+  {
+    auto bb = subsystems.engine.buffer_builder();
+    auto ib = subsystems.engine.image_builder();
+
+    if (options.scene.empty()) {
+      const auto sponza = Gltf::load_from_file(ib, bb, t, "assets/scenes/sponza/Sponza.gltf");
+      meshes.insert(meshes.end(), sponza.begin(), sponza.end());
+    } else {
+      const auto scene = Gltf::load_from_file(ib, bb, t, options.scene);
+      meshes.insert(meshes.end(), scene.begin(), scene.end());
+    }
+    for (const auto& mesh : meshes) {
+      mesh.buffers.vertices.defer_deletion(subsystems.engine.global_deletion_stacks.allocator);
+      if (mesh.buffers.indices) {
+        mesh.buffers.indices->defer_deletion(subsystems.engine.global_deletion_stacks.allocator);
+      }
+    }
+
+    subsystems.engine.end_transfer(std::move(t));
+    subsystems.engine.sync();
+  }
 }
 
 void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input(event); }
@@ -51,7 +78,8 @@ void tr::App::run() {
 
     if (auto frame_opt = subsystems.engine.start_frame(); frame_opt.has_value()) {
       auto frame = frame_opt.value();
-      subsystems.engine.draw(frame);
+      subsystems.engine.draw(frame, meshes);
+
       if (subsystems.imgui.start_frame()) {
         subsystems.engine.debug_info.imgui(subsystems.engine);
         subsystems.imgui.draw(subsystems.engine, frame);

@@ -3,7 +3,6 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <glm/vec2.hpp>
@@ -14,9 +13,10 @@
 namespace tr::renderer {
 struct Vertex {
   glm::vec3 pos;
-  glm::vec3 base_color;
+  glm::vec3 normal;
+  glm::vec3 color;
   glm::vec2 uv;
-  static const std::array<VkVertexInputAttributeDescription, 3> attributes;
+  static const std::array<VkVertexInputAttributeDescription, 4> attributes;
   static const std::array<VkVertexInputBindingDescription, 1> bindings;
 };
 

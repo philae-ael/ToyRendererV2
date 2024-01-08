@@ -5,8 +5,13 @@
 namespace tr {
 
 auto Camera::cameraMatrices() const -> CameraMatrices {
+  auto projMatrix = glm::perspective(fov, aspectRatio, zNear, zFar);
+
+  // opengl / gtlf style
+  projMatrix[1][1] *= -1;
+
   return {
-      .projMatrix = glm::perspective(fov, aspectRatio, zNear, zFar),
+      .projMatrix = projMatrix,
       .viewMatrix = glm::toMat4(orientation()) * glm::translate(glm::mat4(1.0), position),
   };
 }

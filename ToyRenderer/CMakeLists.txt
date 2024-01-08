@@ -5,6 +5,7 @@ find_package(glfw3 REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(imgui REQUIRED)
 find_package(glm REQUIRED)
+find_package(fastgltf REQUIRED)
 
 add_library(Shaders INTERFACE)
 target_compile_shader(Shaders
@@ -29,6 +30,9 @@ add_executable(ToyRenderer
     src/camera.cpp
     src/options.h
     src/options.cpp
+    src/gltf.h
+    src/gltf.cpp
+    src/renderer/mesh.h
     src/renderer/device.h
     src/renderer/device.cpp
     src/renderer/swapchain.h
@@ -73,7 +77,7 @@ add_executable(ToyRenderer
     src/system/imgui.h
 )
 
-target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator)
+target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator fastgltf::fastgltf)
 
 # set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy")
 # set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")

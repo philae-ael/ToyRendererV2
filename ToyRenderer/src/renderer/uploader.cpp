@@ -4,7 +4,7 @@
 
 auto tr::renderer::Uploader::init(VmaAllocator allocator) -> Uploader {
   Uploader u{allocator};
-  u.staging_buffers.push_back(StagingBuffer::init(allocator));
+  u.staging_buffers.push_back(StagingBuffer::init(allocator, 1 << 26));
   return u;
 }
 

@@ -4,7 +4,6 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -13,7 +12,7 @@
 #include "utils.h"
 #include "utils/assert.h"
 
-const std::array<VkVertexInputAttributeDescription, 3> tr::renderer::Vertex::attributes = {{
+const std::array<VkVertexInputAttributeDescription, 4> tr::renderer::Vertex::attributes = {{
     {
         .location = 0,
         .binding = 0,
@@ -24,10 +23,16 @@ const std::array<VkVertexInputAttributeDescription, 3> tr::renderer::Vertex::att
         .location = 1,
         .binding = 0,
         .format = VK_FORMAT_R32G32B32_SFLOAT,
-        .offset = offsetof(Vertex, base_color),
+        .offset = offsetof(Vertex, normal),
     },
     {
         .location = 2,
+        .binding = 0,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex, color),
+    },
+    {
+        .location = 3,
         .binding = 0,
         .format = VK_FORMAT_R32G32_SFLOAT,
         .offset = offsetof(Vertex, uv),
@@ -36,7 +41,6 @@ const std::array<VkVertexInputAttributeDescription, 3> tr::renderer::Vertex::att
 
 const std::array<VkVertexInputBindingDescription, 1> tr::renderer::Vertex::bindings{{
     {
-
         .binding = 0,
         .stride = sizeof(tr::renderer::Vertex),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,

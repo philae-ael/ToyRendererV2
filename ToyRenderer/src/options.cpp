@@ -38,7 +38,7 @@ struct Entry {
     std::string_view section;
   } info;
 
-  enum class Kind { Boolean, Count, Custom, Choice, None } kind = Kind::None;
+  enum class Kind { Boolean, Count, Custom, Choice, String, None } kind = Kind::None;
   union {
     struct {
       bool *value;
@@ -51,6 +51,9 @@ struct Entry {
     struct {
       std::size_t *count;
     } count_entry;
+    struct {
+      std::string_view *value;
+    } string_entry;
     struct {
       int *value;
       std::span<const std::pair<std::string_view, int>> choices;
@@ -104,7 +107,7 @@ auto CliParser::dispactch_action(const Entry &entry) -> ParseResult {
       }
       entry.custom_entry.action(*this, entry.custom_entry.userdata);
       break;
-    case Entry::Kind::Choice:
+    case Entry::Kind::Choice: {
       if (!has_next()) {
         return ParseResult::MalFormedInput;
       }
@@ -118,6 +121,14 @@ auto CliParser::dispactch_action(const Entry &entry) -> ParseResult {
         return ParseResult::MalFormedInput;
       }
       break;
+    }
+    case Entry::Kind::String: {
+      if (!has_next()) {
+        return ParseResult::MalFormedInput;
+      }
+      *entry.string_entry.value = next();
+      break;
+    }
   }
   return ParseResult::Ok;
 }
@@ -302,6 +313,11 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                            {0, "no-imgui", "disable imgui", "Debug"},
                            Entry::Kind::Boolean,
                            {.bool_entry = {&ret.debug.imgui, true}},
+                       },
+                       {
+                           {'s', "scene", "load scene", "Scene"},
+                           Entry::Kind::String,
+                           {.string_entry = {&ret.scene}},
                        },
                    }}};
 

@@ -16,7 +16,16 @@ struct GBuffer {
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
 
-  static constexpr std::array bindings = utils::to_array({
+  static constexpr std::array set_0 = utils::to_array({
+      DescriptorSetLayoutBindingBuilder{}
+          .binding_(0)
+          .descriptor_type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+          .descriptor_count(1)
+          .stages(VK_SHADER_STAGE_VERTEX_BIT)
+          .build(),
+  });
+
+  static constexpr std::array set_1 = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
           .descriptor_type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)

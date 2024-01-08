@@ -16,6 +16,7 @@
                 "docking-experimental"
             ]
         },
-        "vulkan-memory-allocator"
+        "vulkan-memory-allocator",
+        "fastgltf"
     ]
 }

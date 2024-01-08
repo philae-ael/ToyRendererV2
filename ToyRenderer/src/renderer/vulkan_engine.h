@@ -11,22 +11,27 @@
 #include <cstdlib>
 #include <optional>
 
+#include "../camera.h"
 #include "constants.h"
 #include "debug.h"
 #include "deletion_queue.h"
 #include "descriptors.h"
 #include "device.h"
 #include "instance.h"
+#include "mesh.h"
 #include "passes/deferred.h"
 #include "passes/gbuffer.h"
 #include "ressources.h"
 #include "surface.h"
 #include "swapchain.h"
+#include "uploader.h"
 #include "utils.h"
-#include "../camera.h"
 
 namespace tr::system {
 class Imgui;
+}
+namespace tr {
+class Gltf;
 }
 
 namespace tr::renderer {
@@ -39,8 +44,11 @@ class VulkanEngine {
   void on_resize() { swapchain_need_to_be_rebuilt = true; }
 
   auto start_frame() -> std::optional<Frame>;
-  void draw(Frame);
+  void draw(Frame frame, std::span<const Mesh> meshes);
   void end_frame(Frame);
+
+  auto start_transfer() -> Transferer;
+  void end_transfer(Transferer&&);
 
   void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
 
@@ -56,10 +64,29 @@ class VulkanEngine {
 
   CameraMatrices matrices{};
 
+  auto image_builder() -> ImageBuilder { return {device.vk_device, allocator, &swapchain}; }
+  auto buffer_builder() -> BufferBuilder { return {device.vk_device, allocator}; }
+
+  // Lifetimes
+  struct {  // Cleaned at exit
+    InstanceDeletionStack instance;
+    DeviceDeletionStack device;
+    VmaDeletionStack allocator;
+  } global_deletion_stacks;
+
+  struct {  // Cleaned on swapchain recreation
+    DeviceDeletionStack device;
+    VmaDeletionStack allocator;
+  } swapchain_deletion_stacks;
+
+  struct {
+    DeviceDeletionStack device;
+    VmaDeletionStack allocator;
+  } frame_deletion_stacks;
+
  private:
   void rebuild_swapchain();
   void build_ressources();
-  void upload(DeviceDeletionStack&, VmaDeletionStack&);
 
   GLFWwindow* window{};
 
@@ -85,29 +112,14 @@ class VulkanEngine {
     Deferred deferred;
   } passes;
 
-  // Lifetimes
-  struct {  // Cleaned at exit
-    InstanceDeletionStack instance;
-    DeviceDeletionStack device;
-    VmaDeletionStack allocator;
-  } global_deletion_stacks;
-
-  struct {  // Cleaned on swapchain recreation
-    DeviceDeletionStack device;
-    VmaDeletionStack allocator;
-  } swapchain_deletion_stacks;
-
-  struct {
-    DeviceDeletionStack device;
-  } frame_deletion_stacks;
-
   Instance instance;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   Device device;
   VmaAllocator allocator = nullptr;
-  DescriptorAllocator descriptor_allocator{};
+  DescriptorAllocator global_descriptor_allocator{};
+  DescriptorAllocator frame_descriptor_allocator{};
   std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> deferred_descriptors{};
-  std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> gbuffer_descriptors{};
+  std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> camera_descriptors{};
   std::array<BufferRessource, MAX_FRAMES_IN_FLIGHT> gbuffer_camera_buffer{};
   VkSampler base_sampler{};
 
@@ -120,6 +132,8 @@ class VulkanEngine {
   std::array<FrameSynchro, MAX_FRAMES_IN_FLIGHT> frame_synchronisation_pool;
   std::array<VkCommandPool, MAX_FRAMES_IN_FLIGHT> graphic_command_pools{};
   std::array<OneTimeCommandBuffer, MAX_FRAMES_IN_FLIGHT> graphics_command_buffers{};
+
+  VkCommandPool transfer_command_pool = VK_NULL_HANDLE;
 
   // Data shall be moved, one day
   BufferRessource triangle_vertex_buffer;

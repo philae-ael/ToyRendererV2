@@ -68,10 +68,9 @@ struct BufferDefinition {
   }
 };
 
-struct BufferBuilder {
-  VkDevice device;
-  VmaAllocator allocator;
-
+class BufferBuilder {
+ public:
+  BufferBuilder(VkDevice device, VmaAllocator allocator) : device(device), allocator(allocator) {}
   [[nodiscard]] auto build_buffer(BufferDefinition definition, std::string_view debug_name) const -> BufferRessource {
     BufferRessource res{
         .usage = definition.usage,
@@ -105,6 +104,10 @@ struct BufferBuilder {
 
     return res;
   }
+
+ private:
+  VkDevice device;
+  VmaAllocator allocator;
 };
 
 enum ImageUsageBits {
@@ -251,10 +254,10 @@ struct ImageDefinition {
   }
 };
 
-struct ImageBuilder {
-  VkDevice device;
-  VmaAllocator allocator;
-  Swapchain* swapchain;
+class ImageBuilder {
+ public:
+  ImageBuilder(VkDevice device, VmaAllocator allocator, Swapchain* swapchain)
+      : device(device), allocator(allocator), swapchain(swapchain) {}
 
   [[nodiscard]] auto build_image(ImageDefinition definition, std::string_view debug_name) const -> ImageRessource {
     const auto format = definition.format(*swapchain);
@@ -324,6 +327,11 @@ struct ImageBuilder {
         .usage = definition.usage,
     };
   }
+
+ private:
+  VkDevice device;
+  VmaAllocator allocator;
+  Swapchain* swapchain;
 };
 
 // Storage for ressources that are used based on frame_id

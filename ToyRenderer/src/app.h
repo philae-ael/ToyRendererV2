@@ -4,9 +4,11 @@
 #include <utils/types.h>
 
 #include <cstdint>
+#include <vector>
 
 #include "camera.h"
 #include "options.h"
+#include "renderer/mesh.h"
 #include "renderer/vulkan_engine.h"
 #include "system/imgui.h"
 #include "system/input.h"
@@ -38,5 +40,7 @@ class App {
     utils::Timeline<float> timeline;
     CameraController camera_controller;
   } state;
+
+  std::vector<renderer::Mesh> meshes;
 };
 }  // namespace tr

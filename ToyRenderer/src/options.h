@@ -2,7 +2,9 @@
 
 #include <spdlog/common.h>
 #include <vulkan/vulkan_core.h>
+
 #include <span>
+#include <string_view>
 
 namespace tr {
 
@@ -17,6 +19,8 @@ struct Options {
   struct {
     VkPresentModeKHR prefered_present_mode = VK_PRESENT_MODE_FIFO_KHR;
   } config{};
+
+  std::string_view scene;
 
   static auto from_args(std::span<const char *> args) -> Options;
 };

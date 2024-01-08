@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
+#include <glm/fwd.hpp>
 #include <optional>
 #include <span>
 
@@ -14,6 +15,7 @@
 #include "debug.h"
 #include "deletion_queue.h"
 #include "descriptors.h"
+#include "mesh.h"
 #include "passes/gbuffer.h"
 #include "queue.h"
 #include "ressources.h"
@@ -23,25 +25,6 @@
 #include "timestamp.h"
 #include "uploader.h"
 #include "utils.h"
-#include "vertex.h"
-
-const std::array triangle = std::to_array<tr::renderer::Vertex>({
-    {
-        .pos = {-1, -1, 0.},
-        .base_color = {1, 0, 0},
-        .uv = {0, 0},
-    },
-    {
-        .pos = {1, -1, 0.},
-        .base_color = {0, 0, 1},
-        .uv = {0, 0},
-    },
-    {
-        .pos = {0, 1, 0.},
-        .base_color = {0, 1, 0},
-        .uv = {0, 0},
-    },
-});
 
 auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   if (swapchain_need_to_be_rebuilt) {
@@ -87,46 +70,73 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   return frame;
 }
 
-void tr::renderer::VulkanEngine::draw(Frame frame) {
+void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes) {
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_TOP);
-  debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
-  {
-    CameraMatrices* map = nullptr;
-    vmaMapMemory(allocator, gbuffer_camera_buffer[frame_id % MAX_FRAMES_IN_FLIGHT].alloc,
-                 reinterpret_cast<void**>(&map));
-    *map = matrices;
-    vmaUnmapMemory(allocator, gbuffer_camera_buffer[frame_id % MAX_FRAMES_IN_FLIGHT].alloc);
-  }
+  auto cmd = frame.cmd.vk_cmd;
 
-  passes.gbuffer.draw(frame.cmd.vk_cmd, rm, {{0, 0}, swapchain.extent}, [&] {
-    VkDeviceSize offset = 0;
-    vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.gbuffer.pipeline_layout, 0, 1,
-                            &gbuffer_descriptors[frame_id % MAX_FRAMES_IN_FLIGHT], 0, nullptr);
-    vkCmdBindVertexBuffers(frame.cmd.vk_cmd, 0, 1, &triangle_vertex_buffer.buffer, &offset);
-    vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
+  debug_info.write_gpu_timestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
+  passes.gbuffer.draw(cmd, rm, {{0, 0}, swapchain.extent}, [&] {
+    {
+      CameraMatrices* map = nullptr;
+      const auto& buf = gbuffer_camera_buffer[frame_id % MAX_FRAMES_IN_FLIGHT];
+      vmaMapMemory(allocator, buf.alloc, reinterpret_cast<void**>(&map));
+      *map = matrices;
+      vmaUnmapMemory(allocator, buf.alloc);
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.gbuffer.pipeline_layout, 0, 1,
+                              &camera_descriptors[frame_id % MAX_FRAMES_IN_FLIGHT], 0, nullptr);
+    }
+    for (const auto& mesh : meshes) {
+      VkDeviceSize offset = 0;
+      vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
+      if (mesh.buffers.indices) {
+        vkCmdBindIndexBuffer(cmd, mesh.buffers.indices->buffer, 0, VK_INDEX_TYPE_UINT32);
+      }
+
+      vkCmdPushConstants(cmd, passes.gbuffer.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4),
+                         &mesh.transform);
+
+      for (auto& surface : mesh.surfaces) {
+        if (mesh.buffers.indices) {
+          vkCmdDrawIndexed(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0, 0);
+        } else {
+          vkCmdDraw(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0);
+        }
+      }
+    }
   });
 
   debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                                  GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
 
-  rm.fb0.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
-  passes.deferred.draw(frame.cmd.vk_cmd, rm, {{0, 0}, swapchain.extent}, [&] {
+  {
+    rm.fb0.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
+    rm.fb1.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
     auto descriptor = deferred_descriptors[frame_id % MAX_FRAMES_IN_FLIGHT];
-    VkDescriptorImageInfo image_info{
-        .sampler = base_sampler,
-        .imageView = rm.fb0.view,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    };
-
+    DescriptorUpdater{descriptor, 0}
+        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .image_info({{
+            {
+                .sampler = base_sampler,
+                .imageView = rm.fb0.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+        }})
+        .write(device.vk_device);
     DescriptorUpdater{descriptor, 1}
         .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        .image_info({&image_info, 1})
+        .image_info({{
+            {
+                .sampler = base_sampler,
+                .imageView = rm.fb1.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+        }})
         .write(device.vk_device);
 
     vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.deferred.pipeline_layout, 0, 1,
                             &descriptor, 0, nullptr);
-    vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
-  });
+  }
+  passes.deferred.draw(frame.cmd.vk_cmd, rm, {{0, 0}, swapchain.extent});
 
   debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
@@ -151,7 +161,9 @@ void tr::renderer::VulkanEngine::end_frame(Frame frame) {
   }
 
   // per frame cleanup
+  frame_descriptor_allocator.reset(device.vk_device);
   frame_deletion_stacks.device.cleanup(device.vk_device);
+  frame_deletion_stacks.allocator.cleanup(allocator);
 
   // Store back ressources state
   fb0_ressources.store(frame_id, rm.fb0);
@@ -162,7 +174,7 @@ void tr::renderer::VulkanEngine::end_frame(Frame frame) {
 }
 
 void tr::renderer::VulkanEngine::build_ressources() {
-  ImageBuilder rb{device.vk_device, allocator, &swapchain};
+  auto rb = image_builder();
 
   fb0_ressources.init(rb);
   fb1_ressources.init(rb);
@@ -231,18 +243,8 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     CommandPool::defer_deletion(graphic_command_pools[i], global_deletion_stacks.device);
     graphics_command_buffers[i] = OneTimeCommandBuffer::allocate(device.vk_device, graphic_command_pools[i]);
   }
-
-  BufferBuilder bb{device.vk_device, allocator};
-  triangle_vertex_buffer = bb.build_buffer(
-      {
-          .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-          .size = triangle.size() * sizeof(decltype(triangle)::value_type),
-          .flags = 0,
-      },
-      "Triangle");
-  triangle_vertex_buffer.defer_deletion(global_deletion_stacks.allocator);
-
-  upload(setup_device_deletion_stack, setup_allocator_deletion_stack);
+  transfer_command_pool = CommandPool::init(device, CommandPool::TargetQueue::Transfer);
+  CommandPool::defer_deletion(transfer_command_pool, global_deletion_stacks.device);
 
   swapchain = Swapchain::init_with_config({options.config.prefered_present_mode}, device, surface, window);
   swapchain.defer_deletion(swapchain_deletion_stacks.device);
@@ -257,36 +259,26 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   passes.deferred = Deferred::init(device.vk_device, swapchain, setup_device_deletion_stack);
   passes.deferred.defer_deletion(global_deletion_stacks.device);
 
-  descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
-                                                   {{
-                                                       {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 50},
-                                                       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 50},
-                                                   }});
-  descriptor_allocator.defer_deletion(global_deletion_stacks.device);
-  for (auto& descriptor : deferred_descriptors) {
-    descriptor = descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
-    const auto b = bb.build_buffer(
-        {
-            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            .size = 256,
-            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-        },
-        "uniforms");
-    b.defer_deletion(global_deletion_stacks.allocator);
-    float* map = nullptr;
-    vmaMapMemory(allocator, b.alloc, reinterpret_cast<void**>(&map));
-    map[0] = 0.4;
-    vmaUnmapMemory(allocator, b.alloc);
+  global_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4,
+                                                          {{
+                                                              {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2},
+                                                              {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2},
+                                                          }});
+  global_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
+  frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
+                                                         {{
+                                                             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4096},
+                                                         }});
+  frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
 
-    VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
-    DescriptorUpdater{descriptor, 0}
-        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-        .buffer_info({&buffer_info, 1})
-        .write(device.vk_device);
+  for (auto& descriptor : deferred_descriptors) {
+    descriptor = global_descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
   }
 
+  auto bb = buffer_builder();
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    gbuffer_descriptors[i] = descriptor_allocator.allocate(device.vk_device, passes.gbuffer.descriptor_set_layouts[0]);
+    camera_descriptors[i] =
+        global_descriptor_allocator.allocate(device.vk_device, passes.gbuffer.descriptor_set_layouts[0]);
     const auto b = bb.build_buffer(
         {
             .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -298,7 +290,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     gbuffer_camera_buffer[i] = b;
 
     VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
-    DescriptorUpdater{gbuffer_descriptors[i], 0}
+    DescriptorUpdater{camera_descriptors[i], 0}
         .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
         .buffer_info({&buffer_info, 1})
         .write(device.vk_device);
@@ -341,27 +333,25 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   setup_allocator_deletion_stack.cleanup(allocator);
 }
 
-void tr::renderer::VulkanEngine::upload(DeviceDeletionStack& device_deletion_stack,
-                                        VmaDeletionStack& allocator_deletion_stack) {
-  VkCommandPool transfer_command_pool = CommandPool::init(device, CommandPool::TargetQueue::Transfer);
-  CommandPool::defer_deletion(transfer_command_pool, device_deletion_stack);
-
+auto tr::renderer::VulkanEngine::start_transfer() -> Transferer {
   auto cmd = OneTimeCommandBuffer::allocate(device.vk_device, transfer_command_pool);
   VK_UNWRAP(cmd.begin);
+  return {
+      cmd,
+      Uploader::init(allocator),
+  };
+}
+void tr::renderer::VulkanEngine::end_transfer(Transferer&& t_in) {
+  Transferer t{std::move(t_in)};
+  VK_UNWRAP(t.cmd.end);
 
-  auto uploader = Uploader::init(allocator);
-  uploader.upload(cmd.vk_cmd, triangle_vertex_buffer.buffer, 0, std::as_bytes(std::span{triangle}));
-
-  VK_UNWRAP(cmd.end);
-
-  QueueSubmit{}.command_buffers({{cmd.vk_cmd}}).submit(device.queues.transfer_queue, VK_NULL_HANDLE);
-  uploader.defer_trim(allocator_deletion_stack);
-
-  sync();
+  QueueSubmit{}.command_buffers({{t.cmd.vk_cmd}}).submit(device.queues.transfer_queue, VK_NULL_HANDLE);
+  t.uploader.defer_trim(frame_deletion_stacks.allocator);
 }
 
 tr::renderer::VulkanEngine::~VulkanEngine() {
   sync();
+
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkFreeCommandBuffers(device.vk_device, graphic_command_pools[i], 1, &graphics_command_buffers[i].vk_cmd);
   }

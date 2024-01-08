@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "deletion_queue.h"
+#include "swapchain.h"
 #include "vertex.h"
 namespace tr::renderer {
 
@@ -55,6 +56,15 @@ class Uploader {
 
   VmaAllocator allocator;
   std::vector<tr::renderer::StagingBuffer> staging_buffers{};
+};
+
+struct Transferer {
+  OneTimeCommandBuffer cmd;
+  Uploader uploader;
+
+  void upload(VkBuffer dst, std::size_t offset, std::span<const std::byte> src) {
+    uploader.upload(cmd.vk_cmd, dst, offset, src);
+  }
 };
 
 }  // namespace tr::renderer
