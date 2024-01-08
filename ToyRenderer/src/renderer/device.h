@@ -7,6 +7,7 @@
 #include "deletion_queue.h"
 #include "utils/assert.h"
 #include "utils/types.h"
+#include "utils/cast.h"
 
 struct GLFWwindow;
 
@@ -44,7 +45,7 @@ struct Device : utils::types::threadsafe {
 
       bool suitable_memory = ((type_filter & (1 << i)) != 0) && (memory_type.propertyFlags & properties) == properties;
       if (suitable_memory) {
-        return i;
+        return utils::narrow_cast<uint32_t>(i);
       }
     }
 

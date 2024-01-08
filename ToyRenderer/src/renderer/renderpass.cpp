@@ -1,7 +1,8 @@
 #include "renderpass.h"
 
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.h>
 
+#include <array>
 #include <cstddef>
 
 #include "swapchain.h"
@@ -61,7 +62,7 @@ auto tr::renderer::Renderpass::init(VkDevice device, tr::renderer::Swapchain& sw
         .pNext = nullptr,
         .flags = 0,
         .renderPass = renderpass.vk_renderpass,
-        .attachmentCount = attachements.size(),
+        .attachmentCount = utils::narrow_cast<uint32_t>(attachements.size()),
         .pAttachments = attachements.data(),
         .width = swapchain.extent.width,
         .height = swapchain.extent.height,

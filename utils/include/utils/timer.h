@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <ratio>
+#include <span>
 
 #include "utils/math.h"
 namespace utils {
@@ -37,10 +38,10 @@ class FilteredTimer {
  private:
   Timer timer;
   math::KalmanFilter<float> filter{
-      .process_covariance = 0.1,
-      .noise_covariance = 1.0,
-      .state = 0.0,
-      .covariance = 0.0,
+      .process_covariance = 0.1F,
+      .noise_covariance = 1.0F,
+      .state = 0.0F,
+      .covariance = 0.0F,
   };
 };
 

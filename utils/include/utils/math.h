@@ -10,14 +10,14 @@ struct KalmanFilter {
   // Note: we suppose that the model is **static** and one dimensionnal
 
   // Parameters: they should not be null
-  T process_covariance = 1.0;
-  T noise_covariance = 1.0;
+  T process_covariance = 1.0F;
+  T noise_covariance = 1.0F;
 
-  T state = 0.0;
-  T covariance = 0.0;
+  T state = 0.0F;
+  T covariance = 0.0F;
 
-  void update(double mesured) {
-    T predicted_state = state + 0;
+  void update(float mesured) {
+    T predicted_state = state + 0.F;
     T predicted_covariance = covariance + process_covariance;
 
     T residual = mesured - predicted_state;

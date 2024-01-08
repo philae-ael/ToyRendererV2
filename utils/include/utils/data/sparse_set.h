@@ -5,7 +5,7 @@
 
 namespace utils::data {
 
-template <class T, const types::usize N = 256>
+template <class T, const std::size_t N = 256>
 class sparse_set {
  public:
   struct item {
@@ -72,7 +72,4 @@ class sparse_set {
 
   utils::data::hive<types::usize, N> sparse;
 };
-
-template class sparse_set<int>;
-static_assert(std::ranges::range<sparse_set<int>>);
 }  // namespace utils::data

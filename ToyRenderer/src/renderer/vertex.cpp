@@ -73,7 +73,7 @@ auto tr::renderer::TriangleVertexBuffer(tr::renderer::Device &device, VkCommandB
       .size = triangle.size() * sizeof(tr::renderer::Vertex),
       .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
       .sharingMode = VK_SHARING_MODE_CONCURRENT,
-      .queueFamilyIndexCount = queues.size(),
+      .queueFamilyIndexCount = utils::narrow_cast<uint32_t>(queues.size()),
       .pQueueFamilyIndices = queues.data(),
   };
 

@@ -35,7 +35,7 @@ struct Timestamp {
     if (query_pool == VK_NULL_HANDLE) {
       return;
     }
-    vkCmdWriteTimestamp(cmd, pipelineStage, query_pool, query_index(frame_id, index));
+    vkCmdWriteTimestamp(cmd, pipelineStage, query_pool, utils::narrow_cast<uint32_t>(query_index(frame_id, index)));
   }
 
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) {
@@ -43,12 +43,12 @@ struct Timestamp {
   }
 
   void reset_queries(VkCommandBuffer cmd, std::size_t frame_id) {
-    vkCmdResetQueryPool(cmd, query_pool, query_index(frame_id, 0), QUERY_COUNT);
+    vkCmdResetQueryPool(cmd, query_pool, utils::narrow_cast<uint32_t>(query_index(frame_id, 0)), QUERY_COUNT);
   }
 
   auto get(VkDevice device, std::size_t frame_id) -> bool {
     VkResult result =
-        vkGetQueryPoolResults(device, query_pool, query_index(frame_id, 0), QUERY_COUNT,
+        vkGetQueryPoolResults(device, query_pool, utils::narrow_cast<uint32_t>(query_index(frame_id, 0)), QUERY_COUNT,
                               2 * QUERY_COUNT * sizeof(uint64_t), &raw_timestamps.at(raw_timestamps_index(frame_id, 0)),
                               2 * sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
     switch (result) {

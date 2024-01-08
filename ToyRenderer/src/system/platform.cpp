@@ -32,13 +32,13 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
   glfw_extract_platform(window)->on_mouse_move(xpos, ypos);
 }
 
-void tr::system::Platform::init(tr::App* app) {
+void tr::system::Platform::init(tr::App* new_app) {
   TR_ASSERT(glfwInit() != 0, "could not initializa GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-  this->app = app;
+  this->app = new_app;
   window = glfwCreateWindow(WinWidthInitial, WinHeightInitial, "Toy Renderer", nullptr, nullptr);
   TR_ASSERT(window, "could not open window");
 

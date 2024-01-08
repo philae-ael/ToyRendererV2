@@ -120,22 +120,22 @@ void tr::renderer::VulkanEngine::rebuild_swapchain() {
 }
 
 void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char*> required_instance_extensions,
-                                      GLFWwindow* window) {
+                                      GLFWwindow* w) {
   if (options.debug.renderdoc) {
     renderdoc = tr::renderer::Renderdoc::init();
   }
 
-  this->window = window;
+  window = w;
   instance = Instance::init(options, required_instance_extensions);
   instance.defer_deletion(global_deletion_stacks.instance);
 
-  surface = Surface::init(instance.vk_instance, window);
+  surface = Surface::init(instance.vk_instance, w);
   Surface::defer_deletion(surface, global_deletion_stacks.instance);
 
   device = Device::init(instance.vk_instance, surface);
   device.defer_deletion(global_deletion_stacks.instance);
 
-  swapchain = Swapchain::init(options, device, surface, window);
+  swapchain = Swapchain::init(options, device, surface, w);
   swapchain.defer_deletion(swapchain_device_deletion_stack);
 
   renderpass = tr::renderer::Renderpass::init(device.vk_device, swapchain);
@@ -208,7 +208,7 @@ tr::renderer::VulkanEngine::~VulkanEngine() {
   // TODO: add a free queue for buffers?
   vkFreeMemory(device.vk_device, staging_buffer.buffer.device_memory, nullptr);
   vkFreeMemory(device.vk_device, triangle_vertex_buffer.device_memory, nullptr);
-  vkFreeCommandBuffers(device.vk_device, graphics_command_pool, main_command_buffer_pool.size(),
+  vkFreeCommandBuffers(device.vk_device, graphics_command_pool, utils::narrow_cast<uint32_t>(main_command_buffer_pool.size()),
                        main_command_buffer_pool.data());
   swapchain_device_deletion_stack.cleanup(device.vk_device);
   global_deletion_stacks.device.cleanup(device.vk_device);

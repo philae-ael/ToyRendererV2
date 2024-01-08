@@ -11,6 +11,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project("ToyRenderer")
 
+if (MSVC)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:preprocessor")
+endif()
+
+
 add_subdirectory("ToyRenderer")
 add_subdirectory("utils")
 add_subdirectory("libs" SYSTEM)

@@ -22,6 +22,8 @@ add_library(imgui_glfw_vulkan STATIC
     ${IMGUI_HEADERS}
 )
 
-target_link_libraries(imgui_glfw_vulkan PRIVATE glfw vulkan)
+find_package(Vulkan REQUIRED)
+
+target_link_libraries(imgui_glfw_vulkan PRIVATE glfw Vulkan::Vulkan)
 file(COPY ${IMGUI_HEADERS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include)
 target_include_directories(imgui_glfw_vulkan PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)

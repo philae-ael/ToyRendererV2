@@ -9,8 +9,8 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cwchar>
 #include <set>
+#include <array>
 #include <vector>
 
 #include "utils.h"
@@ -90,7 +90,7 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
         }
 
         auto present_support = VK_FALSE;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
+        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, utils::narrow_cast<uint32_t>(i), surface, &present_support);
         if (present_support == VK_TRUE) {
           present_family = i;
         }

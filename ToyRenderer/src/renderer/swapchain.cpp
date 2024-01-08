@@ -5,6 +5,7 @@
 #include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm>
 #include <cstdint>
 
 #include "debug.h"
@@ -20,15 +21,15 @@ auto tr::renderer::Swapchain::compute_extent(GLFWwindow* window) const -> VkExte
   int height{};
   glfwGetFramebufferSize(window, &width, &height);
 
-  VkExtent2D extent{
+  VkExtent2D new_extent{
       utils::narrow_cast<uint32_t>(width),
       utils::narrow_cast<uint32_t>(height),
   };
 
-  extent.width = std::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-  extent.height = std::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+  new_extent.width = std::clamp(new_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+  new_extent.height = std::clamp(new_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
-  return extent;
+  return new_extent;
 }
 
 auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::renderer::Device& device,
@@ -55,7 +56,7 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
                                             s.available_present_modes.data());
 
   std::optional<VkSurfaceFormatKHR> chosen_format;
-    spdlog::debug("Available surface formats:");
+  spdlog::debug("Available surface formats:");
   for (const auto& available_format : s.available_formats) {
     spdlog::debug("\tformat {} | colorSpace {}", available_format.format, available_format.colorSpace);
     if (available_format.format == VK_FORMAT_B8G8R8A8_UNORM &&
@@ -112,10 +113,10 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
 
   VK_UNWRAP(vkCreateSwapchainKHR, device.vk_device, &create_info, nullptr, &s.vk_swapchain);
   {
-    std::uint32_t image_count{};
-    vkGetSwapchainImagesKHR(device.vk_device, s.vk_swapchain, &image_count, nullptr);
-    s.images.resize(image_count);
-    vkGetSwapchainImagesKHR(device.vk_device, s.vk_swapchain, &image_count, s.images.data());
+    std::uint32_t swapchain_image_count{};
+    vkGetSwapchainImagesKHR(device.vk_device, s.vk_swapchain, &swapchain_image_count, nullptr);
+    s.images.resize(swapchain_image_count);
+    vkGetSwapchainImagesKHR(device.vk_device, s.vk_swapchain, &swapchain_image_count, s.images.data());
   }
 
   s.image_views.resize(s.images.size());

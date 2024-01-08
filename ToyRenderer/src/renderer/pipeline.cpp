@@ -76,9 +76,9 @@ auto tr::renderer::Pipeline::init(Device& device, VkRenderPass renderpass) -> Pi
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .vertexBindingDescriptionCount = Vertex::bindings.size(),
+      .vertexBindingDescriptionCount = utils::narrow_cast<uint32_t>(Vertex::bindings.size()),
       .pVertexBindingDescriptions = Vertex::bindings.data(),
-      .vertexAttributeDescriptionCount = Vertex::attributes.size(),
+      .vertexAttributeDescriptionCount = utils::narrow_cast<uint32_t>(Vertex::attributes.size()),
       .pVertexAttributeDescriptions = Vertex::attributes.data(),
   };
 
@@ -171,7 +171,7 @@ auto tr::renderer::Pipeline::init(Device& device, VkRenderPass renderpass) -> Pi
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .stageCount = shader_stages.size(),
+      .stageCount = utils::narrow_cast<uint32_t>(shader_stages.size()),
       .pStages = shader_stages.data(),
       .pVertexInputState = &vertex_input_state,
       .pInputAssemblyState = &input_assembly_state,

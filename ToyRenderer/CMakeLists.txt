@@ -1,4 +1,6 @@
-﻿add_executable(ToyRenderer
+﻿find_package(Vulkan REQUIRED)
+
+add_executable(ToyRenderer
     src/main.cpp
     src/app.h
     src/app.cpp
@@ -36,7 +38,7 @@
     src/system/input.cpp
     src/system/imgui.h
 )
-target_link_libraries(ToyRenderer PRIVATE glfw vulkan imgui_glfw_vulkan spdlog glm utils renderdoc)
+target_link_libraries(ToyRenderer PRIVATE glfw Vulkan::Vulkan imgui_glfw_vulkan spdlog glm utils renderdoc)
 
 # set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy")
 # set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")

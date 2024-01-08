@@ -2,6 +2,7 @@
 
 #include <spdlog/common.h>
 #include <vulkan/vulkan_core.h>
+#include <span>
 
 namespace tr {
 
