@@ -30,13 +30,13 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
       VK_DYNAMIC_STATE_SCISSOR,
       VK_DYNAMIC_STATE_VIEWPORT,
   };
-  const auto dynamic_state_state = PipelineDynamicState{}.dynamic_state(dynamic_states).build();
+  const auto dynamic_state_state = PipelineDynamicStateBuilder{}.dynamic_state(dynamic_states).build();
 
   const auto vertex_input_state =
       PipelineVertexInputStateBuilder{}.vertex_attributes(Vertex::attributes).vertex_bindings(Vertex::bindings).build();
 
   const auto input_assembly_state =
-      PipelineInputAssemblyBuilder{}.topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
+      PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
   const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
   const auto rasterizer_state = PipelineRasterizationStateBuilder{}.build();
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
@@ -61,7 +61,7 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const auto layout = PipelineLayoutBuilder{}.build(device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
-                            .layout(layout)
+                            .layout_(layout)
                             .pipeline_rendering_create_info(&pipeline_rendering_create_info)
                             .vertex_input_state(&vertex_input_state)
                             .input_assembly_state(&input_assembly_state)

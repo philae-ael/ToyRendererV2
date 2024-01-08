@@ -7,13 +7,17 @@
 #include <cstdint>
 #include <vector>
 
+#include "camera.h"
 #include "options.h"
 #include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
 #include "utils/types.h"
 
-void tr::App::update() {}
+void tr::App::update() {
+  const auto dt = state.frame_timer.elapsed();
+  state.camera_controller.update(subsystems.input.consume_camera_input(), dt);
+}
 
 tr::App::App(tr::Options options) : options(options) {
   subsystems.platform.init(this);

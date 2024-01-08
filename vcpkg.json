@@ -2,7 +2,10 @@
     "dependencies": [
         "jsoncpp",
         "vulkan",
-        "spdlog",
+        {
+            "name": "spdlog",
+            "default-features": false
+        },
         "glfw3",
         "glm",
         {

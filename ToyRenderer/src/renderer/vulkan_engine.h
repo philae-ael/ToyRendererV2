@@ -14,6 +14,7 @@
 #include "constants.h"
 #include "debug.h"
 #include "deletion_queue.h"
+#include "descriptors.h"
 #include "device.h"
 #include "instance.h"
 #include "passes/deferred.h"
@@ -52,6 +53,13 @@ class VulkanEngine {
   friend VulkanEngineDebugInfo;
   VulkanEngineDebugInfo debug_info;
 
+ private:
+  void rebuild_swapchain();
+  void build_ressources();
+  void upload(DeviceDeletionStack&, VmaDeletionStack&);
+
+  GLFWwindow* window{};
+
   FrameRessourceManager rm{};
   ImageRessourceStorage fb0_ressources{
       .definition = GBuffer::definitions[0],
@@ -68,13 +76,6 @@ class VulkanEngine {
       .ressources = {},
       .debug_name = "depth",
   };
-
- private:
-  void rebuild_swapchain();
-  void build_ressources();
-  void upload(DeviceDeletionStack&, VmaDeletionStack&);
-
-  GLFWwindow* window{};
 
   struct {
     GBuffer gbuffer;
@@ -101,6 +102,9 @@ class VulkanEngine {
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   Device device;
   VmaAllocator allocator = nullptr;
+  DescriptorAllocator descriptor_allocator{};
+  std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> main_descriptors{};
+  VkSampler base_sampler{};
 
   // Swapchain related
   Swapchain swapchain;

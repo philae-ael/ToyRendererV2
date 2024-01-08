@@ -71,6 +71,13 @@ static constexpr SyncInfo SyncColorAttachment{
     .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 };
 
+static constexpr SyncInfo SyncFragmentShaderReadOnly{
+    .accessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+    .stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+    .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+};
+
 static constexpr SyncInfo SyncLateDepth{
     .accessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     .stageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,

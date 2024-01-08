@@ -5,6 +5,7 @@
 
 #include <cstdint>
 
+#include "camera.h"
 #include "options.h"
 #include "renderer/vulkan_engine.h"
 #include "system/imgui.h"
@@ -35,6 +36,7 @@ class App {
   struct State {
     utils::FilteredTimer frame_timer;
     utils::Timeline<float> timeline;
+    CameraController camera_controller;
   } state;
 };
 }  // namespace tr

@@ -17,17 +17,17 @@ struct GBuffer {
       {
           // fb0
           .flags = IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
-          .usage = ImageUsage::Color,
+          .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
       },
       {
           // fb1
           .flags = IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
-          .usage = ImageUsage::Color,
+          .usage = IMAGE_USAGE_COLOR_BIT |  IMAGE_USAGE_SAMPLED_BIT,
       },
       {
           // depth
           .flags = IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
-          .usage = ImageUsage::Depth,
+          .usage = IMAGE_USAGE_DEPTH_BIT,
       },
   });
 

@@ -16,7 +16,6 @@
 #include "swapchain.h"
 #include "synchronisation.h"
 #include "utils.h"
-#include "vertex.h"
 
 namespace tr::renderer {
 
@@ -32,9 +31,41 @@ struct BufferRessource {
   }
 };
 
+enum BufferOptionFlagsBits {
+  BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT = 1 << 1,
+};
+
+using BufferOptionFlags = std::uint32_t;
+
 struct BufferDefinition {
   VkBufferUsageFlags usage;
   uint32_t size;
+  BufferOptionFlags flags;
+
+  [[nodiscard]] auto vma_required_flags() const -> VkMemoryPropertyFlags {
+    if ((flags & BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT) != 0) {
+      return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    }
+    return 0;
+  }
+  [[nodiscard]] auto vma_prefered_flags() const -> VkMemoryPropertyFlags {
+    if ((flags & BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT) != 0) {
+      return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    }
+    return 0;
+  }
+  [[nodiscard]] auto vma_usage() const -> VmaMemoryUsage {
+    if ((flags & BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT) != 0) {
+      return VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    }
+    return VMA_MEMORY_USAGE_AUTO;
+  }
+  [[nodiscard]] auto vma_flags() const -> VmaAllocationCreateFlags {
+    if ((flags & BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT) != 0) {
+      return VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    }
+    return 0;
+  }
 };
 
 struct BufferBuilder {
@@ -51,18 +82,18 @@ struct BufferBuilder {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
-        .size = 3 * sizeof(tr::renderer::Vertex),
-        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .size = definition.size,
+        .usage = definition.usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices = nullptr,
     };
 
     VmaAllocationCreateInfo allocation_create_info{
-        .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
-        .usage = VMA_MEMORY_USAGE_AUTO,
-        .requiredFlags = 0,
-        .preferredFlags = 0,
+        .flags = definition.vma_flags(),
+        .usage = definition.vma_usage(),
+        .requiredFlags = definition.vma_required_flags(),
+        .preferredFlags = definition.vma_prefered_flags(),
         .memoryTypeBits = 0,
         .pool = VK_NULL_HANDLE,
         .pUserData = nullptr,
@@ -76,10 +107,13 @@ struct BufferBuilder {
   }
 };
 
-enum class ImageUsage {
-  Color,
-  Depth,
+enum ImageUsageBits {
+  IMAGE_USAGE_COLOR_BIT = 1 << 1,
+  IMAGE_USAGE_DEPTH_BIT = 1 << 2,
+  IMAGE_USAGE_SAMPLED_BIT = 1 << 3,
 };
+
+using ImageUsage = std::uint32_t;
 
 struct ImageRessource {
   VkImage image;
@@ -88,7 +122,7 @@ struct ImageRessource {
   VmaAllocation alloc;
   ImageUsage usage;
 
-  static auto from_external_image(VkImage image, VkImageView view, ImageUsage usage,
+  static auto from_external_image(VkImage image, VkImageView view, ImageUsageBits usage,
                                   SyncInfo sync_info = SrcImageMemoryBarrierUndefined) -> ImageRessource {
     return {image, view, sync_info, nullptr, usage};
   }
@@ -100,14 +134,13 @@ struct ImageRessource {
   auto sync(VkCommandBuffer cmd, SyncInfo dst) -> ImageRessource& {
     if (dst.layout != sync_info.layout || dst.queueFamilyIndex != sync_info.queueFamilyIndex) {
       VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
-      switch (usage) {
-        case ImageUsage::Color:
-          aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-          break;
-        case ImageUsage::Depth:
-          aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-          break;
+      if ((usage & ImageUsageBits::IMAGE_USAGE_COLOR_BIT) != 0) {
+        aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
       }
+      if ((usage & ImageUsageBits::IMAGE_USAGE_DEPTH_BIT) != 0) {
+        aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+      }
+
       sync_info
           .prepare_sync_transition(dst, image,
                                    VkImageSubresourceRange{
@@ -175,7 +208,6 @@ struct ImageDefinition {
         "exacly one format has to be specified");
 
     if ((flags & IMAGE_OPTION_FLAG_FORMAT_B8G8R8A8_UNORM_BIT) != 0) {
-      TR_ASSERT(usage == ImageUsage::Color, "BAD USAGE");
       return VK_FORMAT_B8G8R8A8_UNORM;
     }
 
@@ -195,22 +227,27 @@ struct ImageDefinition {
   }
 
   [[nodiscard]] auto image_usage() const -> VkImageUsageFlags {
-    switch (usage) {
-      case ImageUsage::Color:
-        return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-      case ImageUsage::Depth:
-        return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    VkImageUsageFlags ret = 0;
+    if ((usage & IMAGE_USAGE_COLOR_BIT) != 0) {
+      ret |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
-    TR_ASSERT(false, "unexpected");
+    if ((usage & IMAGE_USAGE_DEPTH_BIT) != 0) {
+      ret |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    }
+    if ((usage & IMAGE_USAGE_SAMPLED_BIT) != 0) {
+      ret |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    }
+    return ret;
   }
   [[nodiscard]] auto aspect_mask() const -> VkImageAspectFlags {
-    switch (usage) {
-      case ImageUsage::Color:
-        return VK_IMAGE_ASPECT_COLOR_BIT;
-      case ImageUsage::Depth:
-        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
+    if ((usage & ImageUsageBits::IMAGE_USAGE_COLOR_BIT) != 0) {
+      aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
     }
-    TR_ASSERT(false, "unexpected");
+    if ((usage & ImageUsageBits::IMAGE_USAGE_DEPTH_BIT) != 0) {
+      aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+    return aspectMask;
   }
 };
 

@@ -2,11 +2,14 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <set>
 #include <span>
 #include <string_view>
+
+#include "utils/assert.h"
 
 #define VK_UNWRAP(f, ...) VK_CHECK(f(__VA_ARGS__), f)
 #define VK_CHECK(result, name)                                                                               \
@@ -15,7 +18,29 @@
     TR_ASSERT(__res == VK_SUCCESS, "error while calling " #name " got error code {}", (std::uint32_t)__res); \
   } while (false)
 
+static_assert(0 == static_cast<std::uint32_t>(0), "to remove warning about unused header cstdint, NOLINT doesnt works");
+
 namespace tr::renderer {
+
+template <class Child, class T>
+struct VkBuilder : T {
+  [[nodiscard]] constexpr auto inner() const -> const T& { return *this; }
+  [[nodiscard]] constexpr auto inner_ptr() const -> const T* { return this; }
+  constexpr auto inner() -> T& { return *this; }
+  constexpr auto inner_ptr() -> T* { return this; }
+
+  constexpr auto copy() -> Child { return *this; }
+
+  // Can't constexpr without modifying pNext->pNext i guess
+  /*constexpr*/ auto chain(const VkBaseInStructure* pNext) -> Child& {
+    auto* next = reinterpret_cast<VkBaseOutStructure*>(inner_ptr());
+    while (next->pNext != nullptr) {
+      next = next->pNext;
+    }
+    reinterpret_cast<VkBaseInStructure*>(next)->pNext = pNext;
+    return static_cast<Child&>(*this);
+  }
+};
 
 auto check_extensions(const char* kind, std::span<const char* const> required, std::span<const char* const> optional,
                       std::span<VkExtensionProperties> available) -> std::optional<std::set<std::string>>;

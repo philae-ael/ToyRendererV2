@@ -13,10 +13,12 @@
 #include "constants.h"
 #include "debug.h"
 #include "deletion_queue.h"
+#include "descriptors.h"
 #include "passes/gbuffer.h"
 #include "queue.h"
 #include "ressources.h"
 #include "swapchain.h"
+#include "synchronisation.h"
 #include "timeline_info.h"
 #include "timestamp.h"
 #include "uploader.h"
@@ -36,24 +38,6 @@ const std::array triangle = std::to_array<tr::renderer::Vertex>({
     },
     {
         .pos = {0, 1, 0.},
-        .base_color = {0, 1, 0},
-        .uv = {0, 0},
-    },
-});
-
-const std::array screen_space_triangle = std::to_array<tr::renderer::Vertex>({
-    {
-        .pos = {-1, 3, 0.},
-        .base_color = {1, 0, 0},
-        .uv = {0, 0},
-    },
-    {
-        .pos = {-1, -1, 0.},
-        .base_color = {0, 0, 1},
-        .uv = {0, 0},
-    },
-    {
-        .pos = {3, -1, 0.},
         .base_color = {0, 1, 0},
         .uv = {0, 0},
     },
@@ -95,7 +79,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   // update ressources used this frame
   rm.swapchain =
       ImageRessource::from_external_image(swapchain.images[frame.swapchain_image_index],
-                                          swapchain.image_views[frame.swapchain_image_index], ImageUsage::Color);
+                                          swapchain.image_views[frame.swapchain_image_index], IMAGE_USAGE_COLOR_BIT);
   rm.fb0 = fb0_ressources.get(frame_id);
   rm.fb1 = fb1_ressources.get(frame_id);
   rm.depth = depth_ressources.get(frame_id);
@@ -116,8 +100,24 @@ void tr::renderer::VulkanEngine::draw(Frame frame) {
   debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                                  GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
 
-  passes.deferred.draw(frame.cmd.vk_cmd, rm, {{0, 0}, swapchain.extent},
-                       [&] { vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0); });
+  rm.fb0.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
+  passes.deferred.draw(frame.cmd.vk_cmd, rm, {{0, 0}, swapchain.extent}, [&] {
+    auto descriptor = main_descriptors[frame_id % MAX_FRAMES_IN_FLIGHT];
+    VkDescriptorImageInfo image_info{
+        .sampler = base_sampler,
+        .imageView = rm.fb0.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+
+    DescriptorUpdater{descriptor, 1}
+        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .image_info({&image_info, 1})
+        .write(device.vk_device);
+
+    vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.deferred.pipeline_layout, 0, 1,
+                            &descriptor, 0, nullptr);
+    vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
+  });
 
   debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
@@ -228,6 +228,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
       {
           .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
           .size = triangle.size() * sizeof(decltype(triangle)::value_type),
+          .flags = 0,
       },
       "Triangle");
   triangle_vertex_buffer.defer_deletion(global_deletion_stacks.allocator);
@@ -246,6 +247,59 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
   passes.deferred = Deferred::init(device.vk_device, swapchain, setup_device_deletion_stack);
   passes.deferred.defer_deletion(global_deletion_stacks.device);
+
+  descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
+                                                   {{
+                                                       {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+                                                       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+                                                   }});
+  descriptor_allocator.defer_deletion(global_deletion_stacks.device);
+  for (auto& descriptor : main_descriptors) {
+    descriptor = descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
+    const auto b = bb.build_buffer(
+        {
+            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            .size = 256,
+            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
+        },
+        "uniforms");
+    b.defer_deletion(global_deletion_stacks.allocator);
+    float* map = nullptr;
+    vmaMapMemory(allocator, b.alloc, reinterpret_cast<void**>(&map));
+    map[0] = 0.4;
+    vmaUnmapMemory(allocator, b.alloc);
+
+    VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
+    DescriptorUpdater{descriptor, 0}
+        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        .buffer_info({&buffer_info, 1})
+        .write(device.vk_device);
+  }
+
+  {
+    VkSamplerCreateInfo sampler_create_info{
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .magFilter = VK_FILTER_NEAREST,
+        .minFilter = VK_FILTER_NEAREST,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias = 0,
+        .anisotropyEnable = VK_FALSE,
+        .maxAnisotropy = 0,
+        .compareEnable = VK_FALSE,
+        .compareOp = VK_COMPARE_OP_NEVER,
+        .minLod = 0,
+        .maxLod = 0,
+        .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+    VK_UNWRAP(vkCreateSampler, device.vk_device, &sampler_create_info, nullptr, &base_sampler);
+        global_deletion_stacks.device.defer_deletion(DeviceHandle::Sampler, base_sampler);
+  }
 
   debug_info.gpu_timestamps = decltype(debug_info.gpu_timestamps)::init(device);
   debug_info.gpu_timestamps.defer_deletion(global_deletion_stacks.device);
@@ -268,7 +322,7 @@ void tr::renderer::VulkanEngine::upload(DeviceDeletionStack& device_deletion_sta
   VK_UNWRAP(cmd.begin);
 
   auto uploader = Uploader::init(allocator);
-  uploader.upload(cmd.vk_cmd, triangle_vertex_buffer.buffer, 0, std::as_bytes(std::span{screen_space_triangle}));
+  uploader.upload(cmd.vk_cmd, triangle_vertex_buffer.buffer, 0, std::as_bytes(std::span{triangle}));
 
   VK_UNWRAP(cmd.end);
 

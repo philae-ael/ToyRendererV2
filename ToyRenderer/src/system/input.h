@@ -2,6 +2,8 @@
 
 #include <glm/vec2.hpp>
 
+#include "../camera.h"
+
 namespace tr::system {
 
 enum class InputEventKind {
@@ -34,9 +36,11 @@ struct InputEvent {
 class Input {
  public:
   void on_input(InputEvent);
+  [[nodiscard]] auto consume_camera_input() -> CameraInput;
 
   struct State {
     glm::vec2 cursor_pos;
+    CameraInput camera_input;
   } state;
 };
 }  // namespace tr::system

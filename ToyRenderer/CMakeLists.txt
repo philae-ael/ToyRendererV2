@@ -25,6 +25,8 @@ add_executable(ToyRenderer
     src/main.cpp
     src/app.h
     src/app.cpp
+    src/camera.h
+    src/camera.cpp
     src/options.h
     src/options.cpp
     src/renderer/device.h
@@ -62,6 +64,8 @@ add_executable(ToyRenderer
     src/renderer/constants.h
     src/renderer/uploader.h
     src/renderer/uploader.cpp
+    src/renderer/descriptors.h
+    src/renderer/descriptors.cpp
     src/system/platform.h
     src/system/platform.cpp
     src/system/input.h
