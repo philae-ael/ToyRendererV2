@@ -117,7 +117,7 @@ struct Swapchain {
   std::vector<VkImageView> image_views;
 
   struct SwapchainConfig {
-    VkPresentModeKHR prefered_present_mode;
+    VkPresentModeKHR prefered_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
   } config;
 
  private:

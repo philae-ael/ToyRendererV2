@@ -5,6 +5,7 @@ add_library(utils STATIC
         include/utils/types.h
         include/utils/math.h
         include/utils/cast.h
+        include/utils/timer.h
         include/utils/misc.h
         include/utils/data/hive.h
         include/utils/data/sparse_set.h

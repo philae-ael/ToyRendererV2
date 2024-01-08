@@ -40,7 +40,7 @@ class VulkanEngine {
 
   auto start_frame() -> std::optional<Frame>;
   void draw(Frame frame, std::span<const Mesh> meshes);
-  void end_frame(Frame);
+  void end_frame(Frame&&);
 
   auto start_transfer() -> Transferer;
   void end_transfer(Transferer&&);

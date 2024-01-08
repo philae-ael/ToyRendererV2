@@ -39,7 +39,7 @@ class Input {
   [[nodiscard]] auto consume_camera_input() -> CameraInput;
 
   struct State {
-    glm::vec2 cursor_pos;
+    glm::vec2 cursor_pos{};
     CameraInput camera_input;
   } state;
 };

@@ -15,6 +15,7 @@
 #include "vulkan_engine.h"
 
 #if defined(_WIN32)
+#include <wtypes.h>
 #else
 #include <dlfcn.h>
 #endif
@@ -22,11 +23,24 @@
 auto tr::renderer::Renderdoc::init() -> Renderdoc {
   Renderdoc renderdoc{};
 
+  // Recommended usage is to passively load renderdoc dll (thus using GetModuleHandleA/dlopen RTLD_NOW | RTLD_NOLOAD)
+  // but loading renderdoc is used here to get an FPS counter and to allow easy debugging while being able to record
+  // renderdoc captures
 #if defined(_WIN32)
-  // TODO
+  HMODULE mod = LoadLibraryA("renderdoc.dll");
+  if (mod == nullptr) {
+    mod = LoadLibraryA("C:/Program Files/RenderDoc/renderdoc.dll");
+  }
 #else
-  if (void* mod = dlopen("librenderdoc.so", RTLD_NOW); mod != nullptr) {
+  void* mod = dlopen("librenderdoc.so", RTLD_NOW);
+#endif
+
+  if (mod != nullptr) {
+#if defined(_WIN32)
+    pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+#else
     auto RENDERDOC_GetAPI = reinterpret_cast<pRENDERDOC_GetAPI>(dlsym(mod, "RENDERDOC_GetAPI"));
+#endif
     int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, reinterpret_cast<void**>(&renderdoc.rdoc_api));
 
     TR_ASSERT(ret == 1 && renderdoc.rdoc_api != nullptr, "Could not load renderdoc");
@@ -34,7 +48,6 @@ auto tr::renderer::Renderdoc::init() -> Renderdoc {
   } else {
     spdlog::info("Can't find renderdoc");
   }
-#endif
 
   return renderdoc;
 }
@@ -176,7 +189,7 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
     return;
   }
 
-  std::array present_modes = utils::to_array<std::pair<const char*, VkPresentModeKHR>>({
+  std::array present_modes = utils::to_array<std::pair<const char*, VkPresentModeKHR> >({
       {"Immediate", VK_PRESENT_MODE_IMMEDIATE_KHR},
       {"MailBox", VK_PRESENT_MODE_MAILBOX_KHR},
       {"FIFO", VK_PRESENT_MODE_FIFO_KHR},

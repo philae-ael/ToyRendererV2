@@ -33,47 +33,47 @@ add_executable(ToyRenderer
     src/options.cpp
     src/gltf.h
     src/gltf.cpp
-    src/renderer/mesh.h
-    src/renderer/device.h
-    src/renderer/device.cpp
-    src/renderer/swapchain.h
-    src/renderer/swapchain.cpp
-    src/renderer/renderpass.h
-    src/renderer/renderpass.cpp
-    src/renderer/command_pool.h
     src/renderer/command_pool.cpp
-    src/renderer/instance.h
-    src/renderer/instance.cpp
-    src/renderer/surface.h
-    src/renderer/surface.cpp
-    src/renderer/vulkan_engine.h
-    src/renderer/vulkan_engine.cpp
-    src/renderer/deletion_queue.h
-    src/renderer/deletion_queue.cpp
-    src/renderer/utils.h
-    src/renderer/utils.cpp
-    src/renderer/debug.h
+    src/renderer/command_pool.h
+    src/renderer/constants.h
     src/renderer/debug.cpp
+    src/renderer/debug.h
+    src/renderer/deletion_queue.cpp
+    src/renderer/deletion_queue.h
+    src/renderer/descriptors.cpp
+    src/renderer/descriptors.h
+    src/renderer/device.cpp
+    src/renderer/device.h
     src/renderer/extensions.cpp
     src/renderer/extensions.h
+    src/renderer/instance.cpp
+    src/renderer/instance.h
+    src/renderer/mesh.h
+    src/renderer/passes/deferred.cpp
+    src/renderer/passes/deferred.h
+    src/renderer/passes/gbuffer.cpp
+    src/renderer/passes/gbuffer.h
     src/renderer/pipeline.cpp
     src/renderer/pipeline.h
+    src/renderer/queue.h
+    src/renderer/renderpass.cpp
+    src/renderer/renderpass.h
+    src/renderer/ressources.cpp
+    src/renderer/ressources.h
+    src/renderer/surface.cpp
+    src/renderer/surface.h
+    src/renderer/swapchain.cpp
+    src/renderer/swapchain.h
+    src/renderer/synchronisation.h
+    src/renderer/uploader.cpp
+    src/renderer/uploader.h
+    src/renderer/utils.cpp
+    src/renderer/utils.h
     src/renderer/vertex.cpp
     src/renderer/vertex.h
     src/renderer/vma.cpp
-    src/renderer/queue.h
-    src/renderer/ressources.h
-    src/renderer/ressources.cpp
-    src/renderer/synchronisation.h
-    src/renderer/passes/deferred.h
-    src/renderer/passes/deferred.cpp
-    src/renderer/passes/gbuffer.h
-    src/renderer/passes/gbuffer.cpp
-    src/renderer/constants.h
-    src/renderer/uploader.h
-    src/renderer/uploader.cpp
-    src/renderer/descriptors.h
-    src/renderer/descriptors.cpp
+    src/renderer/vulkan_engine.cpp
+    src/renderer/vulkan_engine.h
     src/system/platform.h
     src/system/platform.cpp
     src/system/input.h

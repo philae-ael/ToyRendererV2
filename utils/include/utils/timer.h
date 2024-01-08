@@ -66,7 +66,7 @@ class Timeline {
  private:
   std::size_t index1 = 0;
   std::size_t index2 = N;
-  std::array<T, 2 * N> data;
+  std::array<T, 2 * N> data{};
 };
 
 }  // namespace utils

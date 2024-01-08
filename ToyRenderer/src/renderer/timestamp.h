@@ -97,7 +97,7 @@ struct GPUTimestamp {
   }
 
   float to_ms{};
-  std::array<uint64_t, 2 * FRAMES * QUERY_COUNT> raw_timestamps;
+  std::array<uint64_t, 2 * FRAMES * QUERY_COUNT> raw_timestamps{};
   VkQueryPool query_pool = VK_NULL_HANDLE;
 };
 }  // namespace tr::renderer

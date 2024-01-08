@@ -175,7 +175,7 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
 }
 
-void tr::renderer::VulkanEngine::end_frame(Frame frame) {
+void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_TOP);
 
   ImageMemoryBarrier::submit<1>(frame.cmd.vk_cmd, {{rm.swapchain.prepare_barrier(SyncPresent)}});

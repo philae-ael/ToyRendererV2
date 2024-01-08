@@ -83,14 +83,14 @@ void tr::App::run() {
     update();
 
     if (auto frame_opt = subsystems.engine.start_frame(); frame_opt.has_value()) {
-      auto frame = frame_opt.value();
+      auto& frame = frame_opt.value();
       subsystems.engine.draw(frame, meshes);
 
       if (subsystems.imgui.start_frame()) {
         subsystems.engine.debug_info.imgui(subsystems.engine);
         subsystems.imgui.draw(subsystems.engine, frame);
       }
-      subsystems.engine.end_frame(frame);
+      subsystems.engine.end_frame(std::move(frame));
     }
 
     state.frame_timer.stop();
