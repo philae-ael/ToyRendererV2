@@ -1,15 +1,16 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
+#include <spdlog/common.h>
 #include <vulkan/vulkan_core.h>
 
 namespace tr {
 
 struct Options {
   struct {
-    spdlog::level::level_enum level;
-    bool renderdoc;
-    bool validations_layers;
+    spdlog::level::level_enum level = spdlog::level::info;
+    bool renderdoc = false;
+    bool validations_layers = false;
+    bool imgui = true;
   } debug{};
 
   struct {

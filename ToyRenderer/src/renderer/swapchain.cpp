@@ -1,6 +1,7 @@
 #include "swapchain.h"
 
 #include <GLFW/glfw3.h>
+#include <spdlog/spdlog.h>
 #include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
@@ -54,8 +55,10 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
                                             s.available_present_modes.data());
 
   std::optional<VkSurfaceFormatKHR> chosen_format;
+    spdlog::debug("Available surface formats:");
   for (const auto& available_format : s.available_formats) {
-    if (available_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
+    spdlog::debug("\tformat {} | colorSpace {}", available_format.format, available_format.colorSpace);
+    if (available_format.format == VK_FORMAT_B8G8R8A8_UNORM &&
         available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
       chosen_format = available_format;
     }
@@ -173,7 +176,7 @@ auto tr::renderer::FrameSynchro::init(VkDevice device) -> FrameSynchro {
   VK_UNWRAP(vkCreateSemaphore, device, &semaphore_create_info, nullptr, &synchro.render_semaphore);
   VK_UNWRAP(vkCreateSemaphore, device, &semaphore_create_info, nullptr, &synchro.present_semaphore);
 
-  set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore," render_semaphore");
-  set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore," present_semaphore");
+  set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore, " render_semaphore");
+  set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore, " present_semaphore");
   return synchro;
 }

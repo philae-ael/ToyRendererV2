@@ -47,21 +47,25 @@ struct Timestamp {
   }
 
   auto get(VkDevice device, std::size_t frame_id) -> bool {
-    VkResult result = vkGetQueryPoolResults(device, query_pool, query_index(frame_id, 0), QUERY_COUNT,
-                                            (QUERY_COUNT + 1) * sizeof(uint64_t),
-                                            raw_timestamps.data() + raw_timestamps_index(frame_id, 0), sizeof(uint64_t),
-                                            // TODO: do a thing with availibility bit, maybe
-                                            VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+    VkResult result =
+        vkGetQueryPoolResults(device, query_pool, query_index(frame_id, 0), QUERY_COUNT,
+                              2 * QUERY_COUNT * sizeof(uint64_t), &raw_timestamps.at(raw_timestamps_index(frame_id, 0)),
+                              2 * sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
     switch (result) {
       case VkResult::VK_NOT_READY:
         return false;
       default:
         VK_CHECK(result, vkGetQueryPoolResults);
     }
-    return raw_timestamps.at(raw_timestamps_index(frame_id, QUERY_COUNT)) != 0;
+    return true;
   }
 
-  auto fetch_elsapsed(std::size_t frame_id, std::size_t from, std::size_t to) -> float {
+  auto fetch_elsapsed(std::size_t frame_id, std::size_t from, std::size_t to) -> std::optional<float> {
+    auto availibility_to = raw_timestamps.at(status_index(frame_id, to));
+    auto availibility_from = raw_timestamps.at(status_index(frame_id, from));
+    if (availibility_to == 0 || availibility_from == 0) {
+      return std::nullopt;
+    }
     return static_cast<float>(raw_timestamps.at(raw_timestamps_index(frame_id, to)) -
                               raw_timestamps.at(raw_timestamps_index(frame_id, from))) *
            to_ms;
@@ -72,11 +76,14 @@ struct Timestamp {
     return (frame_id % FRAMES) * QUERY_COUNT + index;
   }
   auto raw_timestamps_index(std::size_t frame_id, std::size_t index) -> std::size_t {
-    return (frame_id % FRAMES) * (QUERY_COUNT + 1) + index;
+    return 2 * ((frame_id % FRAMES) * QUERY_COUNT + index);
+  }
+  auto status_index(std::size_t frame_id, std::size_t index) -> std::size_t {
+    return 2 * ((frame_id % FRAMES) * QUERY_COUNT + index) + 1;
   }
 
   float to_ms{};
-  std::array<uint64_t, FRAMES *(QUERY_COUNT + 1)> raw_timestamps;
+  std::array<uint64_t, 2 * FRAMES * QUERY_COUNT> raw_timestamps;
   VkQueryPool query_pool = VK_NULL_HANDLE;
 };
 }  // namespace tr::renderer

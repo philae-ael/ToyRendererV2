@@ -279,6 +279,16 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                                     }},
                                 }},
                        },
+                       {
+                           {'i', "imgui", "enable imgui", "Debug"},
+                           Entry::Kind::Boolean,
+                           {.bool_entry = {&ret.debug.imgui, false}},
+                       },
+                       {
+                           {0, "no-imgui", "disable imgui", "Debug"},
+                           Entry::Kind::Boolean,
+                           {.bool_entry = {&ret.debug.imgui, true}},
+                       },
                    }}};
 
   if (ParseResult result = parser.parse(args); result != ParseResult::Ok) {

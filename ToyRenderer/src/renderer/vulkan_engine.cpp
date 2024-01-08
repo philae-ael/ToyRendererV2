@@ -1,5 +1,6 @@
 #include "vulkan_engine.h"
 
+#include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
@@ -76,6 +77,20 @@ void tr::renderer::VulkanEngine::draw(Frame frame) {
 
 void tr::renderer::VulkanEngine::end_frame(Frame frame) {
   write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_TOP);
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  barrier.image = swapchain.images[frame.swapchain_image_index];
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.layerCount = 1;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  vkCmdPipelineBarrier(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
   VK_UNWRAP(frame.cmd.end);
   VK_UNWRAP(vkResetFences, device.vk_device, 1, &frame.synchro.render_fence);
   VK_UNWRAP(frame.submitCmds, device, std::span{&frame.cmd.vk_cmd, 1});
@@ -199,4 +214,54 @@ tr::renderer::VulkanEngine::~VulkanEngine() {
   global_deletion_stacks.device.cleanup(device.vk_device);
   global_deletion_stacks.instance.cleanup(instance.vk_instance);
   vkDestroyInstance(instance.vk_instance, nullptr);
+}
+void tr::renderer::VulkanEngine::imgui() {
+  if (!ImGui::Begin("Vulkan Engine")) {
+    ImGui::End();
+    return;
+  }
+
+  if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::SeparatorText("GPU Timings:");
+    for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
+      auto history = gpu_timelines[i].history();
+      ImGui::PlotLines(GPU_TIME_PERIODS[i].name, history.data(), utils::narrow_cast<int>(history.size()));
+    }
+
+    ImGui::SeparatorText("CPU Timings:");
+    for (std::size_t i = 0; i < CPU_TIME_PERIODS.size(); i++) {
+      auto history = cpu_timelines[i].history();
+      ImGui::PlotLines(CPU_TIME_PERIODS[i].name, history.data(), utils::narrow_cast<int>(history.size()));
+    }
+  }
+
+  ImGui::End();
+}
+
+void tr::renderer::VulkanEngine::record_timeline() {
+  if (gpu_timestamps.get(device.vk_device, frame_id - 1)) {
+    for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
+      auto& period = GPU_TIME_PERIODS[i];
+      auto dt = gpu_timestamps.fetch_elsapsed(frame_id - 1, period.from, period.to);
+      if (!dt) {
+        continue;
+      }
+      avg_gpu_timelines[i].update(*dt);
+      gpu_timelines[i].push(avg_gpu_timelines[i].state);
+
+      spdlog::trace("GPU Took {:.3f}us (smoothed {:3f}us) for period {}", 1000. * *dt,
+                    1000. * avg_gpu_timelines[i].state, period.name);
+    }
+  }
+
+  for (std::size_t i = 0; i < CPU_TIME_PERIODS.size(); i++) {
+    auto& period = CPU_TIME_PERIODS[i];
+    float dt =
+        std::chrono::duration<float, std::milli>(cpu_timestamps[period.to] - cpu_timestamps[period.from]).count();
+    avg_cpu_timelines[i].update(dt);
+    cpu_timelines[i].push(avg_cpu_timelines[i].state);
+
+    spdlog::trace("CPU Took {:.3f}us (smoothed {:3f}us) for period {}", 1000. * dt, 1000. * avg_cpu_timelines[i].state,
+                  period.name);
+  }
 }

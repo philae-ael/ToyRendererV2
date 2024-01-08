@@ -22,7 +22,9 @@ tr::App::App(tr::Options options) : options(options) {
   subsystems.platform.required_vulkan_extensions(required_vulkan_extensions);
   subsystems.engine.init(options, required_vulkan_extensions, subsystems.platform.window);
 
-  subsystems.imgui = system::Imgui::init(subsystems.platform.window, subsystems.engine);
+  if (options.debug.imgui) {
+    subsystems.imgui.init(subsystems.platform.window, subsystems.engine);
+  }
 }
 
 void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input(event); }
@@ -41,10 +43,11 @@ void tr::App::run() {
     update();
 
     if (auto [ok, frame] = subsystems.engine.start_frame(); ok) {
-      system::Imgui::start_frame();
-
       subsystems.engine.draw(frame);
-      system::Imgui::draw(subsystems.engine.swapchain, frame);
+      if (subsystems.imgui.start_frame()) {
+        subsystems.engine.imgui();
+        subsystems.imgui.draw(subsystems.engine, frame);
+      }
       subsystems.engine.end_frame(frame);
     }
 

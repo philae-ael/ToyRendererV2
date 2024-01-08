@@ -37,7 +37,7 @@ struct CPUTimePeriodDescriptor {
 
 static const std::array<GPUTimePeriodDescriptor, 2> GPU_TIME_PERIODS{{
     {"GPU MAIN", GPU_TIMESTAMP_INDEX_TOP, GPU_TIMESTAMP_INDEX_BOTTOM},
-    {"GPU ImGui", GPU_TIMESTAMP_INDEX_IMGUI_TOP, GPU_TIMESTAMP_INDEX_BOTTOM},
+    {"GPU ImGui", GPU_TIMESTAMP_INDEX_IMGUI_TOP, GPU_TIMESTAMP_INDEX_IMGUI_BOTTOM},
 }};
 
 static const std::array<CPUTimePeriodDescriptor, 3> CPU_TIME_PERIODS{{

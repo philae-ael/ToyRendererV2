@@ -1,5 +1,6 @@
 #pragma once
 
+#include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
 #include <vulkan/vulkan_core.h>
@@ -7,6 +8,7 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
 #include <ratio>
 
 #include "debug.h"
@@ -24,6 +26,10 @@
 #include "utils/timer.h"
 #include "vertex.h"
 
+namespace tr::system {
+class Imgui;
+}
+
 namespace tr::renderer {
 
 const std::size_t MAX_IN_FLIGHT = 1;
@@ -39,30 +45,7 @@ class VulkanEngine {
   void draw(Frame);
   void end_frame(Frame);
 
-  void record_timeline() {
-    if (gpu_timestamps.get(device.vk_device, frame_id - 1)) {
-      for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
-        auto& period = GPU_TIME_PERIODS[i];
-        auto dt = gpu_timestamps.fetch_elsapsed(frame_id - 1, period.from, period.to);
-        avg_gpu_timelines[i].update(dt);
-        gpu_timelines[i].push(dt);
-
-        spdlog::trace("GPU Took {:.3f}us (smoothed {:3f}us) for period {}", 1000. * dt,
-                      1000. * avg_gpu_timelines[i].state, period.name);
-      }
-    }
-
-    for (std::size_t i = 0; i < CPU_TIME_PERIODS.size(); i++) {
-      auto& period = CPU_TIME_PERIODS[i];
-      float dt =
-          std::chrono::duration<float, std::milli>(cpu_timestamps[period.to] - cpu_timestamps[period.from]).count();
-      avg_cpu_timelines[i].update(dt);
-      cpu_timelines[i].push(dt);
-
-      spdlog::trace("CPU Took {:.3f}us (smoothed {:3f}us) for period {}", 1000. * dt,
-                    1000. * avg_cpu_timelines[i].state, period.name);
-    }
-  }
+  void record_timeline();
 
   ~VulkanEngine();
 
@@ -73,6 +56,11 @@ class VulkanEngine {
 
   void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
   void rebuild_swapchain();
+
+  void imgui();
+
+ private:
+  friend system::Imgui;
 
   GLFWwindow* window{};
 
@@ -120,10 +108,10 @@ class VulkanEngine {
   using cpu_timestamp_clock = std::chrono::high_resolution_clock;
   std::array<cpu_timestamp_clock::time_point, CPU_TIMESTAMP_INDEX_MAX> cpu_timestamps;
 
-  std::array<utils::Timeline<float>, GPU_TIME_PERIODS.size()> gpu_timelines{};
+  std::array<utils::Timeline<float, 500>, GPU_TIME_PERIODS.size()> gpu_timelines{};
   std::array<utils::math::KalmanFilter<float>, GPU_TIME_PERIODS.size()> avg_gpu_timelines{};
 
-  std::array<utils::Timeline<float>, CPU_TIME_PERIODS.size()> cpu_timelines{};
+  std::array<utils::Timeline<float, 500>, CPU_TIME_PERIODS.size()> cpu_timelines{};
   std::array<utils::math::KalmanFilter<float>, CPU_TIME_PERIODS.size()> avg_cpu_timelines{};
 
   std::size_t frame_id{};
