@@ -12,7 +12,8 @@ namespace tr {
 
 struct Gltf {
   static auto load_from_file(tr::renderer::ImageBuilder&, tr::renderer::BufferBuilder&, tr::renderer::Transferer&,
-                             const std::filesystem::path&) -> std::vector<renderer::Mesh>;
+                             const std::filesystem::path&)
+      -> std::pair<std::vector<std::shared_ptr<tr::renderer::Material>>, std::vector<tr::renderer::Mesh>>;
 };
 
 }  // namespace tr

@@ -41,13 +41,20 @@ tr::App::App(tr::Options options) : options(options) {
     auto bb = subsystems.engine.buffer_builder();
     auto ib = subsystems.engine.image_builder();
 
+    std::string scene_name;
     if (options.scene.empty()) {
-      const auto sponza = Gltf::load_from_file(ib, bb, t, "assets/scenes/sponza/Sponza.gltf");
-      meshes.insert(meshes.end(), sponza.begin(), sponza.end());
+      scene_name = "assets/scenes/sponza/Sponza.gltf";
     } else {
-      const auto scene = Gltf::load_from_file(ib, bb, t, options.scene);
-      meshes.insert(meshes.end(), scene.begin(), scene.end());
+      scene_name = options.scene;
     }
+    const auto [mats, scene] = Gltf::load_from_file(ib, bb, t, scene_name);
+    meshes.insert(meshes.end(), scene.begin(), scene.end());
+
+    for (const auto& mat : mats) {
+      mat->defer_deletion(subsystems.engine.global_deletion_stacks.allocator,
+                          subsystems.engine.global_deletion_stacks.device);
+    }
+
     for (const auto& mesh : meshes) {
       mesh.buffers.vertices.defer_deletion(subsystems.engine.global_deletion_stacks.allocator);
       if (mesh.buffers.indices) {

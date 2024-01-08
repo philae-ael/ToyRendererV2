@@ -217,7 +217,8 @@ auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, c
   return meshes;
 }
 auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
-          const fastgltf::Asset& asset) -> std::vector<tr::renderer::Mesh> {
+          const fastgltf::Asset& asset)
+    -> std::pair<std::vector<std::shared_ptr<tr::renderer::Material>>, std::vector<tr::renderer::Mesh>> {
   {
     const auto err = fastgltf::validate(asset);
     TR_ASSERT(err == fastgltf::Error::None, "Invalid GLTF: {} {}", fastgltf::getErrorName(err),
@@ -226,12 +227,15 @@ auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::r
 
   // TODO: use an id rather than a pointer -> Allows to sort and more
   std::vector<std::shared_ptr<tr::renderer::Material>> materials = load_materials(ib, t, asset);
-  return load_meshes(bb, t, asset, materials);
+  return {
+      materials,
+      load_meshes(bb, t, asset, materials),
+  };
 }
 
 auto tr::Gltf::load_from_file(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb,
                               tr::renderer::Transferer& t, const std::filesystem::path& path)
-    -> std::vector<tr::renderer::Mesh> {
+    -> std::pair<std::vector<std::shared_ptr<tr::renderer::Material>>, std::vector<tr::renderer::Mesh>> {
   fastgltf::Parser parser;
   fastgltf::GltfDataBuffer data;
   fastgltf::Asset asset;

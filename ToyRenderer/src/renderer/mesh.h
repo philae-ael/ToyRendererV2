@@ -6,12 +6,16 @@
 #include <memory>
 #include <vector>
 
+#include "deletion_queue.h"
 #include "ressources.h"
 
 namespace tr::renderer {
 
 struct Material {
   tr::renderer::ImageRessource base_color_texture;
+  void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) const {
+    base_color_texture.defer_deletion(vma_deletion_stack, device_deletion_stack);
+  }
 };
 
 struct Mesh {

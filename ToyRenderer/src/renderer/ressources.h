@@ -76,6 +76,11 @@ struct ImageRessource {
   [[nodiscard]] auto prepare_barrier(SyncInfo dst) -> std::optional<VkImageMemoryBarrier2>;
 
   auto as_attachment(std::optional<VkClearValue> clearValue) -> VkRenderingAttachmentInfo;
+
+  void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) const {
+    device_deletion_stack.defer_deletion(DeviceHandle::ImageView, view);
+    vma_deletion_stack.defer_deletion(VmaHandle::Image, image, alloc);
+  }
 };
 
 // The ressources used during one frame
@@ -137,10 +142,9 @@ struct ImageRessourceStorage {
     }
   }
 
-  void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& devide_deletion_stack) {
+  void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) {
     for (auto& res : ressources) {
-      devide_deletion_stack.defer_deletion(DeviceHandle::ImageView, res.view);
-      vma_deletion_stack.defer_deletion(VmaHandle::Image, res.image, res.alloc);
+      res.defer_deletion(vma_deletion_stack, device_deletion_stack);
     }
   }
 };
