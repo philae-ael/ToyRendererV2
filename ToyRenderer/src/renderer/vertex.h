@@ -1,9 +1,11 @@
 #pragma once
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
@@ -21,24 +23,32 @@ struct Vertex {
 
 struct Buffer {
   VkBuffer vk_buffer = VK_NULL_HANDLE;
-  VkDeviceMemory device_memory = VK_NULL_HANDLE;
+  VmaAllocation alloc = nullptr;
+  VmaAllocationInfo alloc_info{};
 
-  void defer_deletion(DeviceDeletionStack& device_deletion_stack) const {
-    device_deletion_stack.defer_deletion(DeviceHandle::Buffer, vk_buffer);
+  void defer_deletion(VmaDeletionStack& allocator_deletion_stack) const {
+    allocator_deletion_stack.defer_deletion(VmaHandle::Buffer, vk_buffer, alloc);
   }
 };
 
 struct StagingBuffer {
-  static auto init(Device& device, std::size_t size) -> StagingBuffer;
+  static auto init(VmaAllocator& allocator, std::uint32_t size = 65536) -> StagingBuffer;
   std::size_t size = 0;
-  Buffer buffer;
+  uint32_t offset = 0;
+  uint32_t to_upload = 0;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation alloc = nullptr;
+  VmaAllocationInfo alloc_info{};
 
-  void defer_deletion(DeviceDeletionStack& device_deletion_stack) const {
-    buffer.defer_deletion(device_deletion_stack);
+  void defer_deletion(VmaDeletionStack& vma_deletion_stack) const {
+    vma_deletion_stack.defer_deletion(VmaHandle::Buffer, buffer, alloc);
   }
 
-  void stage(VkDevice, VkCommandBuffer, VkBuffer, std::span<const std::byte>);
+  auto with_data(std::span<const std::byte>) -> StagingBuffer&;
+  auto upload(VkCommandBuffer, VkBuffer) -> StagingBuffer&;
+  void reset();
 };
 
-auto TriangleVertexBuffer(tr::renderer::Device& device, VkCommandBuffer cmd, StagingBuffer& staging_buffer) -> Buffer;
+auto TriangleVertexBuffer(Device& device, VmaAllocator allocator, VkCommandBuffer cmd, StagingBuffer& staging_buffer)
+    -> tr::renderer::Buffer;
 }  // namespace tr::renderer

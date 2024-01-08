@@ -7,17 +7,18 @@
 #include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <set>
-#include <array>
 #include <vector>
 
 #include "utils.h"
 
-const std::array<const char*, 2> device_extension{
+const std::array<const char*, 3> device_extension{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+    VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
 };
 
 void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkSurfaceKHR surface) {
@@ -90,7 +91,8 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
         }
 
         auto present_support = VK_FALSE;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, utils::narrow_cast<uint32_t>(i), surface, &present_support);
+        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, utils::narrow_cast<uint32_t>(i), surface,
+                                             &present_support);
         if (present_support == VK_TRUE) {
           present_family = i;
         }

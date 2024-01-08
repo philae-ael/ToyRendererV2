@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
@@ -8,7 +9,7 @@
 #include "utils/assert.h"
 namespace tr::renderer {
 
-template <class ObjectType>
+template <class ObjectType, class Handle = uint64_t>
 class DeletionStack {
  public:
   template <class T>
@@ -29,7 +30,7 @@ class DeletionStack {
   auto operator=(DeletionStack &&) -> DeletionStack & = default;
 
  protected:
-  std::deque<std::pair<ObjectType, uint64_t>> stack;
+  std::deque<std::pair<ObjectType, Handle>> stack;
 };
 
 enum class InstanceHandle { Device, DebugUtilsMessengerEXT, SurfaceKHR };
@@ -57,6 +58,18 @@ enum class DeviceHandle {
 class DeviceDeletionStack : public DeletionStack<DeviceHandle> {
  public:
   void cleanup(VkDevice device);
+};
+
+enum class VmaHandle { Buffer };
+
+class VmaDeletionStack : public DeletionStack<VmaHandle, std::pair<uint64_t, VmaAllocation>> {
+ public:
+  template <class T>
+  void defer_deletion(VmaHandle type, T handle, VmaAllocation alloc) {
+    stack.emplace_back(type, std::pair{reinterpret_cast<uint64_t>(handle), alloc});
+  }
+
+  void cleanup(VmaAllocator allocator);
 };
 
 }  // namespace tr::renderer

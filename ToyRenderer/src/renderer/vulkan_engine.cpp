@@ -2,8 +2,10 @@
 
 #include <imgui.h>
 #include <spdlog/spdlog.h>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
+#include <cstddef>
 #include <span>
 
 #include "command_pool.h"
@@ -24,6 +26,7 @@ void tr::renderer::VulkanEngine::write_gpu_timestamp(VkCommandBuffer cmd, VkPipe
 auto tr::renderer::VulkanEngine::start_frame() -> std::pair<bool, Frame> {
   write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_TOP);
   frame_id += 1;
+  vmaSetCurrentFrameIndex(allocator, frame_id);
 
   Frame frame{};
   frame.synchro = frame_synchronisation_pool[frame_id % MAX_IN_FLIGHT];
@@ -146,6 +149,22 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   transfer_command_pool = CommandPool::init(device, CommandPool::TargetQueue::Transfer);
   CommandPool::defer_deletion(transfer_command_pool, global_deletion_stacks.device);
 
+  VmaAllocatorCreateInfo allocator_create_info{
+      .flags = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT | VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT,
+      .physicalDevice = device.physical_device,
+      .device = device.vk_device,
+      .preferredLargeHeapBlockSize = 0,
+      .pAllocationCallbacks = nullptr,
+      .pDeviceMemoryCallbacks = nullptr,
+      .pHeapSizeLimit = nullptr,
+      .pVulkanFunctions = nullptr,
+      .instance = instance.vk_instance,
+      .vulkanApiVersion = VK_API_VERSION_1_3,
+      .pTypeExternalMemoryHandleTypes = nullptr,
+  };
+
+  VK_UNWRAP(vmaCreateAllocator, &allocator_create_info, &allocator);
+
   VkCommandBufferAllocateInfo cmd_alloc_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext = nullptr,
@@ -166,14 +185,14 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
   VK_UNWRAP(vkAllocateCommandBuffers, device.vk_device, &transfer_cmd_alloc_info, &transfer_command_buffer);
 
-  staging_buffer = tr::renderer::StagingBuffer::init(device, 4096);  // A triangle is 108 bytes (i think)
-  staging_buffer.defer_deletion(global_deletion_stacks.device);
+  staging_buffer = tr::renderer::StagingBuffer::init(allocator, 4096);  // A triangle is 108 bytes (i think)
+  staging_buffer.defer_deletion(global_deletion_stacks.allocator);
 
   OneTimeCommandBuffer transfer_cmd{transfer_command_buffer};
   VK_UNWRAP(transfer_cmd.begin);
 
-  triangle_vertex_buffer = tr::renderer::TriangleVertexBuffer(device, transfer_cmd.vk_cmd, staging_buffer);
-  triangle_vertex_buffer.defer_deletion(global_deletion_stacks.device);
+  triangle_vertex_buffer = tr::renderer::TriangleVertexBuffer(device, allocator, transfer_cmd.vk_cmd, staging_buffer);
+  triangle_vertex_buffer.defer_deletion(global_deletion_stacks.allocator);
 
   VK_UNWRAP(transfer_cmd.end);
   VkSubmitInfo submit_info{
@@ -205,11 +224,10 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
 tr::renderer::VulkanEngine::~VulkanEngine() {
   sync();
-  // TODO: add a free queue for buffers?
-  vkFreeMemory(device.vk_device, staging_buffer.buffer.device_memory, nullptr);
-  vkFreeMemory(device.vk_device, triangle_vertex_buffer.device_memory, nullptr);
-  vkFreeCommandBuffers(device.vk_device, graphics_command_pool, utils::narrow_cast<uint32_t>(main_command_buffer_pool.size()),
-                       main_command_buffer_pool.data());
+  global_deletion_stacks.allocator.cleanup(allocator);
+  vmaDestroyAllocator(allocator);
+  vkFreeCommandBuffers(device.vk_device, graphics_command_pool,
+                       utils::narrow_cast<uint32_t>(main_command_buffer_pool.size()), main_command_buffer_pool.data());
   swapchain_device_deletion_stack.cleanup(device.vk_device);
   global_deletion_stacks.device.cleanup(device.vk_device);
   global_deletion_stacks.instance.cleanup(instance.vk_instance);
@@ -232,6 +250,50 @@ void tr::renderer::VulkanEngine::imgui() {
     for (std::size_t i = 0; i < CPU_TIME_PERIODS.size(); i++) {
       auto history = cpu_timelines[i].history();
       ImGui::PlotLines(CPU_TIME_PERIODS[i].name, history.data(), utils::narrow_cast<int>(history.size()));
+    }
+  }
+  if (ImGui::CollapsingHeader("GPU memory usage", ImGuiTreeNodeFlags_DefaultOpen)) {
+    auto history = gpu_memory_usage.history();
+    ImGui::PlotLines("Global GPU memory usage", history.data(), utils::narrow_cast<int>(history.size()));
+
+    if (ImGui::CollapsingHeader("details")) {
+      std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
+      vmaGetHeapBudgets(allocator, budgets.data());
+
+      for (std::size_t i = 0; i < device.memory_properties.memoryHeapCount; i++) {
+        auto history = gpu_heaps_usage[i].history();
+        auto label = fmt::format("Heap number {}", i);
+        ImGui::PlotLines(label.c_str(), history.data(), utils::narrow_cast<int>(history.size()));
+      }
+      if (ImGui::BeginTable("Memory usage", 7)) {
+        ImGui::TableSetupColumn("Heap Number");
+        ImGui::TableSetupColumn("Usage");
+        ImGui::TableSetupColumn("Budget");
+        ImGui::TableSetupColumn("Allocation Bytes");
+        ImGui::TableSetupColumn("Allocation Count");
+        ImGui::TableSetupColumn("Block Bytes");
+        ImGui::TableSetupColumn("Block Count");
+        ImGui::TableHeadersRow();
+        for (std::size_t i = 0; i < device.memory_properties.memoryHeapCount; i++) {
+          auto& budget = budgets[i];
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          ImGui::Text("%zu", i);
+          ImGui::TableNextColumn();
+          ImGui::Text("%zu", budget.usage);
+          ImGui::TableNextColumn();
+          ImGui::Text("%zu", budget.budget);
+          ImGui::TableNextColumn();
+          ImGui::Text("%lu", budget.statistics.allocationBytes);
+          ImGui::TableNextColumn();
+          ImGui::Text("%u", budget.statistics.allocationCount);
+          ImGui::TableNextColumn();
+          ImGui::Text("%lu", budget.statistics.blockBytes);
+          ImGui::TableNextColumn();
+          ImGui::Text("%u", budget.statistics.blockCount);
+        }
+        ImGui::EndTable();
+      }
     }
   }
 
@@ -264,4 +326,13 @@ void tr::renderer::VulkanEngine::record_timeline() {
     spdlog::trace("CPU Took {:.3f}us (smoothed {:3f}us) for period {}", 1000. * dt, 1000. * avg_cpu_timelines[i].state,
                   period.name);
   }
+
+  std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
+  vmaGetHeapBudgets(allocator, budgets.data());
+  float global_memory_usage{};
+  for (std::size_t i = 0; i < device.memory_properties.memoryHeapCount; i++) {
+    gpu_heaps_usage[i].push(utils::narrow_cast<float>(budgets[i].usage));
+    global_memory_usage += utils::narrow_cast<float>(budgets[i].usage);
+  }
+  gpu_memory_usage.push(global_memory_usage);
 }

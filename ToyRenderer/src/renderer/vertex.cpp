@@ -1,10 +1,12 @@
 
 #include "vertex.h"
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 #include "utils.h"
@@ -58,7 +60,7 @@ const std::array<tr::renderer::Vertex, 3> triangle{{
     },
 }};
 
-auto tr::renderer::TriangleVertexBuffer(tr::renderer::Device &device, VkCommandBuffer cmd,
+auto tr::renderer::TriangleVertexBuffer(Device &device, VmaAllocator allocator, VkCommandBuffer cmd,
                                         StagingBuffer &staging_buffer) -> tr::renderer::Buffer {
   VkBuffer buf = VK_NULL_HANDLE;
 
@@ -83,51 +85,54 @@ auto tr::renderer::TriangleVertexBuffer(tr::renderer::Device &device, VkCommandB
     buffer_create_info.pQueueFamilyIndices = nullptr;
   }
 
-  VK_UNWRAP(vkCreateBuffer, device.vk_device, &buffer_create_info, nullptr, &buf);
-
-  VkMemoryRequirements memory_requirements{};
-  vkGetBufferMemoryRequirements(device.vk_device, buf, &memory_requirements);
-
-  std::uint32_t memory_type =
-      device.find_memory_type(memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-  VkMemoryAllocateInfo allocation_info{
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-      .pNext = nullptr,
-      .allocationSize = memory_requirements.size,
-      .memoryTypeIndex = memory_type,
+  VmaAllocationCreateInfo allocation_create_info{
+      .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+      .usage = VMA_MEMORY_USAGE_AUTO,
+      .requiredFlags = 0,
+      .preferredFlags = 0,
+      .memoryTypeBits = 0,
+      .pool = VK_NULL_HANDLE,
+      .pUserData = nullptr,
+      .priority = 1.0F,
   };
+  VmaAllocation alloc = nullptr;
+  VmaAllocationInfo alloc_info;
 
-  VkDeviceMemory memory = VK_NULL_HANDLE;
+  VK_UNWRAP(vmaCreateBuffer, allocator, &buffer_create_info, &allocation_create_info, &buf, &alloc, &alloc_info);
 
-  VK_UNWRAP(vkAllocateMemory, device.vk_device, &allocation_info, nullptr, &memory);
-  vkBindBufferMemory(device.vk_device, buf, memory, 0);
+  staging_buffer.with_data(std::span{reinterpret_cast<const std::byte *>(triangle.data()), buffer_create_info.size})
+      .upload(cmd, buf);
 
-  staging_buffer.stage(device.vk_device, cmd, buf,
-                       std::span{reinterpret_cast<const std::byte *>(triangle.data()), buffer_create_info.size});
-
-  return {buf, memory};
+  return {buf, alloc, alloc_info};
 }
 
-void tr::renderer::StagingBuffer::stage(VkDevice device, VkCommandBuffer cmd, VkBuffer dst,
-                                        std::span<const std::byte> data) {
-  TR_ASSERT(data.size() <= size, "trying to stage too much data");
-  void *mem = nullptr;
-  VK_UNWRAP(vkMapMemory, device, buffer.device_memory, 0, size, 0, &mem);
-
-  std::memcpy(mem, triangle.data(), data.size());
-
-  vkUnmapMemory(device, buffer.device_memory);
-
+auto tr::renderer::StagingBuffer::upload(VkCommandBuffer cmd, VkBuffer dst) -> StagingBuffer & {
   VkBufferCopy region{
-      .srcOffset = 0,
+      .srcOffset = offset,
       .dstOffset = 0,
-      .size = data.size(),
+      .size = to_upload,
   };
-  vkCmdCopyBuffer(cmd, buffer.vk_buffer, dst, 1, &region);
+  vkCmdCopyBuffer(cmd, buffer, dst, 1, &region);
+  offset += to_upload;
+  to_upload = 0;
+
+  return *this;
 }
 
-auto tr::renderer::StagingBuffer::init(Device &device, std::size_t size) -> StagingBuffer {
+void tr::renderer::StagingBuffer::reset() {
+  to_upload = 0;
+  offset = 0;
+}
+
+auto tr::renderer::StagingBuffer::with_data(std::span<const std::byte> data) -> StagingBuffer & {
+  TR_ASSERT(offset + to_upload + data.size() <= size, "staging buffer too small");
+  memcpy(alloc_info.pMappedData, data.data(), data.size());
+  to_upload = data.size();
+  offset = 0;
+  return *this;
+}
+
+auto tr::renderer::StagingBuffer::init(VmaAllocator &allocator, uint32_t size) -> StagingBuffer {
   VkBuffer buf = VK_NULL_HANDLE;
 
   VkBufferCreateInfo buffer_create_info{
@@ -135,31 +140,24 @@ auto tr::renderer::StagingBuffer::init(Device &device, std::size_t size) -> Stag
       .pNext = nullptr,
       .flags = 0,
       .size = size,
-      .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+      .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
       .pQueueFamilyIndices = nullptr,
   };
-
-  VK_UNWRAP(vkCreateBuffer, device.vk_device, &buffer_create_info, nullptr, &buf);
-
-  VkMemoryRequirements memory_requirements{};
-  vkGetBufferMemoryRequirements(device.vk_device, buf, &memory_requirements);
-
-  std::uint32_t memory_type = device.find_memory_type(
-      memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-  VkMemoryAllocateInfo allocation_info{
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-      .pNext = nullptr,
-      .allocationSize = memory_requirements.size,
-      .memoryTypeIndex = memory_type,
+  VmaAllocationCreateInfo allocation_create_info{
+      .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+      .usage = VMA_MEMORY_USAGE_AUTO,
+      .requiredFlags = 0,
+      .preferredFlags = 0,
+      .memoryTypeBits = 0,
+      .pool = VK_NULL_HANDLE,
+      .pUserData = nullptr,
+      .priority = 1.0F,
   };
+  VmaAllocation alloc = nullptr;
+  VmaAllocationInfo alloc_info;
+  VK_UNWRAP(vmaCreateBuffer, allocator, &buffer_create_info, &allocation_create_info, &buf, &alloc, &alloc_info);
 
-  VkDeviceMemory memory = VK_NULL_HANDLE;
-
-  VK_UNWRAP(vkAllocateMemory, device.vk_device, &allocation_info, nullptr, &memory);
-  vkBindBufferMemory(device.vk_device, buf, memory, 0);
-
-  return {size, {buf, memory}};
+  return {size, 0, 0, buf, alloc, alloc_info};
 }

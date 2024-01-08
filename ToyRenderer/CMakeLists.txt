@@ -1,4 +1,5 @@
 ﻿find_package(Vulkan REQUIRED)
+find_package(VulkanMemoryAllocator REQUIRED)
 find_package(jsoncpp REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(spdlog REQUIRED)
@@ -37,13 +38,14 @@ add_executable(ToyRenderer
     src/renderer/pipeline.h
     src/renderer/vertex.cpp
     src/renderer/vertex.h
+    src/renderer/vma.cpp
     src/system/platform.h
     src/system/platform.cpp
     src/system/input.h
     src/system/input.cpp
     src/system/imgui.h
 )
-target_link_libraries(ToyRenderer PRIVATE glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp)
+target_link_libraries(ToyRenderer PRIVATE glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator)
 
 # set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy")
 # set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")

@@ -14,7 +14,9 @@ const std::array<std::string, 1> wanted_validation_layers{
     "VK_LAYER_KHRONOS_validation",
 };
 
-const std::array<const char*, 0> REQUIRED_EXTENSIONS{};
+const std::array<const char*, 1> REQUIRED_EXTENSIONS{
+    VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+};
 
 VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                           VkDebugUtilsMessageTypeFlagsEXT messageType,

@@ -51,7 +51,7 @@ class FilteredTimer {
 template <class T, const std::size_t N = 250>
 class Timeline {
  public:
-  void push(float point) {
+  void push(T point) {
     data[index1] = point;
     data[index2] = point;
 

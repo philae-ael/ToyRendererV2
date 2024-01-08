@@ -1,6 +1,7 @@
 #include "deletion_queue.h"
 
 #include <utils/assert.h>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #define DESTROY_WITH_INSTANCE(name)                                         \
@@ -54,3 +55,19 @@ void tr::renderer::DeviceDeletionStack::cleanup(VkDevice device) {
   }
 }
 #undef DESTROY_WITH_DEVICE
+
+#define DESTROY_WITH_ALLOCATOR(name)                                                      \
+  case VmaHandle::name:                                                                   \
+    vmaDestroy##name(allocator, reinterpret_cast<Vk##name>(handle.first), handle.second); \
+    break;
+
+void tr::renderer::VmaDeletionStack::cleanup(VmaAllocator allocator) {
+  while (!stack.empty()) {
+    auto [type, handle] = stack.back();
+    stack.pop_back();
+    // NOLINTBEGIN(performance-no-int-to-ptr)
+    switch (type) { DESTROY_WITH_ALLOCATOR(Buffer) }
+    // NOLINTEND(performance-no-int-to-ptr)
+  }
+}
+#undef DESTROY_WITH_ALLOCATOR

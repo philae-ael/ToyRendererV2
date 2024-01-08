@@ -3,13 +3,13 @@
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
-#include <ratio>
 
 #include "debug.h"
 #include "deletion_queue.h"
@@ -68,6 +68,7 @@ class VulkanEngine {
   struct DeletionStacks {
     InstanceDeletionStack instance;
     DeviceDeletionStack device;
+    VmaDeletionStack allocator;
   } global_deletion_stacks;
 
   // Cleaned on swapchain recreation
@@ -100,6 +101,8 @@ class VulkanEngine {
 
   Pipeline pipeline;
 
+  VmaAllocator allocator = nullptr;
+
   // DEBUG AND TIMING
   void write_gpu_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index);
   void write_cpu_timestamp(tr::renderer::CPUTimestampIndex index);
@@ -113,6 +116,9 @@ class VulkanEngine {
 
   std::array<utils::Timeline<float, 500>, CPU_TIME_PERIODS.size()> cpu_timelines{};
   std::array<utils::math::KalmanFilter<float>, CPU_TIME_PERIODS.size()> avg_cpu_timelines{};
+
+  std::array<utils::Timeline<float, 500>, VK_MAX_MEMORY_HEAPS> gpu_heaps_usage{};
+  utils::Timeline<float, 500> gpu_memory_usage{};
 
   std::size_t frame_id{};
 };

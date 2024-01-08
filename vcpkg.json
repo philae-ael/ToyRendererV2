@@ -13,6 +13,7 @@
                 "vulkan-binding",
                 "docking-experimental"
             ]
-        }
+        },
+        "vulkan-memory-allocator"
     ]
 }
