@@ -23,12 +23,9 @@ tr::App::App(tr::Options options) : options(options) {
 }
 
 void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input(event); }
-
 void tr::App::on_resize(utils::types::Extent2d<std::uint32_t> new_size) {
-  utils::ignore_unused(this);
   utils::ignore_unused(new_size);
-  /* TR_ASSERT(false, "NOT IMPLEMENTED ! New size: {}", new_size.width, */
-  /*           new_size.height); */
+  subsystems.engine.on_resize();
 }
 
 void tr::App::run() {

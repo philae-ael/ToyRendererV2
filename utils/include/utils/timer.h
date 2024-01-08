@@ -38,7 +38,7 @@ class FilteredTimer {
   Timer timer;
   math::KalmanFilter<float> filter{
       .process_covariance = 0.1,
-      .noise_covariance = 0.05,
+      .noise_covariance = 1.0,
       .state = 0.0,
       .covariance = 0.0,
   };

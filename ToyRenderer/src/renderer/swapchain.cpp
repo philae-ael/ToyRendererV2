@@ -150,19 +150,9 @@ auto tr::renderer::Swapchain::init(tr::Options& options, tr::renderer::Device& d
   return init_with_config({options.config.prefered_present_mode}, device, surface, window);
 }
 
-auto tr::renderer::Swapchain::acquire_next_frame(tr::renderer::Device& device, FrameSynchro synchro) const
-    -> tr::renderer::Frame {
-  VK_UNWRAP(vkWaitForFences, device.vk_device, 1, &synchro.render_fence, VK_TRUE, 1000000000);
-  VK_UNWRAP(vkResetFences, device.vk_device, 1, &synchro.render_fence);
-
-  Frame frame{
-      .swapchain_image_index = 0,
-      .synchro = synchro,
-  };
-  VK_UNWRAP(vkAcquireNextImageKHR, device.vk_device, vk_swapchain, 1000000000, synchro.present_semaphore,
-            VK_NULL_HANDLE, &frame.swapchain_image_index);
-
-  return frame;
+auto tr::renderer::Swapchain::acquire_next_frame(tr::renderer::Device& device, Frame* frame) const -> VkResult {
+  return vkAcquireNextImageKHR(device.vk_device, vk_swapchain, 1000000000, frame->synchro.present_semaphore,
+                               VK_NULL_HANDLE, &frame->swapchain_image_index);
 }
 
 auto tr::renderer::FrameSynchro::init(VkDevice device) -> FrameSynchro {

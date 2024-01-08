@@ -107,7 +107,7 @@ struct Swapchain {
     device_deletion_stack.defer_deletion(DeviceHandle::SwapchainKHR, vk_swapchain);
   }
 
-  auto acquire_next_frame(Device &, FrameSynchro) const -> Frame;
+  auto acquire_next_frame(tr::renderer::Device &device, Frame *frame) const -> VkResult;
 
   VkSwapchainKHR vk_swapchain = VK_NULL_HANDLE;
 

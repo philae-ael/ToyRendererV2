@@ -9,32 +9,29 @@ class App;
 namespace tr::system {
 class Platform {
  public:
-  // init
   Platform() = default;
   void init(tr::App *);
 
+  ~Platform() { destroy(); }
+  void destroy();
+
   void required_vulkan_extensions(std::vector<const char *> &);
 
-  // destroy
-  void destroy();
-  ~Platform() { destroy(); }
-
-  // normal use
   auto start_frame() -> bool;
 
-  // move
-  Platform(Platform &&other) noexcept : window(other.window) { other.window = nullptr; }
-  auto operator=(Platform &&other) noexcept -> Platform & {
-    destroy();
-    window = other.window;
-    other.window = nullptr;
-    return *this;
-  }
+  void on_resize(int width, int height);
+  void on_key(int key, int scancode, int action, int mods);
+  void on_mouse_move(double xpos, double ypos);
+  void on_mouse_button(int button, int action, int mods);
 
-  // no copy!
+  Platform(Platform &&other) = delete;
+  auto operator=(Platform &&other) = delete;
   Platform(const Platform &) = delete;
   auto operator=(const Platform &) -> Platform & = delete;
 
   GLFWwindow *window = nullptr;
+ private:
+  bool minimized = false;
+  App *app = nullptr;
 };
 }  // namespace tr::system

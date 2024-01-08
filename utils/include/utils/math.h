@@ -13,18 +13,17 @@ struct KalmanFilter {
   T process_covariance = 1.0;
   T noise_covariance = 1.0;
 
-  // State
   T state = 0.0;
   T covariance = 0.0;
 
   void update(double mesured) {
-    T predicted_state = state;
+    T predicted_state = state + 0;
     T predicted_covariance = covariance + process_covariance;
 
     T residual = mesured - predicted_state;
     T gain = predicted_covariance / (noise_covariance + predicted_covariance);
 
-    state = state + gain * residual;
+    state = predicted_state + gain * residual;
     covariance = (1 - gain) * predicted_covariance;
   }
 };

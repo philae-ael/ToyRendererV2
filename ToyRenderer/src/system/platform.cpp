@@ -7,54 +7,29 @@
 #include <vector>
 
 #include "../app.h"
+#include "utils/misc.h"
 
 const auto WinWidthInitial = 1920;
 const auto WinHeightInitial = 1080;
 
-auto glfw_extract_app(GLFWwindow* window) -> tr::App* {
-  return reinterpret_cast<tr::App*>(glfwGetWindowUserPointer(window));
+auto glfw_extract_platform(GLFWwindow* window) -> tr::system::Platform* {
+  return reinterpret_cast<tr::system::Platform*>(glfwGetWindowUserPointer(window));
 }
 
 void resize_callback(GLFWwindow* window, int width, int height) {
-  glfw_extract_app(window)->on_resize({
-      static_cast<std::uint32_t>(width),
-      static_cast<std::uint32_t>(height),
-  });
+  glfw_extract_platform(window)->on_resize(width, height);
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  glfw_extract_app(window)->on_input({
-      .kind = tr::system::InputEventKind::Key,
-      .key_event =
-          {
-              .key = key,
-              .scancode = scancode,
-              .action = action,
-              .mods = mods,
-          },
-  });
+  glfw_extract_platform(window)->on_key(key, scancode, action, mods);
 }
+
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-  glfw_extract_app(window)->on_input({
-      .kind = tr::system::InputEventKind::MouseButton,
-      .mouse_button_event =
-          {
-              .button = button,
-              .action = action,
-              .mods = mods,
-          },
-  });
+  glfw_extract_platform(window)->on_mouse_button(button, action, mods);
 }
 
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-  glfw_extract_app(window)->on_input({
-      .kind = tr::system::InputEventKind::CursorPos,
-      .cursor_pos_event =
-          {
-              .x = xpos,
-              .y = ypos,
-          },
-  });
+  glfw_extract_platform(window)->on_mouse_move(xpos, ypos);
 }
 
 void tr::system::Platform::init(tr::App* app) {
@@ -63,10 +38,11 @@ void tr::system::Platform::init(tr::App* app) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
+  this->app = app;
   window = glfwCreateWindow(WinWidthInitial, WinHeightInitial, "Toy Renderer", nullptr, nullptr);
   TR_ASSERT(window, "could not open window");
 
-  glfwSetWindowUserPointer(window, reinterpret_cast<void*>(app));
+  glfwSetWindowUserPointer(window, reinterpret_cast<void*>(this));
   glfwSetWindowSizeCallback(window, resize_callback);
   glfwSetKeyCallback(window, key_callback);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -74,6 +50,7 @@ void tr::system::Platform::init(tr::App* app) {
 }
 
 void tr::system::Platform::required_vulkan_extensions(std::vector<const char*>& extensions) {
+  utils::ignore_unused(this);
   uint32_t glfw_extensions_count = 0;
   const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extensions_count);
 
@@ -90,6 +67,17 @@ void tr::system::Platform::required_vulkan_extensions(std::vector<const char*>& 
 
 auto tr::system::Platform::start_frame() -> bool {
   glfwPollEvents();
+
+  if (minimized) {
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+      glfwGetFramebufferSize(window, &width, &height);
+      glfwWaitEvents();
+    }
+    minimized = false;
+  }
   return glfwWindowShouldClose(window) == 0;
 }
 
@@ -99,4 +87,46 @@ void tr::system::Platform::destroy() {
     glfwTerminate();
     window = nullptr;
   }
+}
+
+void tr::system::Platform::on_resize(int width, int height) {
+  minimized = width == 0 || height == 0;
+  app->on_resize({
+      static_cast<std::uint32_t>(width),
+      static_cast<std::uint32_t>(height),
+  });
+}
+
+void tr::system::Platform::on_key(int key, int scancode, int action, int mods) {
+  app->on_input({
+      .kind = tr::system::InputEventKind::Key,
+      .key_event =
+          {
+              .key = key,
+              .scancode = scancode,
+              .action = action,
+              .mods = mods,
+          },
+  });
+}
+void tr::system::Platform::on_mouse_move(double xpos, double ypos) {
+  app->on_input({
+      .kind = tr::system::InputEventKind::CursorPos,
+      .cursor_pos_event =
+          {
+              .x = xpos,
+              .y = ypos,
+          },
+  });
+}
+void tr::system::Platform::on_mouse_button(int button, int action, int mods) {
+  app->on_input({
+      .kind = tr::system::InputEventKind::MouseButton,
+      .mouse_button_event =
+          {
+              .button = button,
+              .action = action,
+              .mods = mods,
+          },
+  });
 }

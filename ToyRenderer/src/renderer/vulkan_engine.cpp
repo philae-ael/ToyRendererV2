@@ -6,8 +6,10 @@
 #include <span>
 
 #include "command_pool.h"
+#include "swapchain.h"
 #include "timeline_info.h"
 #include "utils.h"
+#include "utils/cast.h"
 
 struct OneTimeCommandBuffer {
   VkCommandBuffer vk_cmd;
@@ -34,16 +36,28 @@ void tr::renderer::VulkanEngine::write_gpu_timestamp(VkCommandBuffer cmd, VkPipe
 }
 
 void tr::renderer::VulkanEngine::draw() {
-  Frame frame = swapchain.acquire_next_frame(device, frame_synchronisation_pool.pop(device.vk_device));
+  std::size_t in_flight_index = frame_id % MAX_IN_FLIGHT;
+  Frame frame{};
+  frame.synchro = frame_synchronisation_pool[in_flight_index];
+  VK_UNWRAP(vkWaitForFences, device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
 
-  VK_UNWRAP(vkResetCommandBuffer, main_command_buffer, 0);
+  switch (VkResult result = swapchain.acquire_next_frame(device, &frame); result) {
+    case VK_ERROR_OUT_OF_DATE_KHR:
+      rebuild_swapchain();
+      return;
+    case VK_SUBOPTIMAL_KHR:
+      break;
+    default:
+      VK_CHECK(result, swapchain.acquire_next_frame);
+  }
 
-  OneTimeCommandBuffer cmd{main_command_buffer};
+  OneTimeCommandBuffer cmd{main_command_buffer_pool[in_flight_index]};
+  VK_UNWRAP(vkResetCommandBuffer, cmd.vk_cmd, 0);
+
+  write_cpu_timestamp(CPU_TIMESTAMP_INDEX_TOP);
   VK_UNWRAP(cmd.begin);
-
   gpu_timestamps.reset_queries(cmd.vk_cmd, frame_id);
   write_gpu_timestamp(cmd.vk_cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
-  write_cpu_timestamp(CPU_TIMESTAMP_INDEX_TOP);
 
   VkClearValue clear_value{.color = {.float32 = {1.0, 1.0, 1.0, 1.0}}};
   renderpass.begin(cmd.vk_cmd, frame.swapchain_image_index, VkRect2D{{0, 0}, swapchain.extent},
@@ -51,21 +65,20 @@ void tr::renderer::VulkanEngine::draw() {
   renderpass.end(cmd.vk_cmd);
 
   write_gpu_timestamp(cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
-  write_cpu_timestamp(CPU_TIMESTAMP_INDEX_BOTTOM);
   VK_UNWRAP(cmd.end);
+  write_cpu_timestamp(CPU_TIMESTAMP_INDEX_BOTTOM);
 
+  VK_UNWRAP(vkResetFences, device.vk_device, 1, &frame.synchro.render_fence);
   VK_UNWRAP(frame.submitCmds, device, std::span{&cmd.vk_cmd, 1});
-  switch (VkResult result = frame.present(device, swapchain.vk_swapchain); result) {
-    case VkResult::VK_ERROR_OUT_OF_DATE_KHR:
-      spdlog::debug("OUT OF DATE");
-      rebuild_swapchain();
-      break;
-    default:
-      VK_CHECK(result, vkQueuePresentKHR);
+  VkResult result = frame.present(device, swapchain.vk_swapchain);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || fb_resized) {
+    rebuild_swapchain();
+    fb_resized = false;
+  } else {
+    VK_CHECK(result, vkQueuePresentKHR);
   }
   write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_END);
 
-  frame_synchronisation_pool.push_frame_synchro(frame_device_deletion_stack, frame.synchro);
   frame_device_deletion_stack.cleanup(device.vk_device);
 }
 
@@ -108,23 +121,27 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   gpu_timestamps.reinit(device);
   gpu_timestamps.defer_deletion(global_deletion_stacks.device);
 
+  for (auto& synchro : frame_synchronisation_pool) {
+    synchro = FrameSynchro::init(device.vk_device);
+    synchro.defer_deletion(global_deletion_stacks.device);
+  }
+
   VkCommandBufferAllocateInfo cmd_alloc_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext = nullptr,
       .commandPool = graphics_command_pool,
       .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1,
+      .commandBufferCount = utils::narrow_cast<uint32_t>(main_command_buffer_pool.size()),
   };
 
-  VK_UNWRAP(vkAllocateCommandBuffers, device.vk_device, &cmd_alloc_info, &main_command_buffer);
+  VK_UNWRAP(vkAllocateCommandBuffers, device.vk_device, &cmd_alloc_info, main_command_buffer_pool.data());
 }
 
 tr::renderer::VulkanEngine::~VulkanEngine() {
   sync();
-  frame_synchronisation_pool.cleanup(global_deletion_stacks.device);
-
   // TODO: add a free queue for buffers?
-  vkFreeCommandBuffers(device.vk_device, graphics_command_pool, 1, &main_command_buffer);
+  vkFreeCommandBuffers(device.vk_device, graphics_command_pool, main_command_buffer_pool.size(),
+                       main_command_buffer_pool.data());
   swapchain_device_deletion_stack.cleanup(device.vk_device);
   global_deletion_stacks.device.cleanup(device.vk_device);
   global_deletion_stacks.instance.cleanup(instance.vk_instance);

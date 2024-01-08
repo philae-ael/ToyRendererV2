@@ -23,17 +23,15 @@
 #include "utils/timer.h"
 
 namespace tr::renderer {
+
+const std::size_t MAX_IN_FLIGHT = 2;
+
 class VulkanEngine {
  public:
   VulkanEngine() = default;
   void init(tr::Options& options, std::span<const char*> required_instance_extensions, GLFWwindow* window);
 
-  void sync() const {
-    VK_UNWRAP(vkQueueWaitIdle, device.queues.graphics_queue);
-    VK_UNWRAP(vkQueueWaitIdle, device.queues.present_queue);
-  }
-
-  void rebuild_swapchain();
+  void on_resize() { fb_resized = true; }
 
   void start_frame() { frame_id += 1; }
   void draw();
@@ -71,6 +69,9 @@ class VulkanEngine {
   auto operator=(VulkanEngine&&) -> VulkanEngine& = delete;
 
  private:
+  void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
+  void rebuild_swapchain();
+
   GLFWwindow* window{};
 
   // Cleaned at exit
@@ -93,18 +94,19 @@ class VulkanEngine {
   // Swapchain relataed
   Renderpass renderpass;
   Swapchain swapchain;
+  bool fb_resized = false;
 
-  FrameSynchroPool frame_synchronisation_pool;
+  std::array<FrameSynchro, MAX_IN_FLIGHT> frame_synchronisation_pool;
 
   // Buffer should be moved i guess
   VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
-  VkCommandBuffer main_command_buffer = VK_NULL_HANDLE;
+  std::array<VkCommandBuffer, MAX_IN_FLIGHT> main_command_buffer_pool{};
 
   // DEBUG AND TIMING
   void write_gpu_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index);
   void write_cpu_timestamp(tr::renderer::CPUTimestampIndex index);
 
-  Timestamp<2, GPU_TIMESTAMP_INDEX_MAX> gpu_timestamps;
+  Timestamp<MAX_IN_FLIGHT, GPU_TIMESTAMP_INDEX_MAX> gpu_timestamps;
   using cpu_timestamp_clock = std::chrono::high_resolution_clock;
   std::array<cpu_timestamp_clock::time_point, CPU_TIMESTAMP_INDEX_MAX> cpu_timestamps;
 
