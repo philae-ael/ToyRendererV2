@@ -39,7 +39,7 @@ auto tr::system::Platform::init(tr::App* new_app) -> utils::types::Extent2d<int>
   TR_ASSERT(glfwInit() != 0, "could not initializa GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
   this->app = new_app;
 

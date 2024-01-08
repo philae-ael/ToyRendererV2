@@ -2,6 +2,9 @@
 
 #include <spdlog/spdlog.h>
 
+#include <optional>
+#include <string_view>
+
 #include "renderer/synchronisation.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -44,16 +47,10 @@ overloaded(Ts...) -> overloaded<Ts...>;
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
 
-auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
-          const fastgltf::Asset& asset) -> std::vector<tr::renderer::Mesh> {
-  {
-    const auto err = fastgltf::validate(asset);
-    TR_ASSERT(err == fastgltf::Error::None, "Invalid GLTF: {} {}", fastgltf::getErrorName(err),
-              fastgltf::getErrorMessage(err));
-  }
-
-  // TODO: use an id rather than a pointer
+auto load_materials(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, const fastgltf::Asset& asset)
+    -> std::vector<std::shared_ptr<tr::renderer::Material>> {
   std::vector<std::shared_ptr<tr::renderer::Material>> materials;
+
   for (const auto& material : asset.materials) {
     TR_ASSERT(material.pbrData.baseColorTexture, "no base color texture, not supported");
     auto mat = std::make_shared<tr::renderer::Material>();
@@ -100,13 +97,49 @@ auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::r
         },
         "texture image");
 
-    mat->base_color_texture.sync(t.cmd.vk_cmd, tr::renderer::SyncImageTransfer);
+    tr::renderer::ImageMemoryBarrier::submit<1>(
+        t.cmd.vk_cmd, {{
+                          mat->base_color_texture.prepare_barrier(tr::renderer::SyncImageTransfer),
+                      }});
     t.upload_image(mat->base_color_texture, {{0, 0}, {width, height}}, image);
 
     materials.push_back(std::move(mat));
   }
+  return materials;
+}
 
-  std::vector<tr::renderer::Mesh> meshes{};
+auto load_attribute(const fastgltf::Asset& asset, std::vector<tr::renderer::Vertex>& vertices,
+                    const std::string& attribute, const fastgltf::Accessor& accessor, size_t start_v_idx) {
+  vertices.resize(std::max(vertices.size(), start_v_idx + accessor.count));
+
+  if (attribute == "POSITION") {
+    fastgltf::iterateAccessorWithIndex<glm::vec3>(
+        asset, accessor, [&](glm::vec3 pos, size_t v_idx) { vertices[start_v_idx + v_idx].pos = pos; });
+    return;
+  }
+  if (attribute == "NORMAL") {
+    fastgltf::iterateAccessorWithIndex<glm::vec3>(
+        asset, accessor, [&](glm::vec3 normal, size_t v_idx) { vertices[start_v_idx + v_idx].normal = normal; });
+    return;
+  }
+  if (attribute == "TEXCOORD_0") {
+    fastgltf::iterateAccessorWithIndex<glm::vec2>(
+        asset, accessor, [&](glm::vec2 uv, size_t v_idx) { vertices[start_v_idx + v_idx].uv = uv; });
+    return;
+  }
+  if (attribute == "COLOR_0") {
+    fastgltf::iterateAccessorWithIndex<glm::vec4>(
+        asset, accessor, [&](glm::vec4 color, size_t v_idx) { vertices[start_v_idx + v_idx].color = color; });
+    return;
+  }
+
+  static std::unordered_map<std::string, std::once_flag> warn_once_flags;
+  std::call_once(warn_once_flags[attribute], [&] { spdlog::warn("Unknown attribute {}", attribute); });
+}
+
+auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, const fastgltf::Asset& asset,
+                 std::span<std::shared_ptr<tr::renderer::Material>> materials) -> std::vector<tr::renderer::Mesh> {
+  std::vector<tr::renderer::Mesh> meshes;
   for (const auto& scene : asset.scenes) {
     for (auto idx : scene.nodeIndices) {
       const auto& node = asset.nodes[idx];
@@ -152,32 +185,7 @@ auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::r
 
         for (const auto& [attribute, accessor_index] : primitive.attributes) {
           const auto& accessor = asset.accessors[accessor_index];
-          vertices.resize(std::max(vertices.size(), start_v_idx + accessor.count));
-
-          if (attribute == "POSITION") {
-            fastgltf::iterateAccessorWithIndex<glm::vec3>(
-                asset, accessor, [&](glm::vec3 pos, size_t v_idx) { vertices[start_v_idx + v_idx].pos = pos; });
-            continue;
-          }
-          if (attribute == "NORMAL") {
-            fastgltf::iterateAccessorWithIndex<glm::vec3>(asset, accessor, [&](glm::vec3 normal, size_t v_idx) {
-              vertices[start_v_idx + v_idx].normal = normal;
-            });
-            continue;
-          }
-          if (attribute == "TEXCOORD_0") {
-            fastgltf::iterateAccessorWithIndex<glm::vec2>(
-                asset, accessor, [&](glm::vec2 uv, size_t v_idx) { vertices[start_v_idx + v_idx].uv = uv; });
-            continue;
-          }
-          if (attribute == "COLOR_0") {
-            fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                asset, accessor, [&](glm::vec4 color, size_t v_idx) { vertices[start_v_idx + v_idx].color = color; });
-            continue;
-          }
-
-          static std::unordered_map<std::string, std::once_flag> warn_once_flags;
-          std::call_once(warn_once_flags[attribute.c_str()], [&] { spdlog::warn("Unknown attribute {}", attribute); });
+          load_attribute(asset, vertices, std::string{attribute}, accessor, start_v_idx);
         }
       }
 
@@ -207,6 +215,18 @@ auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::r
   }
 
   return meshes;
+}
+auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
+          const fastgltf::Asset& asset) -> std::vector<tr::renderer::Mesh> {
+  {
+    const auto err = fastgltf::validate(asset);
+    TR_ASSERT(err == fastgltf::Error::None, "Invalid GLTF: {} {}", fastgltf::getErrorName(err),
+              fastgltf::getErrorMessage(err));
+  }
+
+  // TODO: use an id rather than a pointer -> Allows to sort and more
+  std::vector<std::shared_ptr<tr::renderer::Material>> materials = load_materials(ib, t, asset);
+  return load_meshes(bb, t, asset, materials);
 }
 
 auto tr::Gltf::load_from_file(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb,

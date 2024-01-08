@@ -62,6 +62,9 @@ add_executable(ToyRenderer
     src/renderer/vertex.h
     src/renderer/vma.cpp
     src/renderer/queue.h
+    src/renderer/ressources.h
+    src/renderer/ressources.cpp
+    src/renderer/synchronisation.h
     src/renderer/passes/deferred.h
     src/renderer/passes/deferred.cpp
     src/renderer/passes/gbuffer.h

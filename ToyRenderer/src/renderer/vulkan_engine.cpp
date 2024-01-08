@@ -9,6 +9,7 @@
 #include <glm/fwd.hpp>
 #include <optional>
 #include <span>
+#include <vector>
 
 #include "command_pool.h"
 #include "constants.h"
@@ -79,12 +80,17 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
 
   debug_info.write_gpu_timestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
 
-  // HOW TO DO IT ONCE?!
+  std::vector<VkImageMemoryBarrier2> barriers;
   for (const auto& mesh : meshes) {
-    for (auto& mesh_surface : mesh.surfaces) {
-      mesh_surface.material->base_color_texture.sync(cmd, SyncFragmentShaderReadOnly);
+    for (auto& surface : mesh.surfaces) {
+      const auto barrier = surface.material->base_color_texture.prepare_barrier(SyncFragmentShaderReadOnly);
+      if (barrier) {
+        barriers.push_back(*barrier);
+      }
     }
   }
+  ImageMemoryBarrier::submit(cmd, barriers);
+
   passes.gbuffer.draw(cmd, rm, {{0, 0}, swapchain.extent}, [&] {
     {
       CameraMatrices* map = nullptr;
@@ -134,8 +140,10 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
                                  GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
 
   {
-    rm.fb0.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
-    rm.fb1.sync(frame.cmd.vk_cmd, SyncFragmentShaderReadOnly);
+    ImageMemoryBarrier::submit<2>(cmd, {{
+                                           rm.fb0.prepare_barrier(SyncFragmentShaderReadOnly),
+                                           rm.fb1.prepare_barrier(SyncFragmentShaderReadOnly),
+                                       }});
     auto descriptor = frame.descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
     DescriptorUpdater{descriptor, 0}
         .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
@@ -170,7 +178,7 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
 void tr::renderer::VulkanEngine::end_frame(Frame frame) {
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_TOP);
 
-  rm.swapchain.sync(frame.cmd.vk_cmd, SyncPresent);
+  ImageMemoryBarrier::submit<1>(frame.cmd.vk_cmd, {{rm.swapchain.prepare_barrier(SyncPresent)}});
 
   VK_UNWRAP(frame.cmd.end);
   VK_UNWRAP(frame.submitCmds, device.queues.graphics_queue);

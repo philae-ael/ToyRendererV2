@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include "../debug.h"
 #include "../descriptors.h"
 #include "../pipeline.h"
 
@@ -76,10 +77,11 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
 void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
   DebugCmdScope scope(cmd, "Deferred");
 
+  ImageMemoryBarrier::submit<1>(cmd, {{
+                                         rm.swapchain.invalidate().prepare_barrier(SyncColorAttachment),
+                                     }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
-      rm.swapchain.invalidate()
-          .sync(cmd, SyncColorAttachment)
-          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 1.0, 1.0}}}),
+      rm.swapchain.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 1.0, 1.0}}}),
   };
 
   VkRenderingInfo render_info{
@@ -105,4 +107,3 @@ void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm
   vkCmdDraw(cmd, 3, 1, 0, 0);
   vkCmdEndRendering(cmd);
 }
-

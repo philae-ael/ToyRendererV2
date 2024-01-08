@@ -2,13 +2,17 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <span>
+
+#include "utils/cast.h"
+#include "utils/data/static_stack.h"
 
 namespace tr::renderer {
 struct ImageMemoryBarrier {
-  VkImageMemoryBarrier2 barrier;
-
-  void submit(VkCommandBuffer cmd) const {
+  static void submit(VkCommandBuffer cmd, std::span<VkImageMemoryBarrier2> barriers) {
     VkDependencyInfo dependency_info{
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .pNext = nullptr,
@@ -17,10 +21,25 @@ struct ImageMemoryBarrier {
         .pMemoryBarriers = nullptr,
         .bufferMemoryBarrierCount = 0,
         .pBufferMemoryBarriers = nullptr,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier,
+        .imageMemoryBarrierCount = utils::narrow_cast<uint32_t>(barriers.size()),
+        .pImageMemoryBarriers = barriers.data(),
     };
     vkCmdPipelineBarrier2(cmd, &dependency_info);
+  }
+
+  template <const size_t N>
+    requires(N != std::dynamic_extent)
+  static void submit(VkCommandBuffer cmd, std::span<const std::optional<VkImageMemoryBarrier2>, N> barriers) {
+    utils::data::static_stack<VkImageMemoryBarrier2, N> barriers_;
+    for (const auto& barrier : barriers) {
+      if (barrier) {
+        barriers_.push_back(*barrier);
+      }
+    }
+
+    if (barriers_.size() > 0) {
+      submit(cmd, barriers_);
+    }
   }
 };
 
@@ -30,23 +49,21 @@ struct SyncInfo {
   VkImageLayout layout;
   uint32_t queueFamilyIndex;
 
-  auto prepare_sync_transition(const SyncInfo& dst, VkImage image, VkImageSubresourceRange subressourceRange) const
-      -> ImageMemoryBarrier {
+  auto barrier(const SyncInfo& dst, VkImage image, VkImageSubresourceRange subressourceRange) const
+      -> VkImageMemoryBarrier2 {
     return {
-        {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .pNext = nullptr,
-            .srcStageMask = stageMask,
-            .srcAccessMask = accessMask,
-            .dstStageMask = dst.stageMask,
-            .dstAccessMask = dst.accessMask,
-            .oldLayout = layout,
-            .newLayout = dst.layout,
-            .srcQueueFamilyIndex = queueFamilyIndex,
-            .dstQueueFamilyIndex = dst.queueFamilyIndex,
-            .image = image,
-            .subresourceRange = subressourceRange,
-        },
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .pNext = nullptr,
+        .srcStageMask = stageMask,
+        .srcAccessMask = accessMask,
+        .dstStageMask = dst.stageMask,
+        .dstAccessMask = dst.accessMask,
+        .oldLayout = layout,
+        .newLayout = dst.layout,
+        .srcQueueFamilyIndex = queueFamilyIndex,
+        .dstQueueFamilyIndex = dst.queueFamilyIndex,
+        .image = image,
+        .subresourceRange = subressourceRange,
     };
   }
 

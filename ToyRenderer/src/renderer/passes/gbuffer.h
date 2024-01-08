@@ -68,17 +68,19 @@ struct GBuffer {
   void draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area, Fn f) {
     DebugCmdScope scope(cmd, "GBuffer");
 
+    ImageMemoryBarrier::submit<3>(cmd, {{
+                                           rm.fb0.invalidate().prepare_barrier(SyncColorAttachment),
+                                           rm.fb1.invalidate().prepare_barrier(SyncColorAttachment),
+                                           rm.depth.invalidate().prepare_barrier(SyncLateDepth),
+                                       }});
+
     std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
-        rm.fb0.invalidate()
-            .sync(cmd, SyncColorAttachment)
-            .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-        rm.fb1.invalidate()
-            .sync(cmd, SyncColorAttachment)
-            .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+        rm.fb0.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+        rm.fb1.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
     });
 
     VkRenderingAttachmentInfo depthAttachment =
-        rm.depth.sync(cmd, SyncLateDepth).as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
+        rm.depth.as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
 
     VkRenderingInfo render_info{
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
