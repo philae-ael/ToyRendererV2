@@ -73,8 +73,9 @@ auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::r
                      int x = 0;
                      int y = 0;
                      int channels = 0;
-                     const auto* im = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(bytes.data()),
-                                                            bytes.size_bytes(), &x, &y, &channels, 4);
+                     const auto* im =
+                         stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(bytes.data()),
+                                               utils::narrow_cast<int>(bytes.size_bytes()), &x, &y, &channels, 4);
                      TR_ASSERT(im != nullptr, "Could not load image");
 
                      width = x;

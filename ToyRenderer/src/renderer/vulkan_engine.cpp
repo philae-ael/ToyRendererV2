@@ -81,8 +81,8 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
 
   // HOW TO DO IT ONCE?!
   for (const auto& mesh : meshes) {
-    for (auto& surface : mesh.surfaces) {
-      surface.material->base_color_texture.sync(cmd, SyncFragmentShaderReadOnly);
+    for (auto& mesh_surface : mesh.surfaces) {
+      mesh_surface.material->base_color_texture.sync(cmd, SyncFragmentShaderReadOnly);
     }
   }
   passes.gbuffer.draw(cmd, rm, {{0, 0}, swapchain.extent}, [&] {
