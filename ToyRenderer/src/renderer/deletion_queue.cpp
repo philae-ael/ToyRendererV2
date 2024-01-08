@@ -50,6 +50,7 @@ void tr::renderer::DeviceDeletionStack::cleanup(VkDevice device) {
       DESTROY_WITH_DEVICE(PipelineLayout)
       DESTROY_WITH_DEVICE(Buffer)
       DESTROY_WITH_DEVICE(DescriptorPool)
+      DESTROY_WITH_DEVICE(ShaderModule)
     }
     // NOLINTEND(performance-no-int-to-ptr)
   }

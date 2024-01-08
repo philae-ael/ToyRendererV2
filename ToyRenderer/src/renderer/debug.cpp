@@ -4,12 +4,14 @@
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
 #include <utils/misc.h>
+#include <vulkan/vulkan_core.h>
 
 #include <cstddef>
 #include <format>
 #include <fstream>
 
 #include "swapchain.h"
+#include "utils/cast.h"
 #include "vulkan_engine.h"
 
 #if defined(_WIN32)
@@ -53,7 +55,7 @@ void tr::renderer::VulkanEngineDebugInfo::write_gpu_timestamp(VkCommandBuffer cm
   gpu_timestamps.write_cmd_query(cmd, pipelineStage, current_frame_id, index);
 }
 
-void tr::renderer::VulkanEngineDebugInfo::imgui(tr::renderer::VulkanEngine& engine) {
+void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine& engine) {
   if (!ImGui::Begin("Vulkan Engine")) {
     ImGui::End();
     return;
@@ -164,6 +166,44 @@ void tr::renderer::VulkanEngineDebugInfo::imgui(tr::renderer::VulkanEngine& engi
   }
 
   ImGui::End();
+}
+
+void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngine& engine) {
+  if (!ImGui::Begin("Options")) {
+    ImGui::End();
+    return;
+  }
+
+  std::array present_modes = utils::to_array<std::pair<const char*, VkPresentModeKHR>>({
+      {"Immediate", VK_PRESENT_MODE_IMMEDIATE_KHR},
+      {"MailBox", VK_PRESENT_MODE_MAILBOX_KHR},
+      {"FIFO", VK_PRESENT_MODE_FIFO_KHR},
+      {"FIFO Relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
+  });
+  int present_mode_selected = -1;
+  for (int i = 0; i < utils::narrow_cast<int>(present_modes.size()); i++) {
+    if (engine.swapchain.config.prefered_present_mode == present_modes[i].second) {
+      present_mode_selected = i;
+      break;
+    }
+  }
+
+  if (present_mode_selected >= 0 && ImGui::BeginCombo("Present mode", present_modes[present_mode_selected].first)) {
+    for (int i = 0; i < utils::narrow_cast<int>(present_modes.size()); i++) {
+      if (ImGui::Selectable(present_modes[i].first, i == present_mode_selected)) {
+        present_mode_selected = i;
+        engine.swapchain.config.prefered_present_mode = present_modes[i].second;
+        engine.swapchain_need_to_be_rebuilt = true;
+      }
+    }
+    ImGui::EndCombo();
+  }
+
+  ImGui::End();
+}
+void tr::renderer::VulkanEngineDebugInfo::imgui(tr::renderer::VulkanEngine& engine) {
+  stat_window(engine);
+  option_window(engine);
 }
 
 void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEngine& engine) {

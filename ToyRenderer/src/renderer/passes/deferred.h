@@ -3,33 +3,34 @@
 #include <vulkan/vulkan_core.h>
 
 #include "../debug.h"
-#include "../pipeline.h"
 #include "../ressources.h"
 
 namespace tr::renderer {
 
 struct Deferred {
-  Pipeline pipeline;
+  VkPipeline pipeline = VK_NULL_HANDLE;
+  static constexpr std::array definitions = utils::to_array<ImageDefinition>({
+      {
+          // swapchain
+          .flags = IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
+          .usage = ImageUsage::Color,
+      },
+  });
 
-  static auto init(Device &device) -> Deferred { return {Pipeline::init(device)}; }
+  static auto init(VkDevice &device, Swapchain &swapchain, DeviceDeletionStack &device_deletion_stack) -> Deferred;
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {
-    pipeline.defer_deletion(device_deletion_stack);
+    device_deletion_stack.defer_deletion(DeviceHandle::Pipeline, pipeline);
   }
 
   template <class Fn>
   void draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area, Fn f) const {
-    DebugCmdScope scope(cmd, "GBuffer");
+    DebugCmdScope scope(cmd, "Deferred");
 
     std::array<VkRenderingAttachmentInfo, 1> attachments{
-        rm.swapchain.transition(cmd, DstImageMemoryBarrierColorAttachment)
+        rm.swapchain.invalidate()
+            .sync(cmd, SyncColorAttachment)
             .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 1.0, 1.0}}}),
-        /* rm.fb1.transition(cmd, DstImageMemoryBarrierColorAttachment) */
-        /*     .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 1.0, 1.0}}}), */
     };
-
-    VkRenderingAttachmentInfo depthAttachment =
-        rm.depth.transition(cmd, DstImageMemoryBarrierDepthAttachment)
-            .as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
 
     VkRenderingInfo render_info{
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -40,7 +41,7 @@ struct Deferred {
         .viewMask = 0,
         .colorAttachmentCount = attachments.size(),
         .pColorAttachments = attachments.data(),
-        .pDepthAttachment = &depthAttachment,
+        .pDepthAttachment = nullptr,
         .pStencilAttachment = nullptr,
     };
     vkCmdBeginRendering(cmd, &render_info);
@@ -50,7 +51,7 @@ struct Deferred {
     };
     vkCmdSetViewport(cmd, 0, 1, &viewport);
     vkCmdSetScissor(cmd, 0, 1, &render_area);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.vk_pipeline);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     f();
     vkCmdEndRendering(cmd);
   }

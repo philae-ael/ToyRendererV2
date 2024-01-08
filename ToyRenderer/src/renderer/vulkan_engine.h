@@ -35,7 +35,7 @@ class VulkanEngine {
   VulkanEngine() = default;
   void init(tr::Options& options, std::span<const char*> required_instance_extensions, GLFWwindow* window);
 
-  void on_resize() { fb_resized = true; }
+  void on_resize() { swapchain_need_to_be_rebuilt = true; }
 
   auto start_frame() -> std::optional<Frame>;
   void draw(Frame);
@@ -55,11 +55,24 @@ class VulkanEngine {
   VulkanEngineDebugInfo debug_info;
 
   FrameRessourceManager rm{};
-  ImageRessourceStorage fb0_ressources{};
-  ImageRessourceStorage fb1_ressources{};
-  ImageRessourceStorage depth_ressources{};
+  ImageRessourceStorage fb0_ressources{
+      .definition = GBuffer::definitions[0],
+      .ressources = {},
+      .debug_name = "fb0",
+  };
+  ImageRessourceStorage fb1_ressources{
+      .definition = GBuffer::definitions[1],
+      .ressources = {},
+      .debug_name = "fb1",
+  };
+  ImageRessourceStorage depth_ressources{
+      .definition = GBuffer::definitions[2],
+      .ressources = {},
+      .debug_name = "depth",
+  };
 
  private:
+  void upload(DeviceDeletionStack&, VmaDeletionStack&);
   GLFWwindow* window{};
 
   struct {
@@ -88,22 +101,18 @@ class VulkanEngine {
   Device device;
   VmaAllocator allocator = nullptr;
 
-  VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
-  VkCommandPool transfer_command_pool = VK_NULL_HANDLE;
-  VkCommandBuffer transfer_command_buffer{};
-
   // Swapchain related
   Swapchain swapchain;
-  bool fb_resized = false;
+  bool swapchain_need_to_be_rebuilt = false;
 
   // FRAME STUFF
   std::size_t frame_id{};
   std::array<FrameSynchro, MAX_FRAMES_IN_FLIGHT> frame_synchronisation_pool;
-  std::array<VkCommandBuffer, MAX_FRAMES_IN_FLIGHT> main_command_buffer_pool{};
+  std::array<VkCommandPool, MAX_FRAMES_IN_FLIGHT> graphic_command_pools{};
+  std::array<VkCommandBuffer, MAX_FRAMES_IN_FLIGHT> graphics_command_buffers{};
 
   // Data shall be moved, one day
   Buffer triangle_vertex_buffer;
-  StagingBuffer staging_buffer;
 
   friend system::Imgui;
 };

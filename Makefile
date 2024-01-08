@@ -6,17 +6,11 @@ ARGS?=
 .PHONY: all run clean format
 
 
-all: $(OUTPUT_DIR)/build.ninja build/shaders/vert.spv build/shaders/frag.spv
+all: $(OUTPUT_DIR)/build.ninja
 	ninja -C$(OUTPUT_DIR)
 
 run: all 
 	./$(OUTPUT_DIR)/ToyRenderer/ToyRenderer $(ARGS)
-
-build/shaders/vert.spv: assets/shaders/triangle.vert build/shaders
-	glslc -c assets/shaders/triangle.vert -o build/shaders/vert.spv
-
-build/shaders/frag.spv: assets/shaders/triangle.frag build/shaders
-	glslc -c assets/shaders/triangle.frag -o build/shaders/frag.spv
 
 build/shaders:
 	mkdir -p build/shaders

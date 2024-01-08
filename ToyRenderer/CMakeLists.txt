@@ -6,6 +6,21 @@ find_package(spdlog REQUIRED)
 find_package(imgui REQUIRED)
 find_package(glm REQUIRED)
 
+add_library(Shaders INTERFACE)
+target_compile_shader(Shaders
+    ENV vulkan1.3
+    EXT inc
+    FORMAT num
+    ARGS -g
+    SOURCES
+    shaders/gbuffer.frag
+    shaders/gbuffer.vert
+    shaders/deferred.frag
+    shaders/deferred.vert
+)
+
+target_include_directories(Shaders INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/include)
+
 add_executable(ToyRenderer
     src/main.cpp
     src/app.h
@@ -40,7 +55,10 @@ add_executable(ToyRenderer
     src/renderer/vertex.h
     src/renderer/vma.cpp
     src/renderer/queue.h
-    src/renderer/passes/defered.h
+    src/renderer/passes/deferred.h
+    src/renderer/passes/deferred.cpp
+    src/renderer/passes/gbuffer.h
+    src/renderer/passes/gbuffer.cpp
     src/renderer/constants.h
     src/system/platform.h
     src/system/platform.cpp
@@ -48,7 +66,8 @@ add_executable(ToyRenderer
     src/system/input.cpp
     src/system/imgui.h
 )
-target_link_libraries(ToyRenderer PRIVATE glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator)
+
+target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator)
 
 # set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy")
 # set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")
@@ -56,5 +75,5 @@ target_link_libraries(ToyRenderer PRIVATE glfw Vulkan::Vulkan imgui::imgui spdlo
 if (MSVC)
     target_compile_options(ToyRenderer PRIVATE /W4)
 else ()
-    target_compile_options(ToyRenderer PRIVATE -Wall -Wextra -fdiagnostics-color=always -ggdb )
+    target_compile_options(ToyRenderer PRIVATE -Wall -Wextra -fdiagnostics-color=always -ggdb)
 endif ()

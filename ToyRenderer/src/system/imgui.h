@@ -113,6 +113,7 @@ class Imgui {
     vkCmdEndRendering(frame.cmd.vk_cmd);
     engine.debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                                           renderer::GPU_TIMESTAMP_INDEX_IMGUI_BOTTOM);
+
     if ((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0) {
       ImGui::UpdatePlatformWindows();
       ImGui::RenderPlatformWindowsDefault();

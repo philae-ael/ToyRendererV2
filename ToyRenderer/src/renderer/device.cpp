@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "constants.h"
+#include "debug.h"
 #include "utils.h"
 
 void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkSurfaceKHR surface) {
@@ -127,8 +128,9 @@ void init_device(tr::renderer::Device& device) {
   };
 
   std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
+  float queue_priority = 1.0;
+  queue_create_infos.reserve(queue_families.size());
   for (auto queue_family : queue_families) {
-    float queue_priority = 1.0;
     queue_create_infos.push_back({
         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
         .pNext = nullptr,
@@ -140,16 +142,14 @@ void init_device(tr::renderer::Device& device) {
   }
 
   VkPhysicalDeviceVulkan12Features vulkan12_features{};
-  vulkan12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+  vulkan12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, vulkan12_features.pNext = nullptr;
   vulkan12_features.hostQueryReset = VK_TRUE;
 
-  VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features{
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
-      .pNext = nullptr,
-      .dynamicRendering = VK_TRUE,
-  };
-
-  vulkan12_features.pNext = &dynamic_rendering_features;
+  VkPhysicalDeviceVulkan13Features vulkan13_features{};
+  vulkan13_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+  vulkan13_features.pNext = &vulkan12_features;
+  vulkan13_features.synchronization2 = VK_TRUE;
+  vulkan13_features.dynamicRendering = VK_TRUE;
 
   std::vector<const char*> extensions;
   extensions.reserve(device.extensions.size());
@@ -159,7 +159,7 @@ void init_device(tr::renderer::Device& device) {
 
   VkDeviceCreateInfo device_create_info{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = &vulkan12_features,
+      .pNext = &vulkan13_features,
       .flags = 0,
       .queueCreateInfoCount = utils::narrow_cast<std::uint32_t>(queue_create_infos.size()),
       .pQueueCreateInfos = queue_create_infos.data(),
@@ -183,5 +183,8 @@ auto tr::renderer::Device::init(VkInstance instance, VkSurfaceKHR surface) -> De
   Device device;
   init_physical_device(device, instance, surface);
   init_device(device);
+  set_debug_object_name(device.vk_device, VK_OBJECT_TYPE_QUEUE, device.queues.present_queue, "present queue");
+  set_debug_object_name(device.vk_device, VK_OBJECT_TYPE_QUEUE, device.queues.transfer_queue, "transfer queue");
+  set_debug_object_name(device.vk_device, VK_OBJECT_TYPE_QUEUE, device.queues.graphics_queue, "graphics queue");
   return device;
 }

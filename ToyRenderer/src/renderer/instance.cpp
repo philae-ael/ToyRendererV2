@@ -106,7 +106,7 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
     }
     std::vector<const char*> validation_layers;
     validation_layers.reserve(instance.extensions.size());
-for (auto& layer : instance.validation_layers) {
+    for (auto& layer : instance.validation_layers) {
       validation_layers.push_back(layer.c_str());
     }
     VkInstanceCreateInfo createInfo{
@@ -178,7 +178,15 @@ VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
       break;
   }
 
-  spdlog::log(level, "[{}] - ({}:{}): {}", reason, pCallbackData->pMessageIdName, pCallbackData->pMessageIdName,
+  std::string messageIdName = "no name";
+  if (pCallbackData->pMessageIdName != nullptr) {
+    messageIdName = pCallbackData->pMessageIdName;
+  }
+  std::string message = "no message";
+  if (pCallbackData->pMessage != nullptr) {
+    message = pCallbackData->pMessage;
+  }
+  spdlog::log(level, "[{}] - ({}:{}): {}", reason, messageIdName, pCallbackData->messageIdNumber,
               pCallbackData->pMessage);
 
   if (pCallbackData->objectCount > 0) {
@@ -190,8 +198,8 @@ VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
     spdlog::log(level,
                 "[{}] - ({}:{}): 1st object affected {} "
                 "(type: {}, name:\"{}\")",
-                reason, pCallbackData->pMessageIdName, pCallbackData->pMessageIdName,
-                pCallbackData->pObjects[0].objectHandle, pCallbackData->pObjects[0].objectType, objectName);
+                reason, messageIdName, pCallbackData->messageIdNumber, pCallbackData->pObjects[0].objectHandle,
+                pCallbackData->pObjects[0].objectType, objectName);
   }
 
   return VK_FALSE;

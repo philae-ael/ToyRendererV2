@@ -24,9 +24,8 @@ auto tr::renderer::CommandPool::init(Device &device, CommandPool::TargetQueue ta
   VkCommandPoolCreateInfo command_pool_create_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = nullptr,
-      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+      .flags = 0,
       .queueFamilyIndex = queue_family_index,
-
   };
 
   VK_UNWRAP(vkCreateCommandPool, device.vk_device, &command_pool_create_info, nullptr, &command_pool);

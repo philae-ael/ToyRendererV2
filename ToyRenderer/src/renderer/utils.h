@@ -1,8 +1,8 @@
 #pragma once
 
-#include <format>
 #include <vulkan/vulkan_core.h>
 
+#include <format>
 #include <optional>
 #include <set>
 #include <span>
@@ -449,6 +449,31 @@ struct std::formatter<VkObjectType> : formatter<std::string_view> {
       CASE(VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV)
       CASE(VK_OBJECT_TYPE_SHADER_EXT)
       CASE(VK_OBJECT_TYPE_MAX_ENUM)
+    }
+#undef CASE
+    return std::format_to(ctx.out(), "{}", value);
+  }
+};
+
+template <>
+struct std::formatter<VkPresentModeKHR> : formatter<std::string_view> {
+  auto format(VkPresentModeKHR result, format_context& ctx) const -> format_context::iterator {  // NOLINT
+    string_view value = "unknown";
+
+#define CASE(name) \
+  case name:       \
+    value = #name; \
+    break;
+
+    switch (result) {
+      CASE(VK_PRESENT_MODE_IMMEDIATE_KHR)
+      CASE(VK_PRESENT_MODE_MAILBOX_KHR)
+      CASE(VK_PRESENT_MODE_FIFO_KHR)
+      CASE(VK_PRESENT_MODE_FIFO_RELAXED_KHR)
+      CASE(VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR)
+      CASE(VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR)
+      CASE(VK_PRESENT_MODE_MAX_ENUM_KHR)
+      break;
     }
 #undef CASE
     return std::format_to(ctx.out(), "{}", value);

@@ -53,6 +53,7 @@ enum class DeviceHandle {
   PipelineLayout,
   Buffer,
   DescriptorPool,
+  ShaderModule
 };
 
 class DeviceDeletionStack : public DeletionStack<DeviceHandle> {

@@ -4,6 +4,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
+#include <string_view>
 
 #include "constants.h"
 #include "swapchain.h"
@@ -66,13 +67,13 @@ struct Renderdoc {
 };
 
 template <class T>
-void set_debug_object_name(VkDevice device, VkObjectType type, T t, const char *name) {
+void set_debug_object_name(VkDevice device, VkObjectType type, T t, const std::string &name) {
   VkDebugUtilsObjectNameInfoEXT name_info{
       .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
       .pNext = nullptr,
       .objectType = type,
       .objectHandle = reinterpret_cast<uint64_t>(t),
-      .pObjectName = name,
+      .pObjectName = name.c_str(),
   };
   vkSetDebugUtilsObjectNameEXT(device, &name_info);
 }
@@ -84,6 +85,7 @@ struct VulkanEngineDebugInfo {
   void write_gpu_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index);
   void write_cpu_timestamp(tr::renderer::CPUTimestampIndex index);
   void record_timeline(VulkanEngine &);
+
   void imgui(VulkanEngine &);
 
   Frame current_frame{};
@@ -103,6 +105,10 @@ struct VulkanEngineDebugInfo {
   utils::Timeline<float, 500> gpu_memory_usage{};
 
   Renderdoc renderdoc;
+
+ private:
+  void stat_window(VulkanEngine &);
+  void option_window(VulkanEngine &);
 };
 
 }  // namespace tr::renderer

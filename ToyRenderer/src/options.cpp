@@ -289,6 +289,7 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                                         {"immediate", VK_PRESENT_MODE_IMMEDIATE_KHR},
                                         {"fifo", VK_PRESENT_MODE_FIFO_KHR},
                                         {"mailbox", VK_PRESENT_MODE_MAILBOX_KHR},
+                                        {"relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
                                     }},
                                 }},
                        },

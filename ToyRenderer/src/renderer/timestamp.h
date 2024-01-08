@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 #include "deletion_queue.h"
 #include "device.h"
@@ -39,14 +40,23 @@ struct GPUTimestamp {
   }
 
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) {
+    if (query_pool == VK_NULL_HANDLE) {
+      return;
+    }
     device_deletion_stack.defer_deletion(DeviceHandle::QueryPool, query_pool);
   }
 
   void reset_queries(VkCommandBuffer cmd, std::size_t frame_id) {
+    if (query_pool == VK_NULL_HANDLE) {
+      return;
+    }
     vkCmdResetQueryPool(cmd, query_pool, utils::narrow_cast<uint32_t>(query_index(frame_id, 0)), QUERY_COUNT);
   }
 
   auto get(VkDevice device, std::size_t frame_id) -> bool {
+    if (query_pool == VK_NULL_HANDLE) {
+      return false;
+    }
     VkResult result =
         vkGetQueryPoolResults(device, query_pool, utils::narrow_cast<uint32_t>(query_index(frame_id, 0)), QUERY_COUNT,
                               2 * QUERY_COUNT * sizeof(uint64_t), &raw_timestamps.at(raw_timestamps_index(frame_id, 0)),
@@ -61,6 +71,10 @@ struct GPUTimestamp {
   }
 
   auto fetch_elsapsed(std::size_t frame_id, std::size_t from, std::size_t to) -> std::optional<float> {
+    if (query_pool == VK_NULL_HANDLE) {
+      return std::nullopt;
+    }
+
     auto availibility_to = raw_timestamps.at(status_index(frame_id, to));
     auto availibility_from = raw_timestamps.at(status_index(frame_id, from));
     if (availibility_to == 0 || availibility_from == 0) {

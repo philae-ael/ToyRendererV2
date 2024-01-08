@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <format>
 
 #include "../registry.h"
 #include "debug.h"
@@ -36,7 +37,6 @@ auto tr::renderer::Swapchain::compute_extent(GLFWwindow* window) const -> VkExte
 
 auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::renderer::Device& device,
                                                VkSurfaceKHR surface, GLFWwindow* window) -> Swapchain {
-  // TODO: better, it works but not very well
   Swapchain s{};
   s.config = config;
 
@@ -67,14 +67,20 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
     }
   }
   s.surface_format = chosen_format.value_or(s.available_formats[0]);
+  spdlog::debug("Surface format chosen: format {} | colorSpace {}", s.surface_format.format,
+                s.surface_format.colorSpace);
 
   std::optional<VkPresentModeKHR> chosen_present_mode;
+  spdlog::debug("Available present modes:");
   for (const auto& available_present_mode : s.available_present_modes) {
+    spdlog::debug("\t{}", available_present_mode);
+
     if (available_present_mode == config.prefered_present_mode) {
       chosen_present_mode = available_present_mode;
     }
   }
   s.present_mode = chosen_present_mode.value_or(s.available_present_modes[0]);
+  spdlog::debug("Present Mode chosen: {}", s.present_mode);
 
   s.extent = s.compute_extent(window);
   uint32_t image_count = s.capabilities.minImageCount + 1;
@@ -151,6 +157,10 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
     };
 
     VK_UNWRAP(vkCreateImageView, device.vk_device, &image_view_create_info, nullptr, &s.image_views[i]);
+
+    set_debug_object_name(device.vk_device, VK_OBJECT_TYPE_IMAGE, s.images[i], std::format("Swapchain image {}", i));
+    set_debug_object_name(device.vk_device, VK_OBJECT_TYPE_IMAGE_VIEW, s.image_views[i],
+                          std::format("Swapchain view {}", i));
   }
   return s;
 }
