@@ -3,6 +3,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
+#include <utility>
 
 #include "../debug.h"
 #include "../descriptors.h"
@@ -34,38 +35,61 @@ struct GBuffer {
           .build(),
   });
 
-  static constexpr std::array definitions = utils::to_array<ImageDefinition>({
+  static constexpr std::array attachments_color = utils::to_array<ImageRessourceDefinition>({
       {
-          // RGB: color, A: Roughness
-          .flags = 0,
-          .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT, // NOTE: They should NOT be sampled !
-          .size = FrameBufferExtent{},
-          .format = VK_FORMAT_R8G8B8A8_UNORM,
+          {
+              .flags = 0,
+              .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,  // NOTE: They should NOT be sampled !
+              .size = FramebufferExtent{},
+              .format = VK_FORMAT_R8G8B8A8_UNORM,
+              .debug_name = "GBuffer0 (RGB: color, A: roughness)",
+          },
+          ImageRessourceId::GBuffer0,
       },
       {
           // RGB: normal, A: metallic
-          .flags = 0,
-          .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
-          .size = FrameBufferExtent{},
-          .format = VK_FORMAT_R8G8B8A8_SNORM,
+          {
+              .flags = 0,
+              .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
+              .size = FramebufferExtent{},
+              .format = VK_FORMAT_R8G8B8A8_SNORM,
+              .debug_name = "GBuffer1 (RGB: normal, A: metallic)",
+          },
+          ImageRessourceId::GBuffer1,
       },
       {
           // RGB: ViewDir
-          .flags = 0,
-          .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
-          .size = FrameBufferExtent{},
-          .format = VK_FORMAT_R8G8B8A8_SNORM,
-      },
-      {
-          // depth
-          .flags = 0,
-          .usage = IMAGE_USAGE_DEPTH_BIT,
-          .size = FrameBufferExtent{},
-          .format = VK_FORMAT_D16_UNORM,
+          {
+              .flags = 0,
+              .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
+              .size = FramebufferExtent{},
+              .format = VK_FORMAT_R8G8B8A8_SNORM,
+              .debug_name = "GBuffer2 (RGB: viewDir)",
+          },
+          ImageRessourceId::GBuffer2,
       },
   });
 
+  static constexpr ImageRessourceDefinition attachment_depth{
+      {
+          .flags = 0,
+          .usage = IMAGE_USAGE_DEPTH_BIT,
+          .size = FramebufferExtent{},
+          .format = VK_FORMAT_D16_UNORM,
+          .debug_name = "Depth",
+      },
+      ImageRessourceId::Depth,
+  };
+
   static auto init(VkDevice &device, Swapchain &Swapchain, DeviceDeletionStack &device_deletion_stack) -> GBuffer;
+
+  static void register_ressources(RessourceManager &rm) {
+    for (const auto &attachment : attachments_color) {
+      rm.define_image(attachment);
+    }
+    rm.define_image(attachment_depth);
+  }
+
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {
     device_deletion_stack.defer_deletion(DeviceHandle::Pipeline, pipeline);
     device_deletion_stack.defer_deletion(DeviceHandle::PipelineLayout, pipeline_layout);
@@ -74,49 +98,16 @@ struct GBuffer {
     }
   }
 
+  void start_draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const;
+  void end_draw(VkCommandBuffer cmd) const;
+
   template <class Fn>
-  void draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area, Fn f) {
+  void draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area, Fn &&f) {
     DebugCmdScope scope(cmd, "GBuffer");
 
-    ImageMemoryBarrier::submit<4>(cmd, {{
-                                           rm.fb0.invalidate().prepare_barrier(SyncColorAttachment),
-                                           rm.fb1.invalidate().prepare_barrier(SyncColorAttachment),
-                                           rm.fb2.invalidate().prepare_barrier(SyncColorAttachment),
-                                           rm.depth.invalidate().prepare_barrier(SyncLateDepth),
-                                       }});
-
-    std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
-        rm.fb0.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-        rm.fb1.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-        rm.fb2.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-    });
-
-    VkRenderingAttachmentInfo depthAttachment =
-        rm.depth.as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
-
-    VkRenderingInfo render_info{
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .renderArea = render_area,
-        .layerCount = 1,
-        .viewMask = 0,
-        .colorAttachmentCount = utils::narrow_cast<uint32_t>(attachments.size()),
-        .pColorAttachments = attachments.data(),
-        .pDepthAttachment = &depthAttachment,
-        .pStencilAttachment = nullptr,
-    };
-    vkCmdBeginRendering(cmd, &render_info);
-
-    VkViewport viewport{
-        0, 0, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0, 1.0,
-    };
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-    vkCmdSetScissor(cmd, 0, 1, &render_area);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    f();
-
-    vkCmdEndRendering(cmd);
+    start_draw(cmd, rm, render_area);
+    std::forward<Fn>(f)();
+    end_draw(cmd);
   }
 };
 

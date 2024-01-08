@@ -46,6 +46,7 @@ add_executable(ToyRenderer
     src/renderer/device.h
     src/renderer/extensions.cpp
     src/renderer/extensions.h
+    src/renderer/frame.h
     src/renderer/instance.cpp
     src/renderer/instance.h
     src/renderer/mesh.h

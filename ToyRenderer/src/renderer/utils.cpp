@@ -1,6 +1,6 @@
+#include "utils.h"
 
 #include <spdlog/spdlog.h>
-#include "utils.h"
 #include <vulkan/vulkan_core.h>
 
 #include <algorithm>

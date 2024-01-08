@@ -47,7 +47,7 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
   });
 
   const auto color_formats = std::to_array<VkFormat>({
-      attachments_definitions[0].vk_format(swapchain),
+      attachments_color[0].definition.vk_format(swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
@@ -77,11 +77,12 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
 void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
   DebugCmdScope scope(cmd, "Deferred");
 
-  ImageMemoryBarrier::submit<1>(cmd, {{
-                                         rm.swapchain.invalidate().prepare_barrier(SyncColorAttachment),
-                                     }});
+  ImageMemoryBarrier::submit<1>(
+      cmd, {{
+               rm.get_image(ImageRessourceId::Swapchain).invalidate().prepare_barrier(SyncColorAttachment),
+           }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
-      rm.swapchain.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 1.0, 1.0}}}),
+      rm.get_image(ImageRessourceId::Swapchain).as_attachment(ImageClearOpDontCare{}),
   };
 
   VkRenderingInfo render_info{
@@ -99,7 +100,12 @@ void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm
   vkCmdBeginRendering(cmd, &render_info);
 
   VkViewport viewport{
-      0, 0, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0, 1.0,
+      static_cast<float>(render_area.offset.x),
+      static_cast<float>(render_area.offset.y),
+      static_cast<float>(render_area.extent.width),
+      static_cast<float>(render_area.extent.height),
+      0.0,
+      1.0,
   };
   vkCmdSetViewport(cmd, 0, 1, &viewport);
   vkCmdSetScissor(cmd, 0, 1, &render_area);

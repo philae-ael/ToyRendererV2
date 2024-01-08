@@ -63,21 +63,20 @@ auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, c
              },
              image.data);
 
-  auto image_ressource = ib.build_image(
-      tr::renderer::ImageDefinition{
-          .flags = 0,
-          .usage = tr::renderer::IMAGE_USAGE_SAMPLED_BIT | tr::renderer::IMAGE_USAGE_TRANSFER_DST_BIT,
-          .size =
-              VkExtent2D{
-                  .width = width,
-                  .height = height,
+  auto image_ressource = ib.build_image(tr::renderer::ImageDefinition{
+      .flags = 0,
+      .usage = tr::renderer::IMAGE_USAGE_SAMPLED_BIT | tr::renderer::IMAGE_USAGE_TRANSFER_DST_BIT,
+      .size =
+          VkExtent2D{
+              .width = width,
+              .height = height,
 
-              },
-          // TODO: How to deal with RBG (non alpha images?)
-          // and more generally with unsupported formats
-          .format = VK_FORMAT_R8G8B8A8_UNORM,
-      },
-      "texture image");
+          },
+      // TODO: How to deal with RBG (non alpha images?)
+      // and more generally with unsupported formats
+      .format = VK_FORMAT_R8G8B8A8_UNORM,
+      .debug_name = "texture image",
+  });
 
   tr::renderer::ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
                                               {{

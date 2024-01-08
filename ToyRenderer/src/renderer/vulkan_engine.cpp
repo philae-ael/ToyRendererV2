@@ -17,6 +17,7 @@
 #include "deletion_queue.h"
 #include "descriptors.h"
 #include "mesh.h"
+#include "passes/deferred.h"
 #include "passes/gbuffer.h"
 #include "queue.h"
 #include "ressources.h"
@@ -54,6 +55,11 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
 
   frame.descriptor_allocator = frame_descriptor_allocators[frame_id % MAX_FRAMES_IN_FLIGHT];
   frame.descriptor_allocator.reset(device.vk_device);
+  frame.frm = rm.frame(frame_id % MAX_FRAMES_IN_FLIGHT);
+  // TODO: better from external images
+  frame.frm.get_image(ImageRessourceId::Swapchain) =
+      ImageRessource::from_external_image(swapchain.images[frame.swapchain_image_index],
+                                          swapchain.image_views[frame.swapchain_image_index], IMAGE_USAGE_COLOR_BIT);
 
   frame.cmd = graphics_command_buffers[frame_id % MAX_FRAMES_IN_FLIGHT];
   VK_UNWRAP(frame.cmd.begin);
@@ -62,15 +68,6 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   vmaSetCurrentFrameIndex(allocator, frame_id);
   debug_info.set_frame(frame, frame_id);
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_BOTTOM);
-
-  // update ressources used this frame
-  rm.swapchain =
-      ImageRessource::from_external_image(swapchain.images[frame.swapchain_image_index],
-                                          swapchain.image_views[frame.swapchain_image_index], IMAGE_USAGE_COLOR_BIT);
-  rm.fb0 = fb0_ressources.get(frame_id);
-  rm.fb1 = fb1_ressources.get(frame_id);
-  rm.fb2 = fb2_ressources.get(frame_id);
-  rm.depth = depth_ressources.get(frame_id);
 
   return frame;
 }
@@ -101,7 +98,7 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   }
   ImageMemoryBarrier::submit(cmd, barriers);
 
-  passes.gbuffer.draw(cmd, rm, {{0, 0}, swapchain.extent}, [&] {
+  passes.gbuffer.draw(cmd, frame.frm, {{0, 0}, swapchain.extent}, [&] {
     {
       CameraMatrices* map = nullptr;
       const auto& buf = gbuffer_camera_buffer[frame_id % MAX_FRAMES_IN_FLIGHT];
@@ -158,28 +155,29 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
 
   {
     // TODO: move this IN deferred.draw
-    ImageMemoryBarrier::submit<3>(cmd, {{
-                                           rm.fb0.prepare_barrier(SyncFragmentShaderReadOnly),
-                                           rm.fb1.prepare_barrier(SyncFragmentShaderReadOnly),
-                                           rm.fb2.prepare_barrier(SyncFragmentShaderReadOnly),
-                                       }});
+    ImageMemoryBarrier::submit<3>(
+        cmd, {{
+                 frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentShaderReadOnly),
+                 frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentShaderReadOnly),
+                 frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentShaderReadOnly),
+             }});
     auto descriptor = frame.descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
     DescriptorUpdater{descriptor, 0}
         .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
         .image_info({{
             {
                 .sampler = base_sampler,
-                .imageView = rm.fb0.view,
+                .imageView = frame.frm.get_image(ImageRessourceId::GBuffer0).view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             {
                 .sampler = base_sampler,
-                .imageView = rm.fb1.view,
+                .imageView = frame.frm.get_image(ImageRessourceId::GBuffer1).view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             {
                 .sampler = base_sampler,
-                .imageView = rm.fb2.view,
+                .imageView = frame.frm.get_image(ImageRessourceId::GBuffer2).view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
         }})
@@ -188,7 +186,7 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
     vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.deferred.pipeline_layout, 0, 1,
                             &descriptor, 0, nullptr);
   }
-  passes.deferred.draw(frame.cmd.vk_cmd, rm, {{0, 0}, swapchain.extent});
+  passes.deferred.draw(frame.cmd.vk_cmd, frame.frm, {{0, 0}, swapchain.extent});
 
   debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
@@ -198,7 +196,10 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
 void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_TOP);
 
-  ImageMemoryBarrier::submit<1>(frame.cmd.vk_cmd, {{rm.swapchain.prepare_barrier(SyncPresent)}});
+  ImageMemoryBarrier::submit<1>(frame.cmd.vk_cmd,
+                                {{
+                                    frame.frm.get_image(ImageRessourceId::Swapchain).prepare_barrier(SyncPresent),
+                                }});
 
   VK_UNWRAP(frame.cmd.end);
   VK_UNWRAP(frame.submitCmds, device.queues.graphics_queue);
@@ -217,27 +218,7 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
   frame_deletion_stacks.device.cleanup(device.vk_device);
   frame_deletion_stacks.allocator.cleanup(allocator);
 
-  // Store back ressources state
-  fb0_ressources.store(frame_id, rm.fb0);
-  fb1_ressources.store(frame_id, rm.fb1);
-  fb2_ressources.store(frame_id, rm.fb2);
-  depth_ressources.store(frame_id, rm.depth);
-
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_BOTTOM);
-}
-
-void tr::renderer::VulkanEngine::build_ressources() {
-  auto rb = image_builder();
-
-  fb0_ressources.init(rb);
-  fb1_ressources.init(rb);
-  fb2_ressources.init(rb);
-  depth_ressources.init(rb);
-
-  fb0_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
-  fb1_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
-  fb2_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
-  depth_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
 }
 
 void tr::renderer::VulkanEngine::rebuild_swapchain() {
@@ -249,9 +230,15 @@ void tr::renderer::VulkanEngine::rebuild_swapchain() {
   swapchain.reinit(device, surface, window);
   swapchain.defer_deletion(swapchain_deletion_stacks.device);
 
-  // There is only swapchain-specific ressource for now. If there is non swapchain-specific ressources they should not
-  // be rebuilt every swapchain rebuild (or they can be, who cares)
-  build_ressources();
+  rm.get_image_storage(ImageRessourceId::Swapchain).from_external_images(swapchain.images, swapchain.image_views);
+
+  ImageBuilder ib{device.vk_device, allocator, &swapchain};
+  for (auto& image_storage : rm.image_storages()) {
+    if (image_storage.definition.depends_on_swapchain()) {
+      image_storage.init(ib);
+      image_storage.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
+    }
+  }
 }
 
 void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char*> required_instance_extensions,
@@ -303,16 +290,6 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
   swapchain = Swapchain::init_with_config({options.config.prefered_present_mode}, device, surface, window);
   swapchain.defer_deletion(swapchain_deletion_stacks.device);
-  build_ressources();
-
-  // Passes pipelines should be rebuilt everytime there the swapchain changes format
-  // It should not happen but it could happen, who knows when?
-
-  passes.gbuffer = GBuffer::init(device.vk_device, swapchain, setup_device_deletion_stack);
-  passes.gbuffer.defer_deletion(global_deletion_stacks.device);
-
-  passes.deferred = Deferred::init(device.vk_device, swapchain, setup_device_deletion_stack);
-  passes.deferred.defer_deletion(global_deletion_stacks.device);
 
   global_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
                                                           {{
@@ -328,6 +305,32 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
                                                                {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
                                                            }});
     frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
+  }
+
+  // Passes pipelines should be rebuilt everytime there the swapchain changes format
+  // It should not happen but it could happen, who knows when?
+
+  tr::renderer::GBuffer::register_ressources(rm);
+  tr::renderer::Deferred::register_ressources(rm);
+
+  passes.gbuffer = GBuffer::init(device.vk_device, swapchain, setup_device_deletion_stack);
+  passes.gbuffer.defer_deletion(global_deletion_stacks.device);
+
+  passes.deferred = Deferred::init(device.vk_device, swapchain, setup_device_deletion_stack);
+  passes.deferred.defer_deletion(global_deletion_stacks.device);
+
+  ImageBuilder ib{device.vk_device, allocator, &swapchain};
+  for (auto& image_storage : rm.image_storages()) {
+    if ((image_storage.definition.flags & IMAGE_OPTION_FLAG_EXTERNAL_BIT) != 0) {
+      continue;
+    }
+
+    image_storage.init(ib);  // TODO: id -> named ressource
+    if (image_storage.definition.depends_on_swapchain()) {
+      image_storage.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
+    } else {
+      image_storage.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
+    }
   }
 
   auto bb = buffer_builder();

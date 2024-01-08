@@ -24,15 +24,24 @@ struct Deferred {
           .build(),
 
   });
-  static constexpr std::array attachments_definitions = utils::to_array<ImageDefinition>({
+  static constexpr std::array attachments_color = utils::to_array<ImageRessourceDefinition>({
       {
-          // swapchain
-          .flags = 0,
-          .usage = IMAGE_USAGE_COLOR_BIT,
-          .size = FrameBufferExtent{},
-          .format = FrameBufferFormat{},
+          {
+              .flags = 0,
+              .usage = IMAGE_USAGE_COLOR_BIT,
+              .size = FramebufferExtent{},
+              .format = FramebufferFormat{},
+              .debug_name = "swapchain",
+          },
+          ImageRessourceId::Swapchain,
       },
   });
+
+  static void register_ressources(RessourceManager &rm) {
+    for (const auto &attachment : attachments_color) {
+      rm.define_image(attachment);
+    }
+  }
 
   static auto init(VkDevice &device, Swapchain &swapchain, DeviceDeletionStack &device_deletion_stack) -> Deferred;
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {

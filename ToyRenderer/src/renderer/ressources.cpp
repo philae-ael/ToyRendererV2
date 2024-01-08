@@ -8,7 +8,8 @@
 #include "synchronisation.h"
 #include "utils/misc.h"
 
-auto tr::renderer::ImageRessource::as_attachment(std::optional<VkClearValue> clearValue) -> VkRenderingAttachmentInfo {
+auto tr::renderer::ImageRessource::as_attachment(
+    std::variant<VkClearValue, ImageClearOpLoad, ImageClearOpDontCare> clearOp) -> VkRenderingAttachmentInfo {
   return VkRenderingAttachmentInfo{
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
       .pNext = nullptr,
@@ -17,9 +18,18 @@ auto tr::renderer::ImageRessource::as_attachment(std::optional<VkClearValue> cle
       .resolveMode = VK_RESOLVE_MODE_NONE,
       .resolveImageView = VK_NULL_HANDLE,
       .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      .loadOp = clearValue.has_value() ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
+      .loadOp = std::visit(utils::overloaded{
+                               [](VkClearValue) { return VK_ATTACHMENT_LOAD_OP_CLEAR; },
+                               [](ImageClearOpLoad) { return VK_ATTACHMENT_LOAD_OP_LOAD; },
+                               [](ImageClearOpDontCare) { return VK_ATTACHMENT_LOAD_OP_DONT_CARE; },
+                           },
+                           clearOp),
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      .clearValue = clearValue.value_or(VkClearValue{}),
+      .clearValue = std::visit(utils::overloaded{
+                                   [](VkClearValue v) { return v; },
+                                   [](auto) { return VkClearValue{}; },
+                               },
+                               clearOp),
   };
 }
 
@@ -69,7 +79,7 @@ auto tr::renderer::ImageRessource::from_external_image(VkImage image, VkImageVie
 }
 auto tr::renderer::ImageDefinition::vk_format(const Swapchain& swapchain) const -> VkFormat {
   return std::visit(utils::overloaded{
-                        [&](FrameBufferFormat) { return swapchain.surface_format.format; },
+                        [&](FramebufferFormat) { return swapchain.surface_format.format; },
                         [](VkFormat format) { return format; },
                     },
                     format);
@@ -107,7 +117,7 @@ auto tr::renderer::ImageDefinition::vk_aspect_mask() const -> VkImageAspectFlags
 }
 
 auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const -> VkExtent3D {
-  return std::visit(utils::overloaded{[&](FrameBufferExtent) {
+  return std::visit(utils::overloaded{[&](FramebufferExtent) {
                                         return VkExtent3D{
                                             .width = swapchain.extent.width,
                                             .height = swapchain.extent.height,
@@ -124,7 +134,7 @@ auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const 
                     size);
 }
 
-auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition, std::string_view debug_name) const
+auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const
     -> ImageRessource {
   const auto format = definition.vk_format(*swapchain);
   const auto aspect_mask = definition.vk_aspect_mask();
@@ -152,7 +162,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition, std::st
   VmaAllocation alloc{};
   VmaAllocationInfo alloc_info{};
   VK_UNWRAP(vmaCreateImage, allocator, &image_create_info, &allocation_create_info, &image, &alloc, &alloc_info);
-  set_debug_object_name(device, VK_OBJECT_TYPE_IMAGE, image, std::format("{} image", debug_name));
+  set_debug_object_name(device, VK_OBJECT_TYPE_IMAGE, image, std::format("{} image", definition.debug_name));
 
   VkImageViewCreateInfo view_create_info{
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -179,7 +189,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition, std::st
   };
   VkImageView view = VK_NULL_HANDLE;
   VK_UNWRAP(vkCreateImageView, device, &view_create_info, nullptr, &view);
-  set_debug_object_name(device, VK_OBJECT_TYPE_IMAGE_VIEW, view, std::format("{} view", debug_name));
+  set_debug_object_name(device, VK_OBJECT_TYPE_IMAGE_VIEW, view, std::format("{} view", definition.debug_name));
 
   return ImageRessource{
       .image = image,
@@ -251,3 +261,11 @@ auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition, std:
 
   return res;
 }
+
+auto tr::renderer::RessourceManager::frame(uint32_t frame_index) -> FrameRessourceManager {
+  return {
+      this,
+      frame_index,
+  };
+}
+

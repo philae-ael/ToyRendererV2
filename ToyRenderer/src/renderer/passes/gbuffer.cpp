@@ -8,6 +8,7 @@
 
 #include "../pipeline.h"
 #include "../vertex.h"
+#include "utils/misc.h"
 
 const std::array gbuffer_vert_bin = std::to_array<uint32_t>({
 #include "shaders/gbuffer.vert.inc"
@@ -45,22 +46,22 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
-  const std::array color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState>({
+  const std::array<VkPipelineColorBlendAttachmentState, attachments_color.size()> color_blend_attchment_states{
       PipelineColorBlendStateAllColorNoBlend.build(),
       PipelineColorBlendStateAllColorNoBlend.build(),
       PipelineColorBlendStateAllColorNoBlend.build(),
-  });
+  };
 
-  const std::array color_formats = std::to_array<VkFormat>({
-      definitions[0].vk_format(swapchain),
-      definitions[1].vk_format(swapchain),
-      definitions[2].vk_format(swapchain),
-  });
+  const std::array<VkFormat, attachments_color.size()> color_formats{
+      attachments_color[0].definition.vk_format(swapchain),
+      attachments_color[1].definition.vk_format(swapchain),
+      attachments_color[2].definition.vk_format(swapchain),
+  };
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   const auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
                                                   .color_attachment_formats(color_formats)
-                                                  .depth_attachment(definitions[3].vk_format(swapchain))
+                                                  .depth_attachment(attachment_depth.definition.vk_format(swapchain))
                                                   .build();
 
   const auto descriptor_set_layouts = std::to_array({
@@ -94,4 +95,53 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
                             .build(device);
 
   return {descriptor_set_layouts, layout, pipeline};
+}
+void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
+  utils::ignore_unused(this);
+  vkCmdEndRendering(cmd);
+}
+
+void tr::renderer::GBuffer::start_draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
+  ImageMemoryBarrier::submit<4>(
+      cmd, {{
+               rm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachment),
+               rm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachment),
+               rm.get_image(ImageRessourceId::GBuffer2).invalidate().prepare_barrier(SyncColorAttachment),
+               rm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
+           }});
+
+  std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
+      rm.get_image(ImageRessourceId::GBuffer0).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      rm.get_image(ImageRessourceId::GBuffer1).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      rm.get_image(ImageRessourceId::GBuffer2).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+  });
+
+  VkRenderingAttachmentInfo depthAttachment =
+      rm.get_image(ImageRessourceId::Depth).as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
+
+  VkRenderingInfo render_info{
+      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .renderArea = render_area,
+      .layerCount = 1,
+      .viewMask = 0,
+      .colorAttachmentCount = utils::narrow_cast<uint32_t>(attachments.size()),
+      .pColorAttachments = attachments.data(),
+      .pDepthAttachment = &depthAttachment,
+      .pStencilAttachment = nullptr,
+  };
+  vkCmdBeginRendering(cmd, &render_info);
+
+  VkViewport viewport{
+      static_cast<float>(render_area.offset.x),
+      static_cast<float>(render_area.offset.y),
+      static_cast<float>(render_area.extent.width),
+      static_cast<float>(render_area.extent.height),
+      0.0,
+      1.0,
+  };
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  vkCmdSetScissor(cmd, 0, 1, &render_area);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }

@@ -85,27 +85,7 @@ class VulkanEngine {
 
   GLFWwindow* window{};
 
-  FrameRessourceManager rm{};
-  ImageRessourceStorage fb0_ressources{
-      .definition = GBuffer::definitions[0],
-      .ressources = {},
-      .debug_name = "fb0",
-  };
-  ImageRessourceStorage fb1_ressources{
-      .definition = GBuffer::definitions[1],
-      .ressources = {},
-      .debug_name = "fb1",
-  };
-  ImageRessourceStorage fb2_ressources{
-      .definition = GBuffer::definitions[2],
-      .ressources = {},
-      .debug_name = "fb2",
-  };
-  ImageRessourceStorage depth_ressources{
-      .definition = GBuffer::definitions[3],
-      .ressources = {},
-      .debug_name = "depth",
-  };
+  RessourceManager rm{};
 
   struct {
     GBuffer gbuffer;
