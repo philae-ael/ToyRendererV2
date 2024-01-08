@@ -69,6 +69,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
                                           swapchain.image_views[frame.swapchain_image_index], IMAGE_USAGE_COLOR_BIT);
   rm.fb0 = fb0_ressources.get(frame_id);
   rm.fb1 = fb1_ressources.get(frame_id);
+  rm.fb2 = fb2_ressources.get(frame_id);
   rm.depth = depth_ressources.get(frame_id);
 
   return frame;
@@ -83,9 +84,18 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   std::vector<VkImageMemoryBarrier2> barriers;
   for (const auto& mesh : meshes) {
     for (auto& surface : mesh.surfaces) {
-      const auto barrier = surface.material->base_color_texture.prepare_barrier(SyncFragmentShaderReadOnly);
-      if (barrier) {
-        barriers.push_back(*barrier);
+      {
+        const auto barrier = surface.material->base_color_texture.prepare_barrier(SyncFragmentShaderReadOnly);
+        if (barrier) {
+          barriers.push_back(*barrier);
+        }
+      }
+      {
+        const auto barrier = surface.material->metallic_roughness_texture.and_then(
+            [](auto& x) { return x.prepare_barrier(SyncFragmentShaderReadOnly); });
+        if (barrier) {
+          barriers.push_back(*barrier);
+        }
       }
     }
   }
@@ -122,6 +132,13 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
                     .imageView = surface.material->base_color_texture.view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 },
+                {
+                    .sampler = base_sampler,
+                    .imageView =
+                        // TODO: use a default texture if there is no texture
+                    surface.material->metallic_roughness_texture.value_or(surface.material->base_color_texture).view,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                },
             }})
             .write(device.vk_device);
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.gbuffer.pipeline_layout, 1, 1, &descriptor,
@@ -140,9 +157,11 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
                                  GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
 
   {
-    ImageMemoryBarrier::submit<2>(cmd, {{
+    // TODO: move this IN deferred.draw
+    ImageMemoryBarrier::submit<3>(cmd, {{
                                            rm.fb0.prepare_barrier(SyncFragmentShaderReadOnly),
                                            rm.fb1.prepare_barrier(SyncFragmentShaderReadOnly),
+                                           rm.fb2.prepare_barrier(SyncFragmentShaderReadOnly),
                                        }});
     auto descriptor = frame.descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
     DescriptorUpdater{descriptor, 0}
@@ -153,14 +172,14 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
                 .imageView = rm.fb0.view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
-        }})
-        .write(device.vk_device);
-    DescriptorUpdater{descriptor, 1}
-        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        .image_info({{
             {
                 .sampler = base_sampler,
                 .imageView = rm.fb1.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+            {
+                .sampler = base_sampler,
+                .imageView = rm.fb2.view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
         }})
@@ -175,6 +194,7 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_TOP);
 
@@ -200,6 +220,7 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
   // Store back ressources state
   fb0_ressources.store(frame_id, rm.fb0);
   fb1_ressources.store(frame_id, rm.fb1);
+  fb2_ressources.store(frame_id, rm.fb2);
   depth_ressources.store(frame_id, rm.depth);
 
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_BOTTOM);
@@ -210,10 +231,12 @@ void tr::renderer::VulkanEngine::build_ressources() {
 
   fb0_ressources.init(rb);
   fb1_ressources.init(rb);
+  fb2_ressources.init(rb);
   depth_ressources.init(rb);
 
   fb0_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
   fb1_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
+  fb2_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
   depth_ressources.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
 }
 

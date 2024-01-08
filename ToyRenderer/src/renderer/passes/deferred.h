@@ -19,22 +19,18 @@ struct Deferred {
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
           .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(1)
+          .descriptor_count(3)
           .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(),
-      DescriptorSetLayoutBindingBuilder{}
-          .binding_(1)
-          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(1)
-          .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
-          .build(),
+
   });
   static constexpr std::array attachments_definitions = utils::to_array<ImageDefinition>({
       {
           // swapchain
-          .flags = IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
+          .flags = 0,
           .usage = IMAGE_USAGE_COLOR_BIT,
-          .size = {},
+          .size = FrameBufferExtent{},
+          .format = FrameBufferFormat{},
       },
   });
 

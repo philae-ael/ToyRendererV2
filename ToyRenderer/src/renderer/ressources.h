@@ -89,29 +89,28 @@ struct FrameRessourceManager {
   ImageRessource depth;
   ImageRessource fb0;
   ImageRessource fb1;
+  ImageRessource fb2;
 };
 
 enum ImageOptionsFlagBits {
-  IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT = 1 << 0,
-  IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT = 1 << 1,
-  IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT = 1 << 2,  // VK_FORMAT_R8G8B8A8_UINT
-  IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT = 1 << 3,
-  IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT = 1 << 4,  // VK_FORMAT_D32_SFLOAT
-  IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT = 1 << 5,
-  IMAGE_OPTION_FLAG_COLOR_ATTACHMENT_BIT = 1 << 6,
-  IMAGE_OPTION_FLAG_TEXTURE_ATTACHMENT_BIT = 1 << 7,
+  IMAGE_OPTION_FLAG_COLOR_ATTACHMENT_BIT = 1 << 0,
+  IMAGE_OPTION_FLAG_TEXTURE_ATTACHMENT_BIT = 1 << 1,
 };
 using ImageOptionsFlags = std::uint32_t;
+
+struct FrameBufferFormat {};
+struct FrameBufferExtent {};
 
 struct ImageDefinition {
   ImageOptionsFlags flags;
   ImageUsage usage;
-  std::optional<VkExtent2D> size;
+  std::variant<FrameBufferExtent, VkExtent2D> size;
+  std::variant<FrameBufferFormat, VkFormat> format;
 
-  [[nodiscard]] auto format(const Swapchain& swapchain) const -> VkFormat;
-  [[nodiscard]] auto image_usage() const -> VkImageUsageFlags;
-  [[nodiscard]] auto aspect_mask() const -> VkImageAspectFlags;
-  [[nodiscard]] auto extent(const Swapchain& swapchain) const -> VkExtent3D;
+  [[nodiscard]] auto vk_format(const Swapchain& swapchain) const -> VkFormat;
+  [[nodiscard]] auto vk_image_usage() const -> VkImageUsageFlags;
+  [[nodiscard]] auto vk_aspect_mask() const -> VkImageAspectFlags;
+  [[nodiscard]] auto vk_extent(const Swapchain& swapchain) const -> VkExtent3D;
 };
 
 class ImageBuilder {

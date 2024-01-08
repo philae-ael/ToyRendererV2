@@ -28,6 +28,8 @@ struct Device : utils::types::threadsafe {
   VkPhysicalDeviceProperties device_properties{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
 
+  std::vector<VkFormat> format_supported;
+
   struct Queues {
     std::uint32_t graphics_family;
     std::uint32_t present_family;

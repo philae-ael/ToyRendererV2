@@ -4,6 +4,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/mat4x4.hpp>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "deletion_queue.h"
@@ -12,9 +13,14 @@
 namespace tr::renderer {
 
 struct Material {
-  tr::renderer::ImageRessource base_color_texture;
+  tr::renderer::ImageRessource base_color_texture{};
+  std::optional<tr::renderer::ImageRessource> metallic_roughness_texture;
+
   void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) const {
     base_color_texture.defer_deletion(vma_deletion_stack, device_deletion_stack);
+    if (metallic_roughness_texture) {
+      metallic_roughness_texture->defer_deletion(vma_deletion_stack, device_deletion_stack);
+    }
   }
 };
 

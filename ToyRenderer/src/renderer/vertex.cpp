@@ -15,7 +15,7 @@
 #include "utils.h"
 #include "utils/assert.h"
 
-const std::array<VkVertexInputAttributeDescription, 4> tr::renderer::Vertex::attributes = {{
+const std::array<VkVertexInputAttributeDescription, 5> tr::renderer::Vertex::attributes = {{
     {
         .location = 0,
         .binding = 0,
@@ -38,7 +38,13 @@ const std::array<VkVertexInputAttributeDescription, 4> tr::renderer::Vertex::att
         .location = 3,
         .binding = 0,
         .format = VK_FORMAT_R32G32_SFLOAT,
-        .offset = offsetof(Vertex, uv),
+        .offset = offsetof(Vertex, uv1),
+    },
+    {
+        .location = 4,
+        .binding = 0,
+        .format = VK_FORMAT_R32G32_SFLOAT,
+        .offset = offsetof(Vertex, uv2),
     },
 }};
 

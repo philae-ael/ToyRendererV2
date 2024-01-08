@@ -2,8 +2,11 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <variant>
+
 #include "debug.h"
 #include "synchronisation.h"
+#include "utils/misc.h"
 
 auto tr::renderer::ImageRessource::as_attachment(std::optional<VkClearValue> clearValue) -> VkRenderingAttachmentInfo {
   return VkRenderingAttachmentInfo{
@@ -64,33 +67,15 @@ auto tr::renderer::ImageRessource::from_external_image(VkImage image, VkImageVie
                                                        SyncInfo sync_info) -> ImageRessource {
   return {image, view, sync_info, nullptr, usage};
 }
-auto tr::renderer::ImageDefinition::format(const Swapchain& swapchain) const -> VkFormat {
-  TR_ASSERT(
-      std::popcount(
-          (flags & (IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT | IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT |
-                    IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT | IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT))) == 1,
-      "exacly one format has to be specified");
-
-  if ((flags & IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT) != 0) {
-    return VK_FORMAT_R8G8B8A8_UNORM;
-  }
-
-  if ((flags & IMAGE_OPTION_FLAG_FORMAT_R32G32B32A32_SFLOAT_BIT) != 0) {
-    return VK_FORMAT_R32G32B32_SFLOAT;
-  }
-
-  if ((flags & IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT) != 0) {
-    return VK_FORMAT_D16_UNORM;
-  }
-
-  if ((flags & IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT) != 0) {
-    return swapchain.surface_format.format;
-  }
-
-  TR_ASSERT(false, "unexpected");
+auto tr::renderer::ImageDefinition::vk_format(const Swapchain& swapchain) const -> VkFormat {
+  return std::visit(utils::overloaded{
+                        [&](FrameBufferFormat) { return swapchain.surface_format.format; },
+                        [](VkFormat format) { return format; },
+                    },
+                    format);
 }
 
-auto tr::renderer::ImageDefinition::image_usage() const -> VkImageUsageFlags {
+auto tr::renderer::ImageDefinition::vk_image_usage() const -> VkImageUsageFlags {
   VkImageUsageFlags ret = 0;
   if ((usage & IMAGE_USAGE_COLOR_BIT) != 0) {
     ret |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -107,7 +92,7 @@ auto tr::renderer::ImageDefinition::image_usage() const -> VkImageUsageFlags {
   return ret;
 }
 
-auto tr::renderer::ImageDefinition::aspect_mask() const -> VkImageAspectFlags {
+auto tr::renderer::ImageDefinition::vk_aspect_mask() const -> VkImageAspectFlags {
   VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
   if ((usage & ImageUsageBits::IMAGE_USAGE_COLOR_BIT) != 0) {
     aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
@@ -121,31 +106,29 @@ auto tr::renderer::ImageDefinition::aspect_mask() const -> VkImageAspectFlags {
   return aspectMask;
 }
 
-auto tr::renderer::ImageDefinition::extent(const Swapchain& swapchain) const -> VkExtent3D {
-  if ((flags & IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT) != 0) {
-    return VkExtent3D{
-        .width = swapchain.extent.width,
-        .height = swapchain.extent.height,
-        .depth = 1,
-    };
-  }
-  if ((flags & IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT) != 0) {
-    TR_ASSERT(size, " IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT is set but size is not set");
-    return VkExtent3D{
-        .width = size->width,
-        .height = size->height,
-        .depth = 1,
-    };
-  }
-
-  TR_ASSERT(false, "No Flag for image size!");
+auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const -> VkExtent3D {
+  return std::visit(utils::overloaded{[&](FrameBufferExtent) {
+                                        return VkExtent3D{
+                                            .width = swapchain.extent.width,
+                                            .height = swapchain.extent.height,
+                                            .depth = 1,
+                                        };
+                                      },
+                                      [](VkExtent2D extent) {
+                                        return VkExtent3D{
+                                            .width = extent.width,
+                                            .height = extent.height,
+                                            .depth = 1,
+                                        };
+                                      }},
+                    size);
 }
 
 auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition, std::string_view debug_name) const
     -> ImageRessource {
-  const auto format = definition.format(*swapchain);
-  const auto aspect_mask = definition.aspect_mask();
-  const auto extent = definition.extent(*swapchain);
+  const auto format = definition.vk_format(*swapchain);
+  const auto aspect_mask = definition.vk_aspect_mask();
+  const auto extent = definition.vk_extent(*swapchain);
 
   VkImageCreateInfo image_create_info{
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -158,7 +141,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition, std::st
       .arrayLayers = 1,
       .samples = VK_SAMPLE_COUNT_1_BIT,
       .tiling = VK_IMAGE_TILING_OPTIMAL,
-      .usage = definition.image_usage(),
+      .usage = definition.vk_image_usage(),
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
       .pQueueFamilyIndices = nullptr,

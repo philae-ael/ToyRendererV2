@@ -48,17 +48,19 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const std::array color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState>({
       PipelineColorBlendStateAllColorNoBlend.build(),
       PipelineColorBlendStateAllColorNoBlend.build(),
+      PipelineColorBlendStateAllColorNoBlend.build(),
   });
 
   const std::array color_formats = std::to_array<VkFormat>({
-      definitions[0].format(swapchain),
-      definitions[1].format(swapchain),
+      definitions[0].vk_format(swapchain),
+      definitions[1].vk_format(swapchain),
+      definitions[2].vk_format(swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   const auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
                                                   .color_attachment_formats(color_formats)
-                                                  .depth_attachment(definitions[2].format(swapchain))
+                                                  .depth_attachment(definitions[3].vk_format(swapchain))
                                                   .build();
 
   const auto descriptor_set_layouts = std::to_array({

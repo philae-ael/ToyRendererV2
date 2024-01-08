@@ -29,29 +29,39 @@ struct GBuffer {
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
           .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(1)
+          .descriptor_count(2)
           .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(),
   });
 
   static constexpr std::array definitions = utils::to_array<ImageDefinition>({
       {
-          // fb0
-          .flags = IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
-          .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
-          .size = {},
+          // RGB: color, A: Roughness
+          .flags = 0,
+          .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT, // NOTE: They should NOT be sampled !
+          .size = FrameBufferExtent{},
+          .format = VK_FORMAT_R8G8B8A8_UNORM,
       },
       {
-          // fb1
-          .flags = IMAGE_OPTION_FLAG_FORMAT_SAME_AS_FRAMEBUFFER_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
+          // RGB: normal, A: metallic
+          .flags = 0,
           .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
-          .size = {},
+          .size = FrameBufferExtent{},
+          .format = VK_FORMAT_R8G8B8A8_SNORM,
+      },
+      {
+          // RGB: ViewDir
+          .flags = 0,
+          .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
+          .size = FrameBufferExtent{},
+          .format = VK_FORMAT_R8G8B8A8_SNORM,
       },
       {
           // depth
-          .flags = IMAGE_OPTION_FLAG_FORMAT_D16_UNORM_BIT | IMAGE_OPTION_FLAG_SIZE_SAME_AS_FRAMEBUFFER_BIT,
+          .flags = 0,
           .usage = IMAGE_USAGE_DEPTH_BIT,
-          .size = {},
+          .size = FrameBufferExtent{},
+          .format = VK_FORMAT_D16_UNORM,
       },
   });
 
@@ -68,15 +78,17 @@ struct GBuffer {
   void draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area, Fn f) {
     DebugCmdScope scope(cmd, "GBuffer");
 
-    ImageMemoryBarrier::submit<3>(cmd, {{
+    ImageMemoryBarrier::submit<4>(cmd, {{
                                            rm.fb0.invalidate().prepare_barrier(SyncColorAttachment),
                                            rm.fb1.invalidate().prepare_barrier(SyncColorAttachment),
+                                           rm.fb2.invalidate().prepare_barrier(SyncColorAttachment),
                                            rm.depth.invalidate().prepare_barrier(SyncLateDepth),
                                        }});
 
     std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
         rm.fb0.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
         rm.fb1.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+        rm.fb2.as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
     });
 
     VkRenderingAttachmentInfo depthAttachment =

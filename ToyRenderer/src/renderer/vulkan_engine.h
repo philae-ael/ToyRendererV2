@@ -96,8 +96,13 @@ class VulkanEngine {
       .ressources = {},
       .debug_name = "fb1",
   };
-  ImageRessourceStorage depth_ressources{
+  ImageRessourceStorage fb2_ressources{
       .definition = GBuffer::definitions[2],
+      .ressources = {},
+      .debug_name = "fb2",
+  };
+  ImageRessourceStorage depth_ressources{
+      .definition = GBuffer::definitions[3],
       .ressources = {},
       .debug_name = "depth",
   };

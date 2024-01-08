@@ -4,6 +4,9 @@
 #include "options.h"
 #include "registry.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 auto main(int argc, const char *argv[]) -> int {
   tr::Registry::load();
 

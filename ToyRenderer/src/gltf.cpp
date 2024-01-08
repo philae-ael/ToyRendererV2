@@ -1,13 +1,10 @@
 #include "gltf.h"
 
 #include <spdlog/spdlog.h>
-
-#include <optional>
-#include <string_view>
-
-#include "renderer/synchronisation.h"
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <utils/assert.h>
+#include <utils/cast.h>
+#include <utils/misc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
@@ -24,6 +21,7 @@
 #include <glm/mat4x4.hpp>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <unordered_map>
 #include <utility>
@@ -32,76 +30,81 @@
 
 #include "renderer/mesh.h"
 #include "renderer/ressources.h"
+#include "renderer/synchronisation.h"
 #include "renderer/uploader.h"
 #include "renderer/vertex.h"
-#include "utils/assert.h"
-#include "utils/cast.h"
-
-template <typename... Ts>
-struct overloaded : Ts... {
-  using Ts::operator()...;
-};
-template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
+
+auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, const fastgltf::Image& image)
+    -> tr::renderer::ImageRessource {
+  uint32_t width = 0;
+  uint32_t height = 0;
+  std::span<const std::byte> image_data;
+
+  std::visit(utils::overloaded{
+                 [&](const has_bytes auto& c) {
+                   const auto bytes = std::as_bytes(std::span(c.bytes));
+
+                   int x = 0;
+                   int y = 0;
+                   int channels = 0;
+                   const auto* im =
+                       stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(bytes.data()),
+                                             utils::narrow_cast<int>(bytes.size_bytes()), &x, &y, &channels, 4);
+                   TR_ASSERT(im != nullptr, "Could not load image");
+
+                   width = x;
+                   height = y;
+                   image_data = std::as_bytes(std::span{im, static_cast<size_t>(x * y * 4)});
+                 },
+                 [](const auto&) { TR_ASSERT(false, "MEH"); },
+             },
+             image.data);
+
+  auto image_ressource = ib.build_image(
+      tr::renderer::ImageDefinition{
+          .flags = 0,
+          .usage = tr::renderer::IMAGE_USAGE_SAMPLED_BIT | tr::renderer::IMAGE_USAGE_TRANSFER_DST_BIT,
+          .size =
+              VkExtent2D{
+                  .width = width,
+                  .height = height,
+
+              },
+          // TODO: How to deal with RBG (non alpha images?)
+          // and more generally with unsupported formats
+          .format = VK_FORMAT_R8G8B8A8_UNORM,
+      },
+      "texture image");
+
+  tr::renderer::ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
+                                              {{
+                                                  image_ressource.prepare_barrier(tr::renderer::SyncImageTransfer),
+                                              }});
+  t.upload_image(image_ressource, {{0, 0}, {width, height}}, image_data);
+
+  return image_ressource;
+}
 
 auto load_materials(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, const fastgltf::Asset& asset)
     -> std::vector<std::shared_ptr<tr::renderer::Material>> {
   std::vector<std::shared_ptr<tr::renderer::Material>> materials;
 
   for (const auto& material : asset.materials) {
-    TR_ASSERT(material.pbrData.baseColorTexture, "no base color texture, not supported");
     auto mat = std::make_shared<tr::renderer::Material>();
+
+    TR_ASSERT(material.pbrData.baseColorTexture, "no base color texture, not supported");
     const auto& color_texture = asset.textures[material.pbrData.baseColorTexture->textureIndex];
-
     TR_ASSERT(color_texture.imageIndex, "no image index, not supported");
-    const auto& color_image = asset.images[*color_texture.imageIndex];
+    mat->base_color_texture = load_texture(ib, t, asset.images[*color_texture.imageIndex]);
 
-    uint32_t width = 0;
-    uint32_t height = 0;
-    std::span<const std::byte> image;
-
-    std::visit(overloaded{
-                   [&](const has_bytes auto& c) {
-                     const auto bytes = std::as_bytes(std::span(c.bytes));
-
-                     int x = 0;
-                     int y = 0;
-                     int channels = 0;
-                     const auto* im =
-                         stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(bytes.data()),
-                                               utils::narrow_cast<int>(bytes.size_bytes()), &x, &y, &channels, 4);
-                     TR_ASSERT(im != nullptr, "Could not load image");
-
-                     width = x;
-                     height = y;
-                     image = std::span{reinterpret_cast<const std::byte*>(im), static_cast<size_t>(x * y * 4)};
-                   },
-                   [](const auto&) { TR_ASSERT(false, "MEH"); },
-               },
-               color_image.data);
-
-    mat->base_color_texture = ib.build_image(
-        tr::renderer::ImageDefinition{
-            .flags = tr::renderer::IMAGE_OPTION_FLAG_FORMAT_R8G8B8A8_UNORM_BIT |
-                     tr::renderer::IMAGE_OPTION_FLAG_SIZE_CUSTOM_BIT,
-            .usage = tr::renderer::IMAGE_USAGE_SAMPLED_BIT | tr::renderer::IMAGE_USAGE_TRANSFER_DST_BIT,
-            .size =
-                VkExtent2D{
-                    .width = width,
-                    .height = height,
-
-                },
-        },
-        "texture image");
-
-    tr::renderer::ImageMemoryBarrier::submit<1>(
-        t.cmd.vk_cmd, {{
-                          mat->base_color_texture.prepare_barrier(tr::renderer::SyncImageTransfer),
-                      }});
-    t.upload_image(mat->base_color_texture, {{0, 0}, {width, height}}, image);
+    if (material.pbrData.metallicRoughnessTexture) {
+      const auto& metallic_roughness_texture = asset.textures[material.pbrData.baseColorTexture->textureIndex];
+      TR_ASSERT(metallic_roughness_texture.imageIndex, "no image index, not supported");
+      mat->metallic_roughness_texture = load_texture(ib, t, asset.images[*metallic_roughness_texture.imageIndex]);
+    }
 
     materials.push_back(std::move(mat));
   }
@@ -124,7 +127,12 @@ auto load_attribute(const fastgltf::Asset& asset, std::vector<tr::renderer::Vert
   }
   if (attribute == "TEXCOORD_0") {
     fastgltf::iterateAccessorWithIndex<glm::vec2>(
-        asset, accessor, [&](glm::vec2 uv, size_t v_idx) { vertices[start_v_idx + v_idx].uv = uv; });
+        asset, accessor, [&](glm::vec2 uv, size_t v_idx) { vertices[start_v_idx + v_idx].uv1 = uv; });
+    return;
+  }
+  if (attribute == "TEXCOORD_1") {
+    fastgltf::iterateAccessorWithIndex<glm::vec2>(
+        asset, accessor, [&](glm::vec2 uv, size_t v_idx) { vertices[start_v_idx + v_idx].uv2 = uv; });
     return;
   }
   if (attribute == "COLOR_0") {
@@ -146,7 +154,7 @@ auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, c
 
       tr::renderer::Mesh asset_mesh;
       std::visit(
-          overloaded{
+          utils::overloaded{
               [&](const fastgltf::Node::TRS& trs) {
                 const auto rot = glm::mat4_cast(glm::make_quat(trs.rotation.data()));
                 const auto scale = glm::scale(glm::identity<glm::mat4>(), glm::make_vec3(trs.scale.data()));
