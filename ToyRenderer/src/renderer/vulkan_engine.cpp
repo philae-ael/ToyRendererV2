@@ -57,9 +57,9 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   frame.descriptor_allocator.reset(device.vk_device);
   frame.frm = rm.frame(frame_id % MAX_FRAMES_IN_FLIGHT);
   // TODO: better from external images
-  frame.frm.get_image(ImageRessourceId::Swapchain) =
-      ImageRessource::from_external_image(swapchain.images[frame.swapchain_image_index],
-                                          swapchain.image_views[frame.swapchain_image_index], IMAGE_USAGE_COLOR_BIT);
+  frame.frm.get_image(ImageRessourceId::Swapchain) = ImageRessource::from_external_image(
+      swapchain.images[frame.swapchain_image_index], swapchain.image_views[frame.swapchain_image_index],
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
   frame.cmd = graphics_command_buffers[frame_id % MAX_FRAMES_IN_FLIGHT];
   VK_UNWRAP(frame.cmd.begin);
@@ -157,28 +157,28 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
     // TODO: move this IN deferred.draw
     ImageMemoryBarrier::submit<3>(
         cmd, {{
-                 frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentShaderReadOnly),
-                 frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentShaderReadOnly),
-                 frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentShaderReadOnly),
+                 frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentStorageRead),
+                 frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentStorageRead),
+                 frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentStorageRead),
              }});
     auto descriptor = frame.descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
     DescriptorUpdater{descriptor, 0}
-        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
         .image_info({{
             {
-                .sampler = base_sampler,
+                .sampler = VK_NULL_HANDLE,
                 .imageView = frame.frm.get_image(ImageRessourceId::GBuffer0).view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .imageLayout = SyncFragmentStorageRead.layout,
             },
             {
-                .sampler = base_sampler,
+                .sampler = VK_NULL_HANDLE,
                 .imageView = frame.frm.get_image(ImageRessourceId::GBuffer1).view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .imageLayout = SyncFragmentStorageRead.layout,
             },
             {
-                .sampler = base_sampler,
+                .sampler = VK_NULL_HANDLE,
                 .imageView = frame.frm.get_image(ImageRessourceId::GBuffer2).view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .imageLayout = SyncFragmentStorageRead.layout,
             },
         }})
         .write(device.vk_device);

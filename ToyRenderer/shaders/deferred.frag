@@ -4,7 +4,7 @@
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 Fragcolor;
 
-layout(set = 0, binding = 0) uniform sampler2D[3] gbuffers;
+layout(set = 0, binding = 0, rgba8) uniform readonly image2D[3] gbuffers;
 
 float PI = 3.14159;
 
@@ -46,9 +46,12 @@ float saturate(float v) {
 
 PixelData getPixelData(){
     PixelData pixel;
-    vec4 t1 = texture(gbuffers[0], uv);
-    vec4 t2 = texture(gbuffers[1], uv);
-    vec4 t3 = texture(gbuffers[2], uv);
+    ivec2 size = imageSize(gbuffers[0]);
+    ivec2 screen_coordinate = ivec2(vec2(size) * uv);
+
+    vec4 t1 = imageLoad(gbuffers[0], screen_coordinate);
+    vec4 t2 = imageLoad(gbuffers[1], screen_coordinate);
+    vec4 t3 = imageLoad(gbuffers[2], screen_coordinate);
 
     // TODO: more complex packing
     pixel.albedo =  t1.xyz;

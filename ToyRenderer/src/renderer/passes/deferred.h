@@ -18,7 +18,7 @@ struct Deferred {
   static constexpr std::array bindings = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
-          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+          .descriptor_type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
           .descriptor_count(3)
           .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(),
@@ -28,7 +28,7 @@ struct Deferred {
       {
           {
               .flags = 0,
-              .usage = IMAGE_USAGE_COLOR_BIT,
+              .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
               .size = FramebufferExtent{},
               .format = FramebufferFormat{},
               .debug_name = "swapchain",

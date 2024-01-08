@@ -38,13 +38,13 @@ auto tr::renderer::ImageRessource::prepare_barrier(SyncInfo dst) -> std::optiona
 
   if (dst.layout != sync_info.layout || dst.queueFamilyIndex != sync_info.queueFamilyIndex) {
     VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
-    if ((usage & ImageUsageBits::IMAGE_USAGE_COLOR_BIT) != 0) {
+    if ((usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0) {
       aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
     }
-    if ((usage & ImageUsageBits::IMAGE_USAGE_SAMPLED_BIT) != 0) {
+    if ((usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0) {
       aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
     }
-    if ((usage & ImageUsageBits::IMAGE_USAGE_DEPTH_BIT) != 0) {
+    if ((usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
       aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
     }
 
@@ -73,7 +73,7 @@ auto tr::renderer::ImageRessource::invalidate() -> ImageRessource& {
   return *this;
 }
 
-auto tr::renderer::ImageRessource::from_external_image(VkImage image, VkImageView view, ImageUsage usage,
+auto tr::renderer::ImageRessource::from_external_image(VkImage image, VkImageView view, VkImageUsageFlags usage,
                                                        SyncInfo sync_info) -> ImageRessource {
   return {image, view, sync_info, nullptr, usage};
 }
@@ -85,34 +85,18 @@ auto tr::renderer::ImageDefinition::vk_format(const Swapchain& swapchain) const 
                     format);
 }
 
-auto tr::renderer::ImageDefinition::vk_image_usage() const -> VkImageUsageFlags {
-  VkImageUsageFlags ret = 0;
-  if ((usage & IMAGE_USAGE_COLOR_BIT) != 0) {
-    ret |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  }
-  if ((usage & IMAGE_USAGE_DEPTH_BIT) != 0) {
-    ret |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  }
-  if ((usage & IMAGE_USAGE_SAMPLED_BIT) != 0) {
-    ret |= VK_IMAGE_USAGE_SAMPLED_BIT;
-  }
-  if ((usage & IMAGE_USAGE_TRANSFER_DST_BIT) != 0) {
-    ret |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  }
-  return ret;
-}
-
 auto tr::renderer::ImageDefinition::vk_aspect_mask() const -> VkImageAspectFlags {
   VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
-  if ((usage & ImageUsageBits::IMAGE_USAGE_COLOR_BIT) != 0) {
+  if ((usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0) {
     aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
   }
-  if ((usage & ImageUsageBits::IMAGE_USAGE_SAMPLED_BIT) != 0) {
+  if ((usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0) {
     aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
   }
-  if ((usage & ImageUsageBits::IMAGE_USAGE_DEPTH_BIT) != 0) {
+  if ((usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
     aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
   }
+
   return aspectMask;
 }
 
@@ -134,8 +118,7 @@ auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const 
                     size);
 }
 
-auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const
-    -> ImageRessource {
+auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -> ImageRessource {
   const auto format = definition.vk_format(*swapchain);
   const auto aspect_mask = definition.vk_aspect_mask();
   const auto extent = definition.vk_extent(*swapchain);
@@ -151,7 +134,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const
       .arrayLayers = 1,
       .samples = VK_SAMPLE_COUNT_1_BIT,
       .tiling = VK_IMAGE_TILING_OPTIMAL,
-      .usage = definition.vk_image_usage(),
+      .usage = definition.usage,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
       .pQueueFamilyIndices = nullptr,
@@ -268,4 +251,3 @@ auto tr::renderer::RessourceManager::frame(uint32_t frame_index) -> FrameRessour
       frame_index,
   };
 }
-

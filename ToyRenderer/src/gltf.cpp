@@ -65,7 +65,7 @@ auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, c
 
   auto image_ressource = ib.build_image(tr::renderer::ImageDefinition{
       .flags = 0,
-      .usage = tr::renderer::IMAGE_USAGE_SAMPLED_BIT | tr::renderer::IMAGE_USAGE_TRANSFER_DST_BIT,
+      .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
       .size =
           VkExtent2D{
               .width = width,

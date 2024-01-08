@@ -81,7 +81,7 @@ static constexpr SyncInfo SrcImageMemoryBarrierUndefined{
     .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 };
 
-static constexpr SyncInfo SyncColorAttachment{
+static constexpr SyncInfo SyncColorAttachmentOutput{
     .accessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
     .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -92,6 +92,13 @@ static constexpr SyncInfo SyncFragmentShaderReadOnly{
     .accessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
     .stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
     .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+};
+
+static constexpr SyncInfo SyncFragmentStorageRead{
+    .accessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT_KHR,
+    .stageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+    .layout = VK_IMAGE_LAYOUT_GENERAL,
     .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 };
 

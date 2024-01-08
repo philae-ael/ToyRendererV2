@@ -104,9 +104,9 @@ void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
 void tr::renderer::GBuffer::start_draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
   ImageMemoryBarrier::submit<4>(
       cmd, {{
-               rm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachment),
-               rm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachment),
-               rm.get_image(ImageRessourceId::GBuffer2).invalidate().prepare_barrier(SyncColorAttachment),
+               rm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+               rm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+               rm.get_image(ImageRessourceId::GBuffer2).invalidate().prepare_barrier(SyncColorAttachmentOutput),
                rm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
            }});
 

@@ -58,15 +58,6 @@ class BufferBuilder {
   VmaAllocator allocator;
 };
 
-enum ImageUsageBits {
-  IMAGE_USAGE_COLOR_BIT = 1 << 1,
-  IMAGE_USAGE_DEPTH_BIT = 1 << 2,
-  IMAGE_USAGE_SAMPLED_BIT = 1 << 3,
-  IMAGE_USAGE_TRANSFER_DST_BIT = 1 << 4,
-};
-
-using ImageUsage = std::uint32_t;
-
 struct ImageClearOpLoad {};
 struct ImageClearOpDontCare {};
 
@@ -75,9 +66,9 @@ struct ImageRessource {
   VkImageView view;
   SyncInfo sync_info;
   VmaAllocation alloc;
-  ImageUsage usage;
+  VkImageUsageFlags usage;
 
-  static auto from_external_image(VkImage image, VkImageView view, ImageUsage usage,
+  static auto from_external_image(VkImage image, VkImageView view, VkImageUsageFlags usage,
                                   SyncInfo sync_info = SrcImageMemoryBarrierUndefined) -> ImageRessource;
   auto invalidate() -> ImageRessource&;
   [[nodiscard]] auto prepare_barrier(SyncInfo dst) -> std::optional<VkImageMemoryBarrier2>;
@@ -103,13 +94,12 @@ struct FramebufferExtent {};
 
 struct ImageDefinition {
   ImageOptionsFlags flags;
-  ImageUsage usage;
+  VkImageUsageFlags usage;
   std::variant<FramebufferExtent, VkExtent2D> size;
   std::variant<FramebufferFormat, VkFormat> format;
   std::string_view debug_name;
 
   [[nodiscard]] auto vk_format(const Swapchain& swapchain) const -> VkFormat;
-  [[nodiscard]] auto vk_image_usage() const -> VkImageUsageFlags;
   [[nodiscard]] auto vk_aspect_mask() const -> VkImageAspectFlags;
   [[nodiscard]] auto vk_extent(const Swapchain& swapchain) const -> VkExtent3D;
   [[nodiscard]] auto depends_on_swapchain() const -> bool {
@@ -183,7 +173,7 @@ struct ImageRessourceStorage {
     TR_ASSERT(images.size() >= ressources.size(), "??");
 
     for (size_t i = 0; i < ressources.size(); i++) {
-      ressources[i] = ImageRessource::from_external_image(images[i], views[i], definition.vk_image_usage());
+      ressources[i] = ImageRessource::from_external_image(images[i], views[i], definition.usage);
     }
   }
 };

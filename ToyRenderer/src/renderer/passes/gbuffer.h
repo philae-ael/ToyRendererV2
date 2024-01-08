@@ -39,7 +39,7 @@ struct GBuffer {
       {
           {
               .flags = 0,
-              .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,  // NOTE: They should NOT be sampled !
+              .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
               .size = FramebufferExtent{},
               .format = VK_FORMAT_R8G8B8A8_UNORM,
               .debug_name = "GBuffer0 (RGB: color, A: roughness)",
@@ -50,7 +50,7 @@ struct GBuffer {
           // RGB: normal, A: metallic
           {
               .flags = 0,
-              .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
+              .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
               .size = FramebufferExtent{},
               .format = VK_FORMAT_R8G8B8A8_SNORM,
               .debug_name = "GBuffer1 (RGB: normal, A: metallic)",
@@ -61,7 +61,7 @@ struct GBuffer {
           // RGB: ViewDir
           {
               .flags = 0,
-              .usage = IMAGE_USAGE_COLOR_BIT | IMAGE_USAGE_SAMPLED_BIT,
+              .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
               .size = FramebufferExtent{},
               .format = VK_FORMAT_R8G8B8A8_SNORM,
               .debug_name = "GBuffer2 (RGB: viewDir)",
@@ -73,7 +73,7 @@ struct GBuffer {
   static constexpr ImageRessourceDefinition attachment_depth{
       {
           .flags = 0,
-          .usage = IMAGE_USAGE_DEPTH_BIT,
+          .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
           .size = FramebufferExtent{},
           .format = VK_FORMAT_D16_UNORM,
           .debug_name = "Depth",

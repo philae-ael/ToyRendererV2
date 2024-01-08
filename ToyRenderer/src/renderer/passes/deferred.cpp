@@ -79,7 +79,7 @@ void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm
 
   ImageMemoryBarrier::submit<1>(
       cmd, {{
-               rm.get_image(ImageRessourceId::Swapchain).invalidate().prepare_barrier(SyncColorAttachment),
+               rm.get_image(ImageRessourceId::Swapchain).invalidate().prepare_barrier(SyncColorAttachmentOutput),
            }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
       rm.get_image(ImageRessourceId::Swapchain).as_attachment(ImageClearOpDontCare{}),
