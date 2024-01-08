@@ -10,9 +10,8 @@
 #include <set>
 #include <span>
 
-auto tr::renderer::check_extensions(
-    const char* kind, std::span<const char* const> required,
-    std::span<VkExtensionProperties> available_extensions) -> bool {
+auto tr::renderer::check_extensions(const char* kind, std::span<const char* const> required,
+                                    std::span<VkExtensionProperties> available_extensions) -> bool {
   std::set<std::string> available_set;
   spdlog::trace("Available {} extensions", kind);
   for (const auto& extension : available_extensions) {
@@ -27,8 +26,7 @@ auto tr::renderer::check_extensions(
   }
 
   std::vector<const char*> out;
-  std::set_difference(required_set.begin(), required_set.end(),
-                      available_set.begin(), available_set.end(),
+  std::set_difference(required_set.begin(), required_set.end(), available_set.begin(), available_set.end(),
                       std::back_inserter(out));
 
   spdlog::trace("Missing {} extensions:", kind);

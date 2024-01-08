@@ -10,7 +10,6 @@
 #include "options.h"
 #include "system/input.h"
 #include "system/platform.h"
-#include "utils/cast.h"
 #include "utils/types.h"
 
 void tr::App::update() {}
@@ -20,13 +19,10 @@ tr::App::App(tr::Options options) : options(options) {
 
   std::vector<const char*> required_vulkan_extensions;
   subsystems.platform.required_vulkan_extensions(required_vulkan_extensions);
-  subsystems.engine.init(options, required_vulkan_extensions,
-                         subsystems.platform.window);
+  subsystems.engine.init(options, required_vulkan_extensions, subsystems.platform.window);
 }
 
-void tr::App::on_input(tr::system::InputEvent event) {
-  subsystems.input.on_input(event);
-}
+void tr::App::on_input(tr::system::InputEvent event) { subsystems.input.on_input(event); }
 
 void tr::App::on_resize(utils::types::Extent2d<std::uint32_t> new_size) {
   utils::ignore_unused(this);
@@ -38,6 +34,7 @@ void tr::App::on_resize(utils::types::Extent2d<std::uint32_t> new_size) {
 void tr::App::run() {
   while (true) {
     state.frame_timer.start();
+    subsystems.engine.start_frame();
     if (!subsystems.platform.start_frame()) {
       break;
     }
@@ -47,11 +44,10 @@ void tr::App::run() {
     update();
 
     state.frame_timer.stop();
-    state.timeline.push(utils::narrow_cast<std::uint16_t>(
-        state.frame_timer.elapsed_raw() * 1000000));
+    state.timeline.push(state.frame_timer.elapsed_raw());
 
     auto elapsed = state.frame_timer.elapsed();
-    spdlog::trace("Frame took {:.1f}us or {:.0f} FPS", elapsed * 1e6,
-                  1. / elapsed);
+    spdlog::trace("Frame took {:.1f}us or {:.0f} FPS", elapsed * 1000, 1000. / elapsed);
+    subsystems.engine.record_timeline();
   }
 }

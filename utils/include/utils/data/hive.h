@@ -71,8 +71,7 @@ class chunk {
 
   T* get_unchecked(types::u16 index) { return &data.at(index).data; }
 
-  std::tuple<hive_handle_t, std::optional<hive_index_t>, T*> create(
-      hive_index_t index) {
+  std::tuple<hive_handle_t, std::optional<hive_index_t>, T*> create(hive_index_t index) {
     auto& d = data.at(index.chunk_index);
     auto next_index = d.next_free;
 
@@ -140,8 +139,7 @@ class hive {
       };
     }
 
-    auto [handle, new_next_free, data] =
-        inner[next_free->chunk].create(*next_free);
+    auto [handle, new_next_free, data] = inner[next_free->chunk].create(*next_free);
 
     next_free = new_next_free;
     return {handle, data};

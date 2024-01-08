@@ -10,7 +10,7 @@
 #include "utils.h"
 namespace tr::renderer {
 
-template <const size_t FRAMES, const size_t POINTS>
+template <const size_t FRAMES, const size_t QUERY_COUNT>
 struct Timestamp {
   static auto init(Device &device) -> Timestamp {
     Timestamp t{};
@@ -19,50 +19,64 @@ struct Timestamp {
         .pNext = nullptr,
         .flags = 0,
         .queryType = VK_QUERY_TYPE_TIMESTAMP,
-        .queryCount = t.raw_timestamps.size(),
+        .queryCount = FRAMES * QUERY_COUNT,
         .pipelineStatistics = 0,
     };
 
-    VK_UNWRAP(vkCreateQueryPool, device.vk_device, &create_info, nullptr,
-              &t.query_pool);
+    VK_UNWRAP(vkCreateQueryPool, device.vk_device, &create_info, nullptr, &t.query_pool);
+    vkResetQueryPool(device.vk_device, t.query_pool, 0, FRAMES * QUERY_COUNT);
     t.to_ms = device.device_properties.limits.timestampPeriod / 1000000.0F;
     return t;
   }
+  void reinit(Device &device) { *this = init(device); }
 
-  auto write_cmd_query(VkCommandBuffer cmd,
-                       VkPipelineStageFlagBits pipelineStage, uint32_t index) {
+  auto write_cmd_query(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, std::size_t frame_id,
+                       std::size_t index) {
     if (query_pool == VK_NULL_HANDLE) {
       return;
     }
-    vkCmdWriteTimestamp(cmd, pipelineStage, query_pool, index);
+    vkCmdWriteTimestamp(cmd, pipelineStage, query_pool, query_index(frame_id, index));
   }
 
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) {
     device_deletion_stack.defer_deletion(DeviceHandle::QueryPool, query_pool);
   }
 
-  void reset(VkDevice device) {
-    vkResetQueryPool(device, query_pool, 0, raw_timestamps.size());
+  void reset_queries(VkCommandBuffer cmd, std::size_t frame_id) {
+    vkCmdResetQueryPool(cmd, query_pool, query_index(frame_id, 0), QUERY_COUNT);
   }
 
-  void get(VkDevice device) {
-    VK_UNWRAP(vkGetQueryPoolResults, device, query_pool, 0,
-              raw_timestamps.size(), raw_timestamps.size() * sizeof(uint64_t),
-              raw_timestamps.data(), sizeof(uint64_t),
-              VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
-  }
-
-  auto fetch_timestamp(uint32_t index) -> float {
-    if (index >= raw_timestamps.size()) {
-      return 0.0;
+  auto get(VkDevice device, std::size_t frame_id) -> bool {
+    VkResult result = vkGetQueryPoolResults(device, query_pool, query_index(frame_id, 0), QUERY_COUNT,
+                                            (QUERY_COUNT + 1) * sizeof(uint64_t),
+                                            raw_timestamps.data() + raw_timestamps_index(frame_id, 0), sizeof(uint64_t),
+                                            // TODO: do a thing with availibility bit, maybe
+                                            VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+    switch (result) {
+      case VkResult::VK_NOT_READY:
+        return false;
+      default:
+        VK_CHECK(result, vkGetQueryPoolResults);
     }
+    return raw_timestamps.at(raw_timestamps_index(frame_id, QUERY_COUNT)) != 0;
+  }
 
-    return static_cast<float>(raw_timestamps.at(index)) * to_ms;
+  auto fetch_elsapsed(std::size_t frame_id, std::size_t from, std::size_t to) -> float {
+    return static_cast<float>(raw_timestamps.at(raw_timestamps_index(frame_id, to)) -
+                              raw_timestamps.at(raw_timestamps_index(frame_id, from))) *
+           to_ms;
   }
 
  private:
+  auto query_index(std::size_t frame_id, std::size_t index) -> std::size_t {
+    return (frame_id % FRAMES) * QUERY_COUNT + index;
+  }
+  auto raw_timestamps_index(std::size_t frame_id, std::size_t index) -> std::size_t {
+    return (frame_id % FRAMES) * (QUERY_COUNT + 1) + index;
+  }
+
   float to_ms{};
-  std::array<uint64_t, FRAMES * POINTS> raw_timestamps;
+  std::array<uint64_t, FRAMES *(QUERY_COUNT + 1)> raw_timestamps;
   VkQueryPool query_pool = VK_NULL_HANDLE;
 };
 }  // namespace tr::renderer

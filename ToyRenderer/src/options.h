@@ -1,6 +1,7 @@
 #pragma once
 
 #include <spdlog/spdlog.h>
+#include <vulkan/vulkan_core.h>
 
 namespace tr {
 
@@ -9,9 +10,13 @@ struct Options {
     spdlog::level::level_enum level;
     bool renderdoc;
     bool validations_layers;
-  } debug;
+  } debug{};
 
-  static auto from_argv(std::span<const char *> args) -> Options;
+  struct {
+    VkPresentModeKHR prefered_present_mode = VK_PRESENT_MODE_FIFO_KHR;
+  } config{};
+
+  static auto from_args(std::span<const char *> args) -> Options;
 };
 
 }  // namespace tr

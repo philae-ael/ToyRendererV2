@@ -3,29 +3,34 @@
 #include <utils/assert.h>
 #include <vulkan/vulkan_core.h>
 
+#include <array>
+#include <iterator>
+
+#include "extensions.h"
 #include "utils.h"
 #include "utils/cast.h"
 
-const std::array<const char*, 1> wanted_validation_layers{
+const std::array<std::string, 1> wanted_validation_layers{
     "VK_LAYER_KHRONOS_validation",
 };
 
-VKAPI_ATTR auto VKAPI_CALL
-debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-               VkDebugUtilsMessageTypeFlagsEXT messageType,
-               const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-               void* /*pUserData*/) -> VkBool32;
+const std::array<const char*, 0> REQUIRED_EXTENSIONS{};
 
-auto tr::renderer::Instance::init(
-    const tr::Options& options,
-    std::span<const char*> required_vulkan_instance_extensions)
+VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                          VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                          const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                          void* /*pUserData*/) -> VkBool32;
+
+auto tr::renderer::Instance::init(const tr::Options& options, std::span<const char*> required_wsi_extensions)
     -> tr::renderer::Instance {
   Instance instance;
 
   std::vector<const char*> required_extensions{
-      required_vulkan_instance_extensions.begin(),
-      required_vulkan_instance_extensions.end(),
+      REQUIRED_EXTENSIONS.begin(),
+      REQUIRED_EXTENSIONS.end(),
   };
+
+  std::copy(required_wsi_extensions.begin(), required_wsi_extensions.end(), std::back_inserter(required_extensions));
 
   std::vector<const char*> validation_layers{};
   if (options.debug.validations_layers) {
@@ -43,9 +48,9 @@ auto tr::renderer::Instance::init(
       spdlog::trace("\t{}", layer.layerName);
 
       for (const auto& wanted_layer : wanted_validation_layers) {
-        if (std::strcmp(wanted_layer, layer.layerName) == 0) {
+        if (wanted_layer == layer.layerName) {
           satisfied_layer_count += 1;
-          validation_layers.push_back(wanted_layer);
+          validation_layers.push_back(wanted_layer.c_str());
         }
       }
     }
@@ -56,8 +61,7 @@ auto tr::renderer::Instance::init(
     }
 
     if (wanted_validation_layers.size() != satisfied_layer_count) {
-      spdlog::warn("{} wanted layers are satisfied out of {}",
-                   satisfied_layer_count, wanted_validation_layers.size());
+      spdlog::warn("{} wanted layers are satisfied out of {}", satisfied_layer_count, wanted_validation_layers.size());
     }
   }
 
@@ -66,12 +70,10 @@ auto tr::renderer::Instance::init(
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
 
     std::vector<VkExtensionProperties> available_extensions(extension_count);
-    vkEnumerateInstanceExtensionProperties(nullptr, &extension_count,
-                                           available_extensions.data());
+    vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.data());
 
-    TR_ASSERT(
-        check_extensions("instance", required_extensions, available_extensions),
-        "Required extensions are not satisfied");
+    TR_ASSERT(check_extensions("instance", required_extensions, available_extensions),
+              "Required extensions are not satisfied");
   }
 
   {
@@ -82,8 +84,7 @@ auto tr::renderer::Instance::init(
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
         .pfnUserCallback = debug_callback,
         .pUserData = nullptr,
@@ -96,7 +97,7 @@ auto tr::renderer::Instance::init(
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .pEngineName = "ToyRenderer",
         .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_0,
+        .apiVersion = VK_API_VERSION_1_2,
     };
 
     VkInstanceCreateInfo createInfo{
@@ -104,11 +105,9 @@ auto tr::renderer::Instance::init(
         .pNext = nullptr,
         .flags = 0,
         .pApplicationInfo = &appInfo,
-        .enabledLayerCount =
-            utils::narrow_cast<std::uint32_t>(validation_layers.size()),
+        .enabledLayerCount = utils::narrow_cast<std::uint32_t>(validation_layers.size()),
         .ppEnabledLayerNames = validation_layers.data(),
-        .enabledExtensionCount =
-            utils::narrow_cast<std::uint32_t>(required_extensions.size()),
+        .enabledExtensionCount = utils::narrow_cast<std::uint32_t>(required_extensions.size()),
         .ppEnabledExtensionNames = required_extensions.data(),
     };
 
@@ -117,22 +116,20 @@ auto tr::renderer::Instance::init(
     }
 
     VK_UNWRAP(vkCreateInstance, &createInfo, nullptr, &instance.vk_instance);
-    load_extensions(instance.vk_instance);
+    load_extensions(instance.vk_instance, ExtensionFlags::DEBUG_UTILS);
 
     if (options.debug.validations_layers) {
-      VK_UNWRAP(vkCreateDebugUtilsMessengerEXT, instance.vk_instance,
-                &createInfoDebugUtils, nullptr,
+      VK_UNWRAP(vkCreateDebugUtilsMessengerEXT, instance.vk_instance, &createInfoDebugUtils, nullptr,
                 &instance.vk_debug_utils_messenger_ext);
     }
   }
   return instance;
 }
 
-VKAPI_ATTR auto VKAPI_CALL
-debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-               VkDebugUtilsMessageTypeFlagsEXT messageType,
-               const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-               void* /*pUserData*/) -> VkBool32 {
+VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                          VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                          const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                          void* /*pUserData*/) -> VkBool32 {
   spdlog::level::level_enum level{spdlog::level::warn};
 
   switch (messageSeverity) {
@@ -172,8 +169,7 @@ debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
       break;
   }
 
-  spdlog::log(level, "[{}] - ({}:{}): {}", reason,
-              pCallbackData->pMessageIdName, pCallbackData->pMessageIdName,
+  spdlog::log(level, "[{}] - ({}:{}): {}", reason, pCallbackData->pMessageIdName, pCallbackData->pMessageIdName,
               pCallbackData->pMessage);
 
   if (pCallbackData->objectCount > 0) {
@@ -182,14 +178,12 @@ debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
       objectName = pCallbackData->pObjects[0].pObjectName;
     }
 
-    spdlog::log(
-        level,
-        "[{}] - ({}:{}): 1st object affected {} "
-        "(type: {}, name:\"{}\")",
-        reason, pCallbackData->pMessageIdName, pCallbackData->pMessageIdName,
-        pCallbackData->pObjects[0].objectHandle,
-        tr::renderer::vkObjectTypeName(pCallbackData->pObjects[0].objectType),
-        objectName);
+    spdlog::log(level,
+                "[{}] - ({}:{}): 1st object affected {} "
+                "(type: {}, name:\"{}\")",
+                reason, pCallbackData->pMessageIdName, pCallbackData->pMessageIdName,
+                pCallbackData->pObjects[0].objectHandle,
+                tr::renderer::vkObjectTypeName(pCallbackData->pObjects[0].objectType), objectName);
   }
 
   return VK_FALSE;

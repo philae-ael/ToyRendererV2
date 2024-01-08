@@ -22,8 +22,7 @@ void resize_callback(GLFWwindow* window, int width, int height) {
   });
 }
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action,
-                  int mods) {
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   glfw_extract_app(window)->on_input({
       .kind = tr::system::InputEventKind::Key,
       .key_event =
@@ -35,8 +34,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action,
           },
   });
 }
-void mouse_button_callback(GLFWwindow* window, int button, int action,
-                           int mods) {
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
   glfw_extract_app(window)->on_input({
       .kind = tr::system::InputEventKind::MouseButton,
       .mouse_button_event =
@@ -65,8 +63,7 @@ void tr::system::Platform::init(tr::App* app) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-  window = glfwCreateWindow(WinWidthInitial, WinHeightInitial, "Toy Renderer",
-                            nullptr, nullptr);
+  window = glfwCreateWindow(WinWidthInitial, WinHeightInitial, "Toy Renderer", nullptr, nullptr);
   TR_ASSERT(window, "could not open window");
 
   glfwSetWindowUserPointer(window, reinterpret_cast<void*>(app));
@@ -76,11 +73,9 @@ void tr::system::Platform::init(tr::App* app) {
   glfwSetCursorPosCallback(window, cursor_pos_callback);
 }
 
-void tr::system::Platform::required_vulkan_extensions(
-    std::vector<const char*>& extensions) {
+void tr::system::Platform::required_vulkan_extensions(std::vector<const char*>& extensions) {
   uint32_t glfw_extensions_count = 0;
-  const char** glfw_extensions =
-      glfwGetRequiredInstanceExtensions(&glfw_extensions_count);
+  const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extensions_count);
 
   TR_ASSERT(glfw_extensions != nullptr,
             "Can't get required instances extensions from gltfw; is vulkan "
@@ -88,8 +83,7 @@ void tr::system::Platform::required_vulkan_extensions(
 
   extensions.reserve(extensions.size() + glfw_extensions_count);
 
-  for (const char* extension :
-       std::span(glfw_extensions, glfw_extensions_count)) {
+  for (const char* extension : std::span(glfw_extensions, glfw_extensions_count)) {
     extensions.push_back(extension);
   }
 }

@@ -19,8 +19,7 @@ const std::array<const char*, 1> device_extension{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 };
 
-void init_physical_device(tr::renderer::Device& device, VkInstance instance,
-                          VkSurfaceKHR surface) {
+void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkSurfaceKHR surface) {
   std::uint32_t device_count = 0;
   vkEnumeratePhysicalDevices(instance, &device_count, nullptr);
   TR_ASSERT(device_count > 0, "no physical device has been found");
@@ -52,25 +51,19 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance,
 
     {
       std::uint32_t extension_count = 0;
-      vkEnumerateDeviceExtensionProperties(physical_device, nullptr,
-                                           &extension_count, nullptr);
+      vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, nullptr);
 
       std::vector<VkExtensionProperties> available_extensions(extension_count);
-      vkEnumerateDeviceExtensionProperties(physical_device, nullptr,
-                                           &extension_count,
-                                           available_extensions.data());
-      if (!tr::renderer::check_extensions("extensions", device_extension,
-                                          available_extensions)) {
+      vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, available_extensions.data());
+      if (!tr::renderer::check_extensions("extensions", device_extension, available_extensions)) {
         continue;
       }
     }
     {
       std::uint32_t surface_format_count = 0;
-      vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface,
-                                           &surface_format_count, nullptr);
+      vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &surface_format_count, nullptr);
       std::uint32_t present_mode_count = 0;
-      vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface,
-                                                &present_mode_count, nullptr);
+      vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nullptr);
       if (surface_format_count == 0 || present_mode_count == 0) {
         continue;
       }
@@ -78,11 +71,9 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance,
 
     {
       uint32_t queue_family_count = 0;
-      vkGetPhysicalDeviceQueueFamilyProperties(physical_device,
-                                               &queue_family_count, nullptr);
+      vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
       std::vector<VkQueueFamilyProperties> queue_families{queue_family_count};
-      vkGetPhysicalDeviceQueueFamilyProperties(
-          physical_device, &queue_family_count, queue_families.data());
+      vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.data());
       std::optional<std::size_t> graphics_family;
       std::optional<std::size_t> present_family;
       for (std::size_t i = 0; i < queue_family_count; i++) {
@@ -93,8 +84,7 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance,
         }
 
         auto present_support = VK_FALSE;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface,
-                                             &present_support);
+        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
         if (present_support == VK_TRUE) {
           present_family = i;
         }
@@ -103,25 +93,20 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance,
         continue;
       }
 
-      device.queues.graphics_family =
-          utils::narrow_cast<std::uint32_t>(*graphics_family);
-      device.queues.graphics_family_properties =
-          queue_families[*graphics_family];
-      device.queues.present_family =
-          utils::narrow_cast<std::uint32_t>(*present_family);
+      device.queues.graphics_family = utils::narrow_cast<std::uint32_t>(*graphics_family);
+      device.queues.graphics_family_properties = queue_families[*graphics_family];
+      device.queues.present_family = utils::narrow_cast<std::uint32_t>(*present_family);
       device.queues.present_family_properties = queue_families[*present_family];
     }
 
     // We take the 1st one suitable
     spdlog::debug("\tDevice is suitable!");
     device.physical_device = physical_device;
-    vkGetPhysicalDeviceProperties(device.physical_device,
-                                  &device.device_properties);
+    vkGetPhysicalDeviceProperties(device.physical_device, &device.device_properties);
     break;
   }
 
-  TR_ASSERT(device.physical_device != VK_NULL_HANDLE,
-            "could not find any suitable physical device");
+  TR_ASSERT(device.physical_device != VK_NULL_HANDLE, "could not find any suitable physical device");
 }
 
 void init_device(tr::renderer::Device& device) {
@@ -143,34 +128,31 @@ void init_device(tr::renderer::Device& device) {
     });
   }
 
+  VkPhysicalDeviceVulkan12Features enabled_features12{};
+  enabled_features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+  enabled_features12.hostQueryReset = VK_TRUE;
+
   VkDeviceCreateInfo device_create_info{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = nullptr,
+      .pNext = &enabled_features12,
       .flags = 0,
-      .queueCreateInfoCount =
-          utils::narrow_cast<std::uint32_t>(queue_create_infos.size()),
+      .queueCreateInfoCount = utils::narrow_cast<std::uint32_t>(queue_create_infos.size()),
       .pQueueCreateInfos = queue_create_infos.data(),
       .enabledLayerCount = 0,
       .ppEnabledLayerNames = nullptr,
-      .enabledExtensionCount =
-          utils::narrow_cast<std::uint32_t>(device_extension.size()),
+      .enabledExtensionCount = utils::narrow_cast<std::uint32_t>(device_extension.size()),
       .ppEnabledExtensionNames = device_extension.data(),
       .pEnabledFeatures = nullptr,
   };
 
-  VkResult result = vkCreateDevice(device.physical_device, &device_create_info,
-                                   nullptr, &device.vk_device);
-  TR_ASSERT(result == VkResult::VK_SUCCESS,
-            "failed to create logical device, got error code {}", result);
+  VkResult result = vkCreateDevice(device.physical_device, &device_create_info, nullptr, &device.vk_device);
+  TR_ASSERT(result == VkResult::VK_SUCCESS, "failed to create logical device, got error code {}", result);
 
-  vkGetDeviceQueue(device.vk_device, device.queues.graphics_family, 0,
-                   &device.queues.graphics_queue);
-  vkGetDeviceQueue(device.vk_device, device.queues.present_family, 0,
-                   &device.queues.present_queue);
+  vkGetDeviceQueue(device.vk_device, device.queues.graphics_family, 0, &device.queues.graphics_queue);
+  vkGetDeviceQueue(device.vk_device, device.queues.present_family, 0, &device.queues.present_queue);
 }
 
-auto tr::renderer::Device::init(VkInstance instance, VkSurfaceKHR surface)
-    -> Device {
+auto tr::renderer::Device::init(VkInstance instance, VkSurfaceKHR surface) -> Device {
   Device device;
   init_physical_device(device, instance, surface);
   init_device(device);

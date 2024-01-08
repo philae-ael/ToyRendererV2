@@ -1,3 +1,5 @@
+#include "extensions.h"
+
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
 #include <vulkan/vulkan_core.h>
@@ -24,30 +26,27 @@
 //
 // playing too much in this file may crash clangd (OOM) so be careful
 
-#define EXTENSIONS                         \
-  LOAD(vkSetDebugUtilsObjectNameEXT, 2)    \
-  LOAD(vkSetDebugUtilsObjectTagEXT, 2)     \
-  LOAD(vkQueueBeginDebugUtilsLabelEXT, 2)  \
-  LOAD(vkQueueEndDebugUtilsLabelEXT, 1)    \
-  LOAD(vkQueueInsertDebugUtilsLabelEXT, 2) \
-  LOAD(vkCmdBeginDebugUtilsLabelEXT, 2)    \
-  LOAD(vkCmdEndDebugUtilsLabelEXT, 1)      \
-  LOAD(vkCmdInsertDebugUtilsLabelEXT, 2)   \
-  LOAD(vkCreateDebugUtilsMessengerEXT, 4)  \
-  LOAD(vkDestroyDebugUtilsMessengerEXT, 3) \
-  LOAD(vkSubmitDebugUtilsMessageEXT, 4)
+#define EXTENSIONS                                      \
+  LOAD(DEBUG_UTILS, vkSetDebugUtilsObjectNameEXT, 2)    \
+  LOAD(DEBUG_UTILS, vkSetDebugUtilsObjectTagEXT, 2)     \
+  LOAD(DEBUG_UTILS, vkQueueBeginDebugUtilsLabelEXT, 2)  \
+  LOAD(DEBUG_UTILS, vkQueueEndDebugUtilsLabelEXT, 1)    \
+  LOAD(DEBUG_UTILS, vkQueueInsertDebugUtilsLabelEXT, 2) \
+  LOAD(DEBUG_UTILS, vkCmdBeginDebugUtilsLabelEXT, 2)    \
+  LOAD(DEBUG_UTILS, vkCmdEndDebugUtilsLabelEXT, 1)      \
+  LOAD(DEBUG_UTILS, vkCmdInsertDebugUtilsLabelEXT, 2)   \
+  LOAD(DEBUG_UTILS, vkCreateDebugUtilsMessengerEXT, 4)  \
+  LOAD(DEBUG_UTILS, vkDestroyDebugUtilsMessengerEXT, 3) \
+  LOAD(DEBUG_UTILS, vkSubmitDebugUtilsMessageEXT, 4)
 // NOLINTBEGIN
 
 #define EVAL(a) a
 
 namespace {
-#define LOAD(name, arg_count) PFN_##name pfn_##name = (PFN_##name)not_loaded;
+#define LOAD(section, name, arg_count) PFN_##name pfn_##name = (PFN_##name)not_loaded;
 
 // This is probably UB, but it shoudl work on the major platforms
-void not_loaded() {
-  spdlog::warn(
-      "extension has not been setup,  has load_extensions been called?");
-}
+void not_loaded() { spdlog::warn("extension has not been setup, has load_extensions been called?"); }
 
 void nop() {}
 
@@ -56,21 +55,22 @@ EVAL(EXTENSIONS)
 #undef LOAD
 }  // namespace
 
-#define LOAD(name, arg_count)                                                 \
-  do {                                                                        \
-    auto tmp_pfn_##name =                                                     \
-        reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name)); \
-    if (tmp_pfn_##name == nullptr) {                                          \
-      spdlog::debug("could not load function" #name                           \
-                    " extension may be missing"                               \
-                    " function will be a nop");                               \
-      pfn_##name = (PFN_##name)nop;                                           \
-    } else {                                                                  \
-      pfn_##name = tmp_pfn_##name;                                            \
-    }                                                                         \
+#define LOAD(section, name, arg_count)                                                            \
+  do {                                                                                            \
+    if ((flags & (ExtensionFlags::section)) == (ExtensionFlags::section)) {                       \
+      auto tmp_pfn_##name = reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name)); \
+      if (tmp_pfn_##name == nullptr) {                                                            \
+        spdlog::debug("could not load function" #name                                             \
+                      " extension may be missing"                                                 \
+                      " function will be a nop");                                                 \
+        pfn_##name = (PFN_##name)nop;                                                             \
+      } else {                                                                                    \
+        pfn_##name = tmp_pfn_##name;                                                              \
+      }                                                                                           \
+    }                                                                                             \
   } while (0);
 
-void load_extensions(VkInstance instance) { EVAL(EXTENSIONS) }
+void load_extensions(VkInstance instance, ExtensionFlags flags) { EVAL(EXTENSIONS) }
 #undef LOAD
 
 template <const size_t N, class F>
@@ -125,17 +125,13 @@ using arg_t = info_type<N, F>::arg_t;
 
 #define ARG(M) ar##M
 
-#define LOAD(name, N)                                                \
-  return_t<PFN_##name> name(ARG_LIST(PFN_##name, 0, g##0, M##N())) { \
-    return pfn_##name(CALL_LIST(g##0, M##N()));                      \
-  }
+#define LOAD(section, name, N) \
+  return_t<PFN_##name> name(ARG_LIST(PFN_##name, 0, g##0, M##N())) { return pfn_##name(CALL_LIST(g##0, M##N())); }
 
-#define ARG_LIST(name, i, M, ...) \
-  __VA_OPT__(ARG_LIST_HELPER(name, i, M, __VA_ARGS__()))
+#define ARG_LIST(name, i, M, ...) __VA_OPT__(ARG_LIST_HELPER(name, i, M, __VA_ARGS__()))
 #define ARG_LIST_AGAIN() ARG_LIST_HELPER
 #define ARG_LIST_HELPER(name, i, M, ...) \
-  arg_t<i, name> ARG(M) __VA_OPT__(      \
-      , ARG_LIST_AGAIN PARENS(name, i + 1, M PARENS, __VA_ARGS__ PARENS))
+  arg_t<i, name> ARG(M) __VA_OPT__(, ARG_LIST_AGAIN PARENS(name, i + 1, M PARENS, __VA_ARGS__ PARENS))
 
 #define CALL_LIST(M, ...) __VA_OPT__(CALL_LIST_HELPER(M, __VA_ARGS__()))
 #define CALL_LIST_AGAIN() CALL_LIST_HELPER

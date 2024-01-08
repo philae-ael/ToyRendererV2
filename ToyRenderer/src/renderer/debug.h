@@ -45,7 +45,6 @@ class DebugQueueScope {
 };
 
 struct Renderdoc {
-
   static auto init() -> Renderdoc;
   void TriggerCapture() const {
     if (rdoc_api != nullptr) {

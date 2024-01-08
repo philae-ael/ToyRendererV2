@@ -23,9 +23,7 @@ class Platform {
   auto start_frame() -> bool;
 
   // move
-  Platform(Platform &&other) noexcept : window(other.window) {
-    other.window = nullptr;
-  }
+  Platform(Platform &&other) noexcept : window(other.window) { other.window = nullptr; }
   auto operator=(Platform &&other) noexcept -> Platform & {
     destroy();
     window = other.window;

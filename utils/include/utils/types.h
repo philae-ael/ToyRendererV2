@@ -13,4 +13,8 @@ template <class T>
 struct Extent2d {
   T width, height;
 };
+
+struct threadsafe {};
+struct threadunsafe {};
+
 }  // namespace utils::types

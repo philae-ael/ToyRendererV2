@@ -2,13 +2,14 @@
 
 #include <chrono>
 #include <cstddef>
+#include <ratio>
 
 #include "utils/math.h"
 namespace utils {
 
 class Timer {
  public:
-  double elapsed = 0.0;
+  float elapsed = 0.0;
   void start() { timer_start_point = Clock::now(); }
   void stop() {
     auto timer_end_point = Clock::now();
@@ -18,7 +19,7 @@ class Timer {
 
  private:
   using Clock = std::chrono::high_resolution_clock;
-  using duration_s = std::chrono::duration<double>;
+  using duration_s = std::chrono::duration<float, std::milli>;
   Clock::time_point timer_start_point;
 };
 
@@ -30,12 +31,12 @@ class FilteredTimer {
     filter.update(timer.elapsed);
   }
 
-  [[nodiscard]] auto elapsed() const -> double { return filter.state; }
-  [[nodiscard]] auto elapsed_raw() const -> double { return timer.elapsed; }
+  [[nodiscard]] auto elapsed() const -> float { return filter.state; }
+  [[nodiscard]] auto elapsed_raw() const -> float { return timer.elapsed; }
 
  private:
   Timer timer;
-  math::KalmanFilter filter{
+  math::KalmanFilter<float> filter{
       .process_covariance = 0.1,
       .noise_covariance = 0.05,
       .state = 0.0,
@@ -59,9 +60,7 @@ class Timeline {
 
   // if N = 1000, index2 = 1050, history is stored continously between [50;1049)
   // thus in [index1;index1 + 1000)
-  auto history() -> std::span<T> {
-    return {&data.at(std::min(index1, index2)), N};
-  }
+  auto history() -> std::span<T> { return {&data.at(std::min(index1, index2)), N}; }
 
  private:
   std::size_t index1 = 0;

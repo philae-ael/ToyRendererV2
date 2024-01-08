@@ -3,12 +3,13 @@
 #include <vulkan/vulkan_core.h>
 
 #include "deletion_queue.h"
+#include "utils/types.h"
 
 struct GLFWwindow;
 
 namespace tr::renderer {
 
-struct Device {
+struct Device : utils::types::threadsafe {
   static auto init(VkInstance instance, VkSurfaceKHR surface) -> Device;
   void defer_deletion(InstanceDeletionStack &instance_deletion_stack) const {
     instance_deletion_stack.defer_deletion(InstanceHandle::Device, vk_device);

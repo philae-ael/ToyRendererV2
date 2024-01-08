@@ -7,9 +7,7 @@
 #include "swapchain.h"
 #include "utils.h"
 
-auto tr::renderer::Renderpass::init(VkDevice device,
-                                    tr::renderer::Swapchain& swapchain)
-    -> Renderpass {
+auto tr::renderer::Renderpass::init(VkDevice device, tr::renderer::Swapchain& swapchain) -> Renderpass {
   Renderpass renderpass;
   VkAttachmentDescription color_attachement{
       .flags = 0,
@@ -53,8 +51,7 @@ auto tr::renderer::Renderpass::init(VkDevice device,
       .pDependencies = nullptr,
   };
 
-  VK_UNWRAP(vkCreateRenderPass, device, &renderpass_create_info, nullptr,
-            &renderpass.vk_renderpass);
+  VK_UNWRAP(vkCreateRenderPass, device, &renderpass_create_info, nullptr, &renderpass.vk_renderpass);
 
   renderpass.framebuffers.resize(swapchain.image_views.size());
   for (std::size_t i = 0; i < swapchain.image_views.size(); i++) {
@@ -71,8 +68,7 @@ auto tr::renderer::Renderpass::init(VkDevice device,
         .layers = 1,
     };
 
-    VK_UNWRAP(vkCreateFramebuffer, device, &framebuffer_create_info, nullptr,
-              &renderpass.framebuffers[i]);
+    VK_UNWRAP(vkCreateFramebuffer, device, &framebuffer_create_info, nullptr, &renderpass.framebuffers[i]);
   }
   return renderpass;
 }

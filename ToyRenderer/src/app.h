@@ -32,7 +32,7 @@ class App {
 
   struct State {
     utils::FilteredTimer frame_timer;
-    utils::Timeline<uint16_t> timeline;
+    utils::Timeline<float> timeline;
   } state;
 };
 }  // namespace tr
