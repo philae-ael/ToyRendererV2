@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "../registry.h"
 #include "debug.h"
 #include "device.h"
 #include "utils.h"
@@ -27,7 +28,8 @@ auto tr::renderer::Swapchain::compute_extent(GLFWwindow* window) const -> VkExte
   };
 
   new_extent.width = std::clamp(new_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-  new_extent.height = std::clamp(new_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+  new_extent.height =
+      std::clamp(new_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
   return new_extent;
 }
@@ -118,6 +120,9 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
     s.images.resize(swapchain_image_count);
     vkGetSwapchainImagesKHR(device.vk_device, s.vk_swapchain, &swapchain_image_count, s.images.data());
   }
+
+  Registry::global()["screen"]["width"] = s.extent.width;
+  Registry::global()["screen"]["height"] = s.extent.height;
 
   s.image_views.resize(s.images.size());
   for (std::size_t i = 0; i < s.images.size(); i++) {

@@ -1,5 +1,1 @@
-﻿add_subdirectory("glfw")
-add_subdirectory("glm")
-add_subdirectory("spdlog")
-add_subdirectory("imgui")
 add_subdirectory("renderdoc")

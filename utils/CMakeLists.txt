@@ -1,4 +1,5 @@
-﻿add_library(utils STATIC
+﻿find_package(spdlog REQUIRED)
+add_library(utils STATIC
         src/assert.cpp
         include/utils/assert.h
         include/utils/types.h
@@ -11,7 +12,7 @@
 )
 
 target_include_directories(utils PUBLIC "include/")
-target_link_libraries(utils PRIVATE spdlog)
+target_link_libraries(utils PRIVATE spdlog::spdlog)
 
 if (MSVC)
     target_compile_options(utils PRIVATE /Wall /WX)

@@ -1,7 +1,7 @@
 #include "options.h"
 
-#include <spdlog/fmt/bundled/core.h>
-#include <spdlog/fmt/bundled/format.h>
+#include <fmt/core.h>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include <utils/types.h>
 #include <vulkan/vulkan_core.h>

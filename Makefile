@@ -1,5 +1,6 @@
 BUILD_TYPE?=Debug
 OUTPUT_DIR?=build/$(BUILD_TYPE)
+VCPKG?=~/.vcpkg/
 ARGS?=
 
 .PHONY: all run clean format
@@ -28,4 +29,4 @@ format:
 	find utils/ -iname '*.h' -o -iname '*.cpp' | xargs clang-format -i
 
 $(OUTPUT_DIR)/build.ninja:
-	cmake -B$(OUTPUT_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -GNinja
+	cmake -B$(OUTPUT_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg.cmake

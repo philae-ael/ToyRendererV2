@@ -1,7 +1,3 @@
-
-
-#include "utils.h"
-
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
@@ -9,6 +5,7 @@
 #include <iterator>
 #include <set>
 #include <span>
+#include "utils.h"
 
 auto tr::renderer::check_extensions(const char* kind, std::span<const char* const> required,
                                     std::span<VkExtensionProperties> available_extensions) -> bool {

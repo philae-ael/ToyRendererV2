@@ -7,10 +7,11 @@
 #include <vector>
 
 #include "../app.h"
+#include "../registry.h"
 #include "utils/misc.h"
 
-const auto WinWidthInitial = 1920;
-const auto WinHeightInitial = 1080;
+const auto WinWidthInitial = 1080;
+const auto WinHeightInitial = 720;
 
 auto glfw_extract_platform(GLFWwindow* window) -> tr::system::Platform* {
   return reinterpret_cast<tr::system::Platform*>(glfwGetWindowUserPointer(window));
@@ -36,10 +37,14 @@ void tr::system::Platform::init(tr::App* new_app) {
   TR_ASSERT(glfwInit() != 0, "could not initializa GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
   this->app = new_app;
-  window = glfwCreateWindow(WinWidthInitial, WinHeightInitial, "Toy Renderer", nullptr, nullptr);
+
+  auto width = Registry::global()["screen"].get("width", WinWidthInitial).asInt();
+  auto height = Registry::global()["screen"].get("height", WinHeightInitial).asInt();
+
+  window = glfwCreateWindow(width, height, "Toy Renderer", nullptr, nullptr);
   TR_ASSERT(window, "could not open window");
 
   glfwSetWindowUserPointer(window, reinterpret_cast<void*>(this));
