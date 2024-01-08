@@ -26,7 +26,7 @@ auto create_shader_module(VkDevice device, std::span<const std::byte> module) ->
   return shader_module;
 }
 
-auto tr::renderer::Pipeline::init(Device& device, VkRenderPass renderpass) -> Pipeline {
+auto tr::renderer::Pipeline::init(Device& device) -> Pipeline {
   Pipeline p{};
 
   auto frag = read_file("./build/shaders/frag.spv");
@@ -165,6 +165,22 @@ auto tr::renderer::Pipeline::init(Device& device, VkRenderPass renderpass) -> Pi
       .pPushConstantRanges = nullptr,
   };
 
+  VkPipelineDepthStencilStateCreateInfo depth_state{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .depthTestEnable = VK_TRUE,
+      .depthWriteEnable = VK_TRUE,
+      .depthCompareOp = VK_COMPARE_OP_LESS,
+      .depthBoundsTestEnable = VK_FALSE,
+      .stencilTestEnable = VK_FALSE,
+      .front = {},
+      .back = {},
+      .minDepthBounds = 0.0,
+      .maxDepthBounds = 1.0,
+
+  };
+
   VK_UNWRAP(vkCreatePipelineLayout, device.vk_device, &pipeline_layout_info, nullptr, &p.layout);
 
   VkGraphicsPipelineCreateInfo pipeline_info{
@@ -179,15 +195,28 @@ auto tr::renderer::Pipeline::init(Device& device, VkRenderPass renderpass) -> Pi
       .pViewportState = &viewport_state,
       .pRasterizationState = &rasterizer_state,
       .pMultisampleState = &multisampling_state,
-      .pDepthStencilState = nullptr,
+      .pDepthStencilState = &depth_state,
       .pColorBlendState = &color_blend_state,
       .pDynamicState = &dynamic_state_state,
       .layout = p.layout,
-      .renderPass = renderpass,
+      .renderPass = VK_NULL_HANDLE,
       .subpass = 0,
       .basePipelineHandle = VK_NULL_HANDLE,
       .basePipelineIndex = -1,
   };
+
+  // TODO: swapchain.format
+  VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
+  VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+      .pNext = nullptr,
+      .viewMask = 0,
+      .colorAttachmentCount = 1,
+      .pColorAttachmentFormats = &color_formats,
+      .depthAttachmentFormat = VK_FORMAT_D32_SFLOAT,
+      .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
+  };
+  pipeline_info.pNext = &pipeline_rendering_create_info;
 
   VK_UNWRAP(vkCreateGraphicsPipelines, device.vk_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &p.vk_pipeline);
 

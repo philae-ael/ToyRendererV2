@@ -11,12 +11,14 @@
 #include <cstdlib>
 #include <optional>
 
+#include "constants.h"
 #include "debug.h"
 #include "deletion_queue.h"
 #include "device.h"
 #include "instance.h"
-#include "pipeline.h"
-#include "renderpass.h"
+#include "passes/deferred.h"
+#include "passes/gbuffer.h"
+#include "ressources.h"
 #include "surface.h"
 #include "swapchain.h"
 #include "utils.h"
@@ -52,8 +54,18 @@ class VulkanEngine {
   friend VulkanEngineDebugInfo;
   VulkanEngineDebugInfo debug_info;
 
+  FrameRessourceManager rm{};
+  ImageRessourceStorage fb0_ressources{};
+  ImageRessourceStorage fb1_ressources{};
+  ImageRessourceStorage depth_ressources{};
+
  private:
   GLFWwindow* window{};
+
+  struct {
+    GBuffer gbuffer;
+    Deferred deferred;
+  } passes;
 
   // Lifetimes
   struct {  // Cleaned at exit
@@ -64,11 +76,11 @@ class VulkanEngine {
 
   struct {  // Cleaned on swapchain recreation
     DeviceDeletionStack device;
+    VmaDeletionStack allocator;
   } swapchain_deletion_stacks;
 
   struct {
     DeviceDeletionStack device;
-    VmaDeletionStack allocator;
   } frame_deletion_stacks;
 
   Instance instance;
@@ -83,7 +95,6 @@ class VulkanEngine {
   // Swapchain related
   Swapchain swapchain;
   bool fb_resized = false;
-  Renderpass renderpass;
 
   // FRAME STUFF
   std::size_t frame_id{};
@@ -91,7 +102,6 @@ class VulkanEngine {
   std::array<VkCommandBuffer, MAX_FRAMES_IN_FLIGHT> main_command_buffer_pool{};
 
   // Data shall be moved, one day
-  Pipeline pipeline;
   Buffer triangle_vertex_buffer;
   StagingBuffer staging_buffer;
 

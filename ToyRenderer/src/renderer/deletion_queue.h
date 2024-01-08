@@ -60,7 +60,10 @@ class DeviceDeletionStack : public DeletionStack<DeviceHandle> {
   void cleanup(VkDevice device);
 };
 
-enum class VmaHandle { Buffer };
+enum class VmaHandle {
+  Buffer,
+  Image,
+};
 
 class VmaDeletionStack : public DeletionStack<VmaHandle, std::pair<uint64_t, VmaAllocation>> {
  public:

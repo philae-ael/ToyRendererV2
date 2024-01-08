@@ -29,39 +29,39 @@ namespace utils::data {
 struct hive_index_t {
   union {
     struct {
-      types::u16 chunk;
-      types::u16 chunk_index;
+      std::uint16_t chunk;
+      std::uint16_t chunk_index;
     };
-    types::u32 index;
+    std::uint32_t index;
   };
 };
 
 struct hive_handle_t {
-  types::u32 generation;
+  std::uint32_t generation;
   hive_index_t hive_index;
 };
 
 struct chunk_handle_t {
-  types::u32 generation;
-  types::u16 index;
+  std::uint32_t generation;
+  std::uint16_t index;
 };
 
-template <types::trivial T, const types::usize N>
+template <types::trivial T, const std::size_t N>
 class chunk {
   struct Data {
     union {
       T data;
       std::optional<hive_index_t> next_free;
     };
-    types::u32 generation{};
+    std::uint32_t generation{};
     bool valid{};
   };
 
   std::array<Data, N> data{};
-  types::usize initialized{0};
+  std::size_t initialized{0};
 
  public:
-  T* get(chunk_handle_t handle) {
+  auto get(chunk_handle_t handle) -> T* {
     auto& d = data.at(handle.index);
     if (!d.valid || d.generation != handle.generation) {
       return nullptr;
@@ -69,9 +69,9 @@ class chunk {
     return &d.data;
   }
 
-  T* get_unchecked(types::u16 index) { return &data.at(index).data; }
+  auto get_unchecked(std::uint16_t index) -> T* { return &data.at(index).data; }
 
-  std::tuple<hive_handle_t, std::optional<hive_index_t>, T*> create(hive_index_t index) {
+  auto create(hive_index_t index) -> std::tuple<hive_handle_t, std::optional<hive_index_t>, T*> {
     auto& d = data.at(index.chunk_index);
     auto next_index = d.next_free;
 
@@ -82,7 +82,7 @@ class chunk {
       if (initialized <= N) {
         next_index = {
             .chunk = index.chunk,
-            .chunk_index = utils::narrow_cast<types::u16>(initialized + 1),
+            .chunk_index = utils::narrow_cast<std::uint16_t>(initialized + 1),
         };
       } else {
         next_index = std::nullopt;
@@ -107,14 +107,14 @@ class chunk {
   }
 };
 
-template <types::trivial T, const types::usize N = 256>
+template <types::trivial T, const std::size_t N = 256>
 class hive {
  private:
   std::vector<chunk<T, N>> inner;
   std::optional<hive_index_t> next_free;
 
  public:
-  T* get(hive_handle_t handle) {
+  auto get(hive_handle_t handle) -> T* {
     if (handle.hive_index.chunk >= inner.size()) {
       return nullptr;
     }
@@ -123,18 +123,18 @@ class hive {
         .index = handle.hive_index.chunk_index,
     });
   }
-  T* get_unchecked(hive_index_t index) {
+  auto get_unchecked(hive_index_t index) -> T* {
     if (index.chunk >= inner.size()) {
       return nullptr;
     }
     return inner[index.chunk].get_unchecked(index.chunk_index);
   }
 
-  std::pair<hive_handle_t, T*> create() {
+  auto create() -> std::pair<hive_handle_t, T*> {
     if (!next_free.has_value()) {
       inner.emplace_back();
       next_free = {
-          .chunk = utils::narrow_cast<types::u16>(inner.size() - 1),
+          .chunk = utils::narrow_cast<std::uint16_t>(inner.size() - 1),
           .chunk_index = 0,
       };
     }
@@ -156,5 +156,5 @@ class hive {
   }
 };
 
-template class hive<types::u32>;
+template class hive<std::uint32_t>;
 }  // namespace utils::data

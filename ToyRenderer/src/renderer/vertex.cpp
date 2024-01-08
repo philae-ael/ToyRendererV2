@@ -44,17 +44,17 @@ const std::array<VkVertexInputBindingDescription, 1> tr::renderer::Vertex::bindi
 
 const std::array<tr::renderer::Vertex, 3> triangle{{
     {
-        .pos = {-1, -1, 0},
+        .pos = {-1, -1, 0.5},
         .base_color = {1, 0, 0},
         .uv = {0, 0},
     },
     {
-        .pos = {1, -1, 0},
+        .pos = {1, -1, 0.5},
         .base_color = {0, 0, 1},
         .uv = {0, 0},
     },
     {
-        .pos = {0, 1, 0},
+        .pos = {0, 1, 0.5},
         .base_color = {0, 1, 0},
         .uv = {0, 0},
     },

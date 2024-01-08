@@ -77,6 +77,8 @@ class Imgui {
       return;
     }
     ImGui::Render();
+
+    renderer::DebugCmdScope scope{frame.cmd.vk_cmd, "Imgui"};
     engine.debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                           renderer::GPU_TIMESTAMP_INDEX_IMGUI_TOP);
 

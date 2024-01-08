@@ -40,6 +40,7 @@ add_executable(ToyRenderer
     src/renderer/vertex.h
     src/renderer/vma.cpp
     src/renderer/queue.h
+    src/renderer/passes/defered.h
     src/renderer/constants.h
     src/system/platform.h
     src/system/platform.cpp

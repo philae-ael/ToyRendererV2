@@ -66,7 +66,10 @@ void tr::renderer::VmaDeletionStack::cleanup(VmaAllocator allocator) {
     auto [type, handle] = stack.back();
     stack.pop_back();
     // NOLINTBEGIN(performance-no-int-to-ptr)
-    switch (type) { DESTROY_WITH_ALLOCATOR(Buffer) }
+    switch (type) {
+      DESTROY_WITH_ALLOCATOR(Buffer)
+      DESTROY_WITH_ALLOCATOR(Image)
+    }
     // NOLINTEND(performance-no-int-to-ptr)
   }
 }
