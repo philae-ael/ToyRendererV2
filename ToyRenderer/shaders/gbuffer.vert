@@ -21,12 +21,12 @@ layout(push_constant) uniform Mesh{
 };
 
 void main() {
-    vec4 view = viewMat * vec4(0.0, 0.0, 0.0, 1.0);
-    vec4 pos = viewMat * modelMat * vec4(pos, 1.0);
-    gl_Position = projMat * pos;
+    vec4 WorldPos = modelMat * vec4(pos, 1.0);
+    vec4 view = vec4(0.0, 0.0, 0.0, 1.0) - viewMat * WorldPos;
+    gl_Position = projMat * viewMat * WorldPos;
 
     fragUV1 = uv1;
     fragUV2 = uv2;
     fragNormal = normal;
-    fragViewDir = normalize((view - pos).xyz);
+    fragViewDir =  normalize(view.xyz);
 }

@@ -46,11 +46,11 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
-  const std::array<VkPipelineColorBlendAttachmentState, attachments_color.size()> color_blend_attchment_states{
+  const std::array color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState, attachments_color.size()>({
       PipelineColorBlendStateAllColorNoBlend.build(),
       PipelineColorBlendStateAllColorNoBlend.build(),
       PipelineColorBlendStateAllColorNoBlend.build(),
-  };
+  });
 
   const std::array<VkFormat, attachments_color.size()> color_formats{
       attachments_color[0].definition.vk_format(swapchain),
@@ -102,7 +102,7 @@ void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
 }
 
 void tr::renderer::GBuffer::start_draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
-  ImageMemoryBarrier::submit<4>(
+  ImageMemoryBarrier::submit<attachments_color.size() + 1>(
       cmd, {{
                rm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachmentOutput),
                rm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachmentOutput),
@@ -110,7 +110,7 @@ void tr::renderer::GBuffer::start_draw(VkCommandBuffer cmd, FrameRessourceManage
                rm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
            }});
 
-  std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
+  std::array attachments = utils::to_array<VkRenderingAttachmentInfo, attachments_color.size()>({
       rm.get_image(ImageRessourceId::GBuffer0).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
       rm.get_image(ImageRessourceId::GBuffer1).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
       rm.get_image(ImageRessourceId::GBuffer2).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),

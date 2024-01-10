@@ -5,7 +5,9 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <glm/fwd.hpp>
 #include <optional>
 #include <span>
@@ -79,6 +81,12 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   debug_info.write_gpu_timestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
 
   std::vector<VkImageMemoryBarrier2> barriers;
+  {
+    const auto barrier = default_metallic_roughness.prepare_barrier(SyncFragmentShaderReadOnly);
+    if (barrier) {
+      barriers.push_back(*barrier);
+    }
+  }
   for (const auto& mesh : meshes) {
     for (auto& surface : mesh.surfaces) {
       {
@@ -132,8 +140,7 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
                 {
                     .sampler = base_sampler,
                     .imageView =
-                        // TODO: use a default texture if there is no texture
-                    surface.material->metallic_roughness_texture.value_or(surface.material->base_color_texture).view,
+                    surface.material->metallic_roughness_texture.value_or(default_metallic_roughness).view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 },
             }})
@@ -354,13 +361,25 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
         .write(device.vk_device);
   }
 
+  debug_info.gpu_timestamps = decltype(debug_info.gpu_timestamps)::init(device);
+  debug_info.gpu_timestamps.defer_deletion(global_deletion_stacks.device);
+
+  for (auto& synchro : frame_synchronisation_pool) {
+    synchro = FrameSynchro::init(device.vk_device);
+    synchro.defer_deletion(global_deletion_stacks.device);
+  }
+
+  setup_device_deletion_stack.cleanup(device.vk_device);
+  setup_allocator_deletion_stack.cleanup(allocator);
+
+  // DEFAULT SAMPLER AND TEXTURES
   {
     VkSamplerCreateInfo sampler_create_info{
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
-        .magFilter = VK_FILTER_NEAREST,
-        .minFilter = VK_FILTER_NEAREST,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
         .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
         .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -378,17 +397,25 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     VK_UNWRAP(vkCreateSampler, device.vk_device, &sampler_create_info, nullptr, &base_sampler);
     global_deletion_stacks.device.defer_deletion(DeviceHandle::Sampler, base_sampler);
   }
+  {
+    auto t = start_transfer();
+    default_metallic_roughness = image_builder().build_image({
+        .flags = 0,
+        .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .size = VkExtent2D{1, 1},
+        .format = VK_FORMAT_R8G8_UNORM,
+        .debug_name = "default metallic_roughness_texture",
+    });
 
-  debug_info.gpu_timestamps = decltype(debug_info.gpu_timestamps)::init(device);
-  debug_info.gpu_timestamps.defer_deletion(global_deletion_stacks.device);
+    ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
+                                  {{default_metallic_roughness.prepare_barrier(tr::renderer::SyncImageTransfer)}});
 
-  for (auto& synchro : frame_synchronisation_pool) {
-    synchro = FrameSynchro::init(device.vk_device);
-    synchro.defer_deletion(global_deletion_stacks.device);
+    std::array<uint8_t, 4> data{0xFF, 0xFF, 0xFF, 0xFF};
+    t.upload_image(default_metallic_roughness, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)));
+    end_transfer(std::move(t));
+
+    default_metallic_roughness.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
   }
-
-  setup_device_deletion_stack.cleanup(device.vk_device);
-  setup_allocator_deletion_stack.cleanup(allocator);
 }
 
 auto tr::renderer::VulkanEngine::start_transfer() -> Transferer {

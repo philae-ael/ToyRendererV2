@@ -83,6 +83,7 @@ auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, c
                                                   image_ressource.prepare_barrier(tr::renderer::SyncImageTransfer),
                                               }});
   t.upload_image(image_ressource, {{0, 0}, {width, height}}, image_data);
+  // TODO: ask engine to prepare for a sync of the ressource
 
   return image_ressource;
 }
@@ -100,7 +101,7 @@ auto load_materials(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t,
     mat->base_color_texture = load_texture(ib, t, asset.images[*color_texture.imageIndex]);
 
     if (material.pbrData.metallicRoughnessTexture) {
-      const auto& metallic_roughness_texture = asset.textures[material.pbrData.baseColorTexture->textureIndex];
+      const auto& metallic_roughness_texture = asset.textures[material.pbrData.metallicRoughnessTexture->textureIndex];
       TR_ASSERT(metallic_roughness_texture.imageIndex, "no image index, not supported");
       mat->metallic_roughness_texture = load_texture(ib, t, asset.images[*metallic_roughness_texture.imageIndex]);
     }

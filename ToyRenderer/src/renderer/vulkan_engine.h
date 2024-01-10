@@ -102,6 +102,7 @@ class VulkanEngine {
   std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> camera_descriptors{};
   std::array<BufferRessource, MAX_FRAMES_IN_FLIGHT> gbuffer_camera_buffer{};
   VkSampler base_sampler{};
+  ImageRessource default_metallic_roughness{};
 
   // Swapchain related
   Swapchain swapchain;
