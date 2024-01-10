@@ -140,7 +140,16 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -
       .pQueueFamilyIndices = nullptr,
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
-  VmaAllocationCreateInfo allocation_create_info{};
+  VmaAllocationCreateInfo allocation_create_info{
+      .flags = 0,
+      .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+      .requiredFlags = 0,
+      .preferredFlags = 0,
+      .memoryTypeBits = 0,
+      .pool = nullptr,
+      .pUserData = nullptr,
+      .priority = 0,
+  };
   VkImage image = VK_NULL_HANDLE;
   VmaAllocation alloc{};
   VmaAllocationInfo alloc_info{};
