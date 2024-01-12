@@ -306,10 +306,11 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   global_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
 
   for (auto& frame_descriptor_allocator : frame_descriptor_allocators) {
-    frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
+    frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 8192,
                                                            {{
                                                                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048},
-                                                               {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
+                                                               {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2048},
+                                                              {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
                                                            }});
     frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
   }
