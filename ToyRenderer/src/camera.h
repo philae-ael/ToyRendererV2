@@ -7,9 +7,11 @@
 
 namespace tr {
 
-struct CameraMatrices {
+struct CameraInfo {
   glm::mat4x4 projMatrix;
   glm::mat4x4 viewMatrix;
+  glm::vec3 cameraPosition;
+  float padding = 0.0;
 };
 
 struct CameraInput {
@@ -26,14 +28,15 @@ struct Camera {
   float zNear;
   float zFar;
 
-  [[nodiscard]] auto cameraMatrices() const -> CameraMatrices;
+  [[nodiscard]] auto cameraMatrices() const -> CameraInfo;
   [[nodiscard]] auto orientation() const -> glm::quat;
 };
 
 struct CameraController {
   CameraController()
       : camera{
-            .position = glm::vec3(0.0F, 0.0F, -3.0F),
+            .position = glm::vec3(0.0F, 1.0F, 0.0F),
+            .eulerAngles = {0.0, utils::math::PI_2, 0.0},
             .fov = utils::math::PI_4,
             .aspectRatio = 1.0F,
             .zNear = 0.1F,

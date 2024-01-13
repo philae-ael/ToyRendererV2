@@ -39,7 +39,7 @@ struct StagingBuffer {
   }
 
   [[nodiscard]] auto available(std::size_t alignement = 1) const -> std::size_t {
-    return alloc_info.size - utils::align(offset, alignement);
+    return alloc_info.size - utils::align(offset, utils::narrow_cast<uint32_t>(alignement));
   }
   auto consume(std::size_t size, std::size_t alignement = 1) -> std::span<std::byte>;
   auto commit(VkCommandBuffer, VkBuffer, uint32_t offset) -> StagingBuffer&;

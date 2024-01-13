@@ -15,6 +15,7 @@ layout(location = 5) out vec2 fragUV2;
 layout(set = 0, binding = 0) uniform Global{
     mat4 projMat;
     mat4 viewMat;
+    vec3 cameraPosition;
 };
 
 layout(push_constant) uniform Mesh{
@@ -23,16 +24,16 @@ layout(push_constant) uniform Mesh{
 
 void main() {
     vec4 WorldPos = modelMat * vec4(pos, 1.0);
-    vec4 view = vec4(0.0, 0.0, 0.0, 1.0) - viewMat * WorldPos;
+    vec3 view = cameraPosition - WorldPos.xyz;
     gl_Position = projMat * viewMat * WorldPos;
 
     vec3 bitangent = normalize(cross(normal, tangent));
-    vec3 T = normalize(vec3(modelMat * vec4(tangent, 1.0)));
-    vec3 B = normalize(vec3(modelMat * vec4(bitangent, 1.0)));
-    vec3 N = normalize(vec3(modelMat * vec4(normal, 1.0)));
+    vec3 T = normalize(vec3(modelMat * vec4(tangent, 0.0)));
+    vec3 B = normalize(vec3(modelMat * vec4(bitangent, 0.0)));
+    vec3 N = normalize(vec3(modelMat * vec4(normal, 0.0)));
     TBN = mat3(T, B, N);
 
     fragUV1 = uv1;
     fragUV2 = uv2;
-    fragViewDir =  normalize(view.xyz);
+    fragViewDir = normalize(view);
 }

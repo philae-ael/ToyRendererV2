@@ -28,7 +28,8 @@ const std::array<VkVertexInputAttributeDescription, 6> tr::renderer::Vertex::att
         .binding = 0,
         .format = VK_FORMAT_R32G32B32_SFLOAT,
         .offset = offsetof(Vertex, normal),
-    },    {
+    },
+    {
         .location = 2,
         .binding = 0,
         .format = VK_FORMAT_R32G32B32_SFLOAT,
@@ -98,7 +99,7 @@ auto tr::renderer::StagingBuffer::commit_image(VkCommandBuffer cmd, const ImageR
 
 auto tr::renderer::StagingBuffer::consume(std::size_t size, std::size_t alignement) -> std::span<std::byte> {
   TR_ASSERT(available(alignement) >= size, "StagingBuffer already filled");
-  offset = utils::align(offset, alignement);
+  offset = utils::align(offset, utils::narrow_cast<uint32_t>(alignement));
 
   auto out = std::as_writable_bytes(std::span{reinterpret_cast<std::byte *>(alloc_info.pMappedData), alloc_info.size})
                  .subspan(offset, size);

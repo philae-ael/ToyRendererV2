@@ -173,8 +173,10 @@ auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, c
               [&](const fastgltf::Node::TRS& trs) {
                 const auto rot = glm::mat4_cast(glm::make_quat(trs.rotation.data()));
                 const auto scale = glm::scale(glm::identity<glm::mat4>(), glm::make_vec3(trs.scale.data()));
+                const auto translate =
+                    glm::translate(glm::identity<glm::mat4>(), glm::make_vec3(trs.translation.data()));
 
-                asset_mesh.transform = glm::translate(rot * scale, glm::make_vec3(trs.translation.data()));
+                asset_mesh.transform = translate * rot * scale;
               },
               [&](const fastgltf::Node::TransformMatrix& trs) { asset_mesh.transform = glm::make_mat4(trs.data()); },
           },
@@ -232,7 +234,6 @@ auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, c
           std::format("index buffer for {}", mesh.name));
       t.upload_buffer(asset_mesh.buffers.indices->buffer, 0, indices_bytes);
 
-      asset_mesh.transform = 0.1F * asset_mesh.transform;
       meshes.push_back(asset_mesh);
     }
   }

@@ -59,7 +59,7 @@ class VulkanEngine {
   friend VulkanEngineDebugInfo;
   VulkanEngineDebugInfo debug_info;
 
-  CameraMatrices matrices{};
+  CameraInfo matrices{};
 
   auto image_builder() -> ImageBuilder { return {device.vk_device, allocator, &swapchain}; }
   auto buffer_builder() -> BufferBuilder { return {device.vk_device, allocator}; }

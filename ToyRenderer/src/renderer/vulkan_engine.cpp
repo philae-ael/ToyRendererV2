@@ -90,7 +90,7 @@ void tr::renderer::VulkanEngine::draw(Frame& frame, std::span<const Mesh> meshes
   }
   passes.gbuffer.draw(cmd, frame.frm, {{0, 0}, swapchain.extent}, [&] {
     {
-      CameraMatrices* map = nullptr;
+      CameraInfo* map = nullptr;
       const auto& buf = gbuffer_camera_buffer[frame_id % MAX_FRAMES_IN_FLIGHT];
       vmaMapMemory(allocator, buf.alloc, reinterpret_cast<void**>(&map));
       *map = matrices;
@@ -147,7 +147,7 @@ void tr::renderer::VulkanEngine::draw(Frame& frame, std::span<const Mesh> meshes
                                  GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
 
   DirectionalLight light{
-      .direction = glm::normalize(glm::vec3{1, 2, -1}),
+      .direction = glm::normalize(glm::vec3{0, 2, -2}),
       .color = {2, 2, 2},
   };
 
@@ -345,7 +345,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     const auto b = bb.build_buffer(
         {
             .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            .size = 256,
+            .size = utils::align(sizeof(CameraInfo), size_t(256)),
             .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
         },
         "uniforms");
