@@ -101,8 +101,11 @@ class VulkanEngine {
   std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> deferred_descriptors{};
   std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> camera_descriptors{};
   std::array<BufferRessource, MAX_FRAMES_IN_FLIGHT> gbuffer_camera_buffer{};
+
+  // Default data
   VkSampler base_sampler{};
   ImageRessource default_metallic_roughness{};
+  ImageRessource default_normal{};
 
   // Swapchain related
   Swapchain swapchain;

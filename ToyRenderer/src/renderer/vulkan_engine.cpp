@@ -87,6 +87,12 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
       barriers.push_back(*barrier);
     }
   }
+  {
+    const auto barrier = default_normal.prepare_barrier(SyncFragmentShaderReadOnly);
+    if (barrier) {
+      barriers.push_back(*barrier);
+    }
+  }
   for (const auto& mesh : meshes) {
     for (auto& surface : mesh.surfaces) {
       {
@@ -97,6 +103,13 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
       }
       {
         const auto barrier = surface.material->metallic_roughness_texture.and_then(
+            [](auto& x) { return x.prepare_barrier(SyncFragmentShaderReadOnly); });
+        if (barrier) {
+          barriers.push_back(*barrier);
+        }
+      }
+      {
+        const auto barrier = surface.material->normal_texture.and_then(
             [](auto& x) { return x.prepare_barrier(SyncFragmentShaderReadOnly); });
         if (barrier) {
           barriers.push_back(*barrier);
@@ -139,8 +152,12 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
                 },
                 {
                     .sampler = base_sampler,
-                    .imageView =
-                    surface.material->metallic_roughness_texture.value_or(default_metallic_roughness).view,
+                    .imageView = surface.material->metallic_roughness_texture.value_or(default_metallic_roughness).view,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                },
+                {
+                    .sampler = base_sampler,
+                    .imageView = surface.material->normal_texture.value_or(default_normal).view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 },
             }})
@@ -310,7 +327,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
                                                            {{
                                                                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048},
                                                                {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2048},
-                                                              {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
+                                                               {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
                                                            }});
     frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
   }
@@ -400,22 +417,39 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   }
   {
     auto t = start_transfer();
-    default_metallic_roughness = image_builder().build_image({
-        .flags = 0,
-        .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .size = VkExtent2D{1, 1},
-        .format = VK_FORMAT_R8G8_UNORM,
-        .debug_name = "default metallic_roughness_texture",
-    });
+    {
+      default_metallic_roughness = image_builder().build_image({
+          .flags = 0,
+          .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+          .size = VkExtent2D{1, 1},
+          .format = VK_FORMAT_R8G8_UNORM,
+          .debug_name = "default metallic_roughness_texture",
+      });
+      default_metallic_roughness.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
 
-    ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
-                                  {{default_metallic_roughness.prepare_barrier(tr::renderer::SyncImageTransfer)}});
+      ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
+                                    {{default_metallic_roughness.prepare_barrier(tr::renderer::SyncImageTransfer)}});
 
-    std::array<uint8_t, 4> data{0xFF, 0xFF, 0xFF, 0xFF};
-    t.upload_image(default_metallic_roughness, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)));
+      std::array<uint8_t, 4> data{0xFF, 0xFF, 0xFF, 0xFF};
+      t.upload_image(default_metallic_roughness, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)), 2);
+    }
+
+    {
+      default_normal = image_builder().build_image({
+          .flags = 0,
+          .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+          .size = VkExtent2D{1, 1},
+          .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+          .debug_name = "default normal_texture",
+      });
+      default_normal.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
+
+      ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd, {{default_normal.prepare_barrier(tr::renderer::SyncImageTransfer)}});
+
+      std::array<float, 4> data{0.0, 0.0, 1.0, 0.0};
+      t.upload_image(default_normal, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)), 16);
+    }
     end_transfer(std::move(t));
-
-    default_metallic_roughness.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
   }
 }
 
@@ -432,6 +466,10 @@ void tr::renderer::VulkanEngine::end_transfer(Transferer&& t_in) {
   VK_UNWRAP(t.cmd.end);
 
   QueueSubmit{}.command_buffers({{t.cmd.vk_cmd}}).submit(device.queues.transfer_queue, VK_NULL_HANDLE);
+
+  // WARN: THIS IS BAD: we should keep the uploader until all the uploads are done
+  // Maybe within a deletion queue with a fence ? Or smthg like that
+  sync();
   t.uploader.defer_trim(frame_deletion_stacks.allocator);
 }
 

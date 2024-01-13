@@ -23,6 +23,7 @@
 #include <mutex>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -37,8 +38,8 @@
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
 
-auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, const fastgltf::Image& image)
-    -> tr::renderer::ImageRessource {
+auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, const fastgltf::Image& image,
+                  std::string_view debug_name) -> tr::renderer::ImageRessource {
   uint32_t width = 0;
   uint32_t height = 0;
   std::span<const std::byte> image_data;
@@ -75,14 +76,14 @@ auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, c
       // TODO: How to deal with RBG (non alpha images?)
       // and more generally with unsupported formats
       .format = VK_FORMAT_R8G8B8A8_UNORM,
-      .debug_name = "texture image",
+      .debug_name = debug_name,
   });
 
   tr::renderer::ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
                                               {{
                                                   image_ressource.prepare_barrier(tr::renderer::SyncImageTransfer),
                                               }});
-  t.upload_image(image_ressource, {{0, 0}, {width, height}}, image_data);
+  t.upload_image(image_ressource, {{0, 0}, {width, height}}, image_data, 4);
   // TODO: ask engine to prepare for a sync of the ressource
 
   return image_ressource;
@@ -98,12 +99,19 @@ auto load_materials(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t,
     TR_ASSERT(material.pbrData.baseColorTexture, "no base color texture, not supported");
     const auto& color_texture = asset.textures[material.pbrData.baseColorTexture->textureIndex];
     TR_ASSERT(color_texture.imageIndex, "no image index, not supported");
-    mat->base_color_texture = load_texture(ib, t, asset.images[*color_texture.imageIndex]);
+    mat->base_color_texture = load_texture(ib, t, asset.images[*color_texture.imageIndex], "base color");
 
     if (material.pbrData.metallicRoughnessTexture) {
       const auto& metallic_roughness_texture = asset.textures[material.pbrData.metallicRoughnessTexture->textureIndex];
       TR_ASSERT(metallic_roughness_texture.imageIndex, "no image index, not supported");
-      mat->metallic_roughness_texture = load_texture(ib, t, asset.images[*metallic_roughness_texture.imageIndex]);
+      mat->metallic_roughness_texture =
+          load_texture(ib, t, asset.images[*metallic_roughness_texture.imageIndex], "metal roughness");
+    }
+
+    if (material.normalTexture) {
+      const auto& normal_texture = asset.textures[material.normalTexture->textureIndex];
+      TR_ASSERT(normal_texture.imageIndex, "no image index, not supported");
+      mat->normal_texture = load_texture(ib, t, asset.images[*normal_texture.imageIndex], "normal map");
     }
 
     materials.push_back(std::move(mat));
@@ -123,6 +131,11 @@ auto load_attribute(const fastgltf::Asset& asset, std::vector<tr::renderer::Vert
   if (attribute == "NORMAL") {
     fastgltf::iterateAccessorWithIndex<glm::vec3>(
         asset, accessor, [&](glm::vec3 normal, size_t v_idx) { vertices[start_v_idx + v_idx].normal = normal; });
+    return;
+  }
+  if (attribute == "TANGENT") {
+    fastgltf::iterateAccessorWithIndex<glm::vec4>(
+        asset, accessor, [&](glm::vec3 tangent, size_t v_idx) { vertices[start_v_idx + v_idx].tangent = tangent; });
     return;
   }
   if (attribute == "TEXCOORD_0") {

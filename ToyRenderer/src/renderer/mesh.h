@@ -15,11 +15,15 @@ namespace tr::renderer {
 struct Material {
   tr::renderer::ImageRessource base_color_texture{};
   std::optional<tr::renderer::ImageRessource> metallic_roughness_texture;
+  std::optional<tr::renderer::ImageRessource> normal_texture;
 
   void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) const {
     base_color_texture.defer_deletion(vma_deletion_stack, device_deletion_stack);
     if (metallic_roughness_texture) {
       metallic_roughness_texture->defer_deletion(vma_deletion_stack, device_deletion_stack);
+    }
+    if (normal_texture) {
+      normal_texture->defer_deletion(vma_deletion_stack, device_deletion_stack);
     }
   }
 };

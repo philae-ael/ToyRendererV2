@@ -11,15 +11,17 @@
 
 #include "deletion_queue.h"
 #include "ressources.h"
+#include "utils/misc.h"
 
 namespace tr::renderer {
 struct Vertex {
   glm::vec3 pos;
   glm::vec3 normal;
+  glm::vec3 tangent;
   glm::vec3 color;
   glm::vec2 uv1;
   glm::vec2 uv2;
-  static const std::array<VkVertexInputAttributeDescription, 5> attributes;
+  static const std::array<VkVertexInputAttributeDescription, 6> attributes;
   static const std::array<VkVertexInputBindingDescription, 1> bindings;
 };
 
@@ -30,14 +32,16 @@ struct StagingBuffer {
 
   uint32_t offset = 0;
   uint32_t to_upload = 0;
-  bool used = false;
 
   static auto init(VmaAllocator allocator, std::uint32_t size = 65536) -> StagingBuffer;
   void defer_deletion(VmaDeletionStack& vma_deletion_stack) const {
     vma_deletion_stack.defer_deletion(VmaHandle::Buffer, buffer, alloc);
   }
 
-  auto consume(std::size_t size) -> std::span<std::byte>;
+  [[nodiscard]] auto available(std::size_t alignement = 1) const -> std::size_t {
+    return alloc_info.size - utils::align(offset, alignement);
+  }
+  auto consume(std::size_t size, std::size_t alignement = 1) -> std::span<std::byte>;
   auto commit(VkCommandBuffer, VkBuffer, uint32_t offset) -> StagingBuffer&;
   auto commit_image(VkCommandBuffer cmd, const ImageRessource& image, VkRect2D r) -> StagingBuffer&;
   void reset();

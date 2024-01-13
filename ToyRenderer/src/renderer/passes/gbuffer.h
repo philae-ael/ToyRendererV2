@@ -30,7 +30,7 @@ struct GBuffer {
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
           .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(2)
+          .descriptor_count(3)
           .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(),
   });

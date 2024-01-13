@@ -14,8 +14,9 @@
 #include "ressources.h"
 #include "utils.h"
 #include "utils/assert.h"
+#include "utils/misc.h"
 
-const std::array<VkVertexInputAttributeDescription, 5> tr::renderer::Vertex::attributes = {{
+const std::array<VkVertexInputAttributeDescription, 6> tr::renderer::Vertex::attributes = {{
     {
         .location = 0,
         .binding = 0,
@@ -27,21 +28,26 @@ const std::array<VkVertexInputAttributeDescription, 5> tr::renderer::Vertex::att
         .binding = 0,
         .format = VK_FORMAT_R32G32B32_SFLOAT,
         .offset = offsetof(Vertex, normal),
+    },    {
+        .location = 2,
+        .binding = 0,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex, tangent),
     },
     {
-        .location = 2,
+        .location = 3,
         .binding = 0,
         .format = VK_FORMAT_R32G32B32_SFLOAT,
         .offset = offsetof(Vertex, color),
     },
     {
-        .location = 3,
+        .location = 4,
         .binding = 0,
         .format = VK_FORMAT_R32G32_SFLOAT,
         .offset = offsetof(Vertex, uv1),
     },
     {
-        .location = 4,
+        .location = 5,
         .binding = 0,
         .format = VK_FORMAT_R32G32_SFLOAT,
         .offset = offsetof(Vertex, uv2),
@@ -65,7 +71,6 @@ auto tr::renderer::StagingBuffer::commit(VkCommandBuffer cmd, VkBuffer dst, uint
   vkCmdCopyBuffer(cmd, buffer, dst, 1, &region);
 
   offset += to_upload;
-  used = false;
   return *this;
 }
 auto tr::renderer::StagingBuffer::commit_image(VkCommandBuffer cmd, const ImageRessource &image, VkRect2D r)
@@ -88,24 +93,20 @@ auto tr::renderer::StagingBuffer::commit_image(VkCommandBuffer cmd, const ImageR
   vkCmdCopyBufferToImage(cmd, buffer, image.image, image.sync_info.layout, 1, &region);
 
   offset += to_upload;
-  used = false;
   return *this;
 }
 
-auto tr::renderer::StagingBuffer::consume(std::size_t size) -> std::span<std::byte> {
+auto tr::renderer::StagingBuffer::consume(std::size_t size, std::size_t alignement) -> std::span<std::byte> {
+  TR_ASSERT(available(alignement) >= size, "StagingBuffer already filled");
+  offset = utils::align(offset, alignement);
+
   auto out = std::as_writable_bytes(std::span{reinterpret_cast<std::byte *>(alloc_info.pMappedData), alloc_info.size})
                  .subspan(offset, size);
-  TR_ASSERT(!out.empty(), "StagingBuffer full");
-  TR_ASSERT(!used, "StagingBuffer already used");
-  used = true;
   to_upload = utils::narrow_cast<uint32_t>(size);
   return out;
 }
 
-void tr::renderer::StagingBuffer::reset() {
-  to_upload = offset = 0;
-  used = false;
-}
+void tr::renderer::StagingBuffer::reset() { to_upload = offset = 0; }
 
 auto tr::renderer::StagingBuffer::init(VmaAllocator allocator, uint32_t size) -> StagingBuffer {
   VkBuffer buf = VK_NULL_HANDLE;
