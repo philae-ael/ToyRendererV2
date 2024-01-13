@@ -4,10 +4,9 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
-#include <string_view>
 
 #include "constants.h"
-#include "swapchain.h"
+#include "frame.h"
 #include "timeline_info.h"
 #include "timestamp.h"
 #include "utils/timer.h"
@@ -81,14 +80,13 @@ void set_debug_object_name(VkDevice device, VkObjectType type, T t, const std::s
 class VulkanEngine;
 
 struct VulkanEngineDebugInfo {
-  void set_frame(tr::renderer::Frame frame, std::size_t frame_id);
+  void set_frame_id(VkCommandBuffer cmd, std::size_t frame_id);
   void write_gpu_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index);
   void write_cpu_timestamp(tr::renderer::CPUTimestampIndex index);
   void record_timeline(VulkanEngine &);
 
   void imgui(VulkanEngine &);
 
-  Frame current_frame{};
   std::size_t current_frame_id{};
 
   GPUTimestamp<MAX_FRAMES_IN_FLIGHT, GPU_TIMESTAMP_INDEX_MAX> gpu_timestamps;

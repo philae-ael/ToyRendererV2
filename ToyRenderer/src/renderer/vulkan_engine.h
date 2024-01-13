@@ -8,6 +8,7 @@
 
 #include <array>
 #include <optional>
+#include <vector>
 
 #include "../camera.h"
 #include "constants.h"
@@ -24,6 +25,7 @@
 #include "swapchain.h"
 #include "uploader.h"
 #include "utils.h"
+#include "utils/data/static_stack.h"
 
 namespace tr::system {
 class Imgui;
@@ -39,7 +41,7 @@ class VulkanEngine {
   void on_resize() { swapchain_need_to_be_rebuilt = true; }
 
   auto start_frame() -> std::optional<Frame>;
-  void draw(Frame frame, std::span<const Mesh> meshes);
+  void draw(Frame& frame, std::span<const Mesh> meshes);
   void end_frame(Frame&&);
 
   auto start_transfer() -> Transferer;
@@ -116,6 +118,8 @@ class VulkanEngine {
   std::array<FrameSynchro, MAX_FRAMES_IN_FLIGHT> frame_synchronisation_pool;
   std::array<VkCommandPool, MAX_FRAMES_IN_FLIGHT> graphic_command_pools{};
   std::array<OneTimeCommandBuffer, MAX_FRAMES_IN_FLIGHT> graphics_command_buffers{};
+  VkCommandPool graphic_command_pool_for_next_frame = VK_NULL_HANDLE;
+  utils::data::static_stack<VkCommandBuffer, 2> graphic_command_buffers_for_next_frame{};
 
   VkCommandPool transfer_command_pool = VK_NULL_HANDLE;
 

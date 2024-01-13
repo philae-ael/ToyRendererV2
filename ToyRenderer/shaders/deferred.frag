@@ -8,6 +8,11 @@ layout(set = 0, binding = 0, rgba32f) uniform readonly image2D[3] gbuffers;
 
 const float PI = 3.14159265359;
 
+layout(push_constant) uniform light{
+    vec3 LightPosition;
+    vec3 LightColor;
+};
+
 // Mainly from https://google.github.io/filament/Filament.html
 
 vec3 F_Schlick(float u, vec3 f0) {
@@ -100,10 +105,16 @@ vec3 direction_light(vec3 light_direction, PixelData pixel) {
     return sampleBRDF(light_direction, pixel) * NoL;
 }
 
+// vec3 point_light(vec3 light_pos, PixelData pixel) {
+//     vec3 light_direction = normalize(light_pos - pixel.pos);
+// 
+//     float NoL = saturate(dot(pixel.normal, light_direction));
+//     return sampleBRDF(light_direction, pixel) * NoL;
+// }
+
 void main() {
     PixelData pixel = getPixelData();
 
-    vec3 color = 1.9*direction_light(normalize(vec3(1, 3, -2)), pixel);
-    color += 0.4*direction_light(normalize(vec3(2, -1, 0)), pixel);
+    vec3 color = LightColor * direction_light(LightPosition, pixel);
     Fragcolor = vec4(color, 1.0);
 } 

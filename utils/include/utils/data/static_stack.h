@@ -16,7 +16,8 @@ class static_stack {
   std::size_t item_count{0};
 
  public:
-  auto size() -> std::size_t { return item_count; }
+  [[nodiscard]] auto size() const -> std::size_t { return item_count; }
+  [[nodiscard]] auto empty() const -> bool { return item_count == 0; }
 
   void push_back(T item) {
     TR_ASSERT(item_count < N, "attempt to push in a full stack");
@@ -29,6 +30,8 @@ class static_stack {
   }
 
   void clear() { item_count = 0; }
+  auto data() -> T* { return inner.data(); }
+  auto data() const -> const T* { return inner.data(); }
 
   auto begin() { return inner.begin(); }
   auto end() { return inner.begin() + item_count; }

@@ -84,8 +84,10 @@ auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, c
                                                   image_ressource.prepare_barrier(tr::renderer::SyncImageTransfer),
                                               }});
   t.upload_image(image_ressource, {{0, 0}, {width, height}}, image_data, 4);
-  // TODO: ask engine to prepare for a sync of the ressource
-
+  tr::renderer::ImageMemoryBarrier::submit<1>(
+      t.graphics_cmd.vk_cmd, {{
+                                 image_ressource.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
+                             }});
   return image_ressource;
 }
 

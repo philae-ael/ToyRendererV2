@@ -68,12 +68,14 @@ class Uploader {
 
 struct Transferer {
   OneTimeCommandBuffer cmd;
+  OneTimeCommandBuffer graphics_cmd;
   Uploader uploader;
 
   void upload_buffer(VkBuffer dst, std::size_t offset, std::span<const std::byte> src, std::size_t alignement = 1) {
     uploader.upload_buffer(cmd.vk_cmd, dst, offset, src, alignement);
   }
-  void upload_image(const ImageRessource& image, VkRect2D r, std::span<const std::byte> src, std::size_t alignemnt = 1) {
+  void upload_image(const ImageRessource& image, VkRect2D r, std::span<const std::byte> src,
+                    std::size_t alignemnt = 1) {
     uploader.upload_image(cmd.vk_cmd, image, r, src, alignemnt);
   }
 };

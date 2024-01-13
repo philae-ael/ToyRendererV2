@@ -52,10 +52,9 @@ auto tr::renderer::Renderdoc::init() -> Renderdoc {
   return renderdoc;
 }
 
-void tr::renderer::VulkanEngineDebugInfo::set_frame(tr::renderer::Frame frame, std::size_t frame_id) {
-  current_frame = frame;
+void tr::renderer::VulkanEngineDebugInfo::set_frame_id(VkCommandBuffer cmd, std::size_t frame_id) {
   current_frame_id = frame_id;
-  gpu_timestamps.reset_queries(frame.cmd.vk_cmd, current_frame_id);
+  gpu_timestamps.reset_queries(cmd, current_frame_id);
 }
 
 void tr::renderer::VulkanEngineDebugInfo::write_cpu_timestamp(tr::renderer::CPUTimestampIndex index) {

@@ -5,6 +5,7 @@
 #include <variant>
 
 #include "debug.h"
+#include "swapchain.h"
 #include "synchronisation.h"
 #include "utils/misc.h"
 

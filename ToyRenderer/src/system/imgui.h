@@ -72,7 +72,7 @@ class Imgui {
     return true;
   }
 
-  void draw(renderer::VulkanEngine &engine, renderer::Frame frame) const {
+  void draw(renderer::VulkanEngine &engine, renderer::Frame& frame) const {
     if (!valid) {
       return;
     }

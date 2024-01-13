@@ -6,6 +6,7 @@
 
 #include "../debug.h"
 #include "../descriptors.h"
+#include "../mesh.h"
 #include "../pipeline.h"
 
 const std::array triangle_vert_bin = std::to_array<uint32_t>({
@@ -57,7 +58,17 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
   const auto descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Deferred::bindings).build(device),
   });
-  const auto layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(device);
+  const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
+      {
+          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .offset = 0,
+          .size = sizeof(DirectionalLight),
+      },
+  });
+  const auto layout = PipelineLayoutBuilder{}
+                          .set_layouts(descriptor_set_layouts)
+                          .push_constant_ranges(push_constant_ranges)
+                          .build(device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
                             .layout_(layout)

@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <glm/fwd.hpp>
+#include <glm/geometric.hpp>
 #include <optional>
 #include <span>
 #include <vector>
@@ -68,57 +69,25 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
 
   // Update frame id for subsystems
   vmaSetCurrentFrameIndex(allocator, frame_id);
-  debug_info.set_frame(frame, frame_id);
+  debug_info.set_frame_id(frame.cmd.vk_cmd, frame_id);
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_BOTTOM);
 
   return frame;
 }
 
-void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes) {
+void tr::renderer::VulkanEngine::draw(Frame& frame, std::span<const Mesh> meshes) {
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_TOP);
   auto cmd = frame.cmd.vk_cmd;
 
   debug_info.write_gpu_timestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
 
-  std::vector<VkImageMemoryBarrier2> barriers;
-  {
-    const auto barrier = default_metallic_roughness.prepare_barrier(SyncFragmentShaderReadOnly);
-    if (barrier) {
-      barriers.push_back(*barrier);
-    }
-  }
-  {
-    const auto barrier = default_normal.prepare_barrier(SyncFragmentShaderReadOnly);
-    if (barrier) {
-      barriers.push_back(*barrier);
-    }
-  }
-  for (const auto& mesh : meshes) {
-    for (auto& surface : mesh.surfaces) {
-      {
-        const auto barrier = surface.material->base_color_texture.prepare_barrier(SyncFragmentShaderReadOnly);
-        if (barrier) {
-          barriers.push_back(*barrier);
-        }
-      }
-      {
-        const auto barrier = surface.material->metallic_roughness_texture.and_then(
-            [](auto& x) { return x.prepare_barrier(SyncFragmentShaderReadOnly); });
-        if (barrier) {
-          barriers.push_back(*barrier);
-        }
-      }
-      {
-        const auto barrier = surface.material->normal_texture.and_then(
-            [](auto& x) { return x.prepare_barrier(SyncFragmentShaderReadOnly); });
-        if (barrier) {
-          barriers.push_back(*barrier);
-        }
-      }
-    }
-  }
-  ImageMemoryBarrier::submit(cmd, barriers);
+  if (!graphic_command_buffers_for_next_frame.empty()) {
+    vkCmdExecuteCommands(cmd, graphic_command_buffers_for_next_frame.size(),
+                         graphic_command_buffers_for_next_frame.data());
+    graphic_command_buffers_for_next_frame.clear();
 
+    // TODO: free the command buffers
+  }
   passes.gbuffer.draw(cmd, frame.frm, {{0, 0}, swapchain.extent}, [&] {
     {
       CameraMatrices* map = nullptr;
@@ -177,6 +146,11 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
   debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                                  GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
 
+  DirectionalLight light{
+      .direction = glm::normalize(glm::vec3{1, 2, -1}),
+      .color = {2, 2, 2},
+  };
+
   {
     // TODO: move this IN deferred.draw
     ImageMemoryBarrier::submit<3>(
@@ -209,8 +183,11 @@ void tr::renderer::VulkanEngine::draw(Frame frame, std::span<const Mesh> meshes)
 
     vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.deferred.pipeline_layout, 0, 1,
                             &descriptor, 0, nullptr);
+
+    vkCmdPushConstants(cmd, passes.deferred.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DirectionalLight),
+                       &light);
+    passes.deferred.draw(frame.cmd.vk_cmd, frame.frm, {{0, 0}, swapchain.extent});
   }
-  passes.deferred.draw(frame.cmd.vk_cmd, frame.frm, {{0, 0}, swapchain.extent});
 
   debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
@@ -309,6 +286,9 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     CommandPool::defer_deletion(graphic_command_pools[i], global_deletion_stacks.device);
     graphics_command_buffers[i] = OneTimeCommandBuffer::allocate(device.vk_device, graphic_command_pools[i]);
   }
+  graphic_command_pool_for_next_frame = CommandPool::init(device, CommandPool::TargetQueue::Graphics);
+  CommandPool::defer_deletion(graphic_command_pool_for_next_frame, global_deletion_stacks.device);
+
   transfer_command_pool = CommandPool::init(device, CommandPool::TargetQueue::Transfer);
   CommandPool::defer_deletion(transfer_command_pool, global_deletion_stacks.device);
 
@@ -432,6 +412,11 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
       std::array<uint8_t, 4> data{0xFF, 0xFF, 0xFF, 0xFF};
       t.upload_image(default_metallic_roughness, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)), 2);
+      tr::renderer::ImageMemoryBarrier::submit<1>(
+          t.graphics_cmd.vk_cmd,
+          {{
+              default_metallic_roughness.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
+          }});
     }
 
     {
@@ -448,6 +433,10 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
       std::array<float, 4> data{0.0, 0.0, 1.0, 0.0};
       t.upload_image(default_normal, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)), 16);
+      tr::renderer::ImageMemoryBarrier::submit<1>(
+          t.graphics_cmd.vk_cmd, {{
+                                     default_normal.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
+                                 }});
     }
     end_transfer(std::move(t));
   }
@@ -455,15 +444,21 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
 auto tr::renderer::VulkanEngine::start_transfer() -> Transferer {
   auto cmd = OneTimeCommandBuffer::allocate(device.vk_device, transfer_command_pool);
+  auto graphics_cmd = OneTimeCommandBuffer::allocate(device.vk_device, graphic_command_pool_for_next_frame, false);
+
   VK_UNWRAP(cmd.begin);
+  VK_UNWRAP(graphics_cmd.begin);
   return {
       cmd,
+      graphics_cmd,
       Uploader::init(allocator),
   };
 }
 void tr::renderer::VulkanEngine::end_transfer(Transferer&& t_in) {
   Transferer t{std::move(t_in)};
   VK_UNWRAP(t.cmd.end);
+  VK_UNWRAP(t.graphics_cmd.end);
+  graphic_command_buffers_for_next_frame.push_back(t.graphics_cmd.vk_cmd);
 
   QueueSubmit{}.command_buffers({{t.cmd.vk_cmd}}).submit(device.queues.transfer_queue, VK_NULL_HANDLE);
 

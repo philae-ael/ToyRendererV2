@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/fwd.hpp>
 #include <glm/mat4x4.hpp>
 #include <memory>
 #include <optional>
@@ -43,6 +44,13 @@ struct Mesh {
   };
   std::vector<Surface> surfaces;
   glm::mat4x4 transform = glm::identity<glm::mat4x4>();
+};
+
+struct DirectionalLight {
+  glm::vec3 direction;
+  float padding1_;
+  glm::vec3 color;
+  float padding2_;
 };
 
 }  // namespace tr::renderer

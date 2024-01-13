@@ -42,5 +42,6 @@ class App {
   } state;
 
   std::vector<renderer::Mesh> meshes;
+  std::vector<renderer::DirectionalLight> point_lights;
 };
 }  // namespace tr
