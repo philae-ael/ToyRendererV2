@@ -4,6 +4,8 @@
 
 #include <cstddef>
 #include <span>
+
+#include "utils/cast.h"
 namespace tr::renderer {
 
 struct QueueSubmit {
@@ -36,7 +38,7 @@ struct QueueSubmit {
 
   auto command_buffers(std::span<const VkCommandBuffer> buffers) -> QueueSubmit& {
     submit_info.pCommandBuffers = buffers.data();
-    submit_info.commandBufferCount =  utils::narrow_cast<uint32_t>(buffers.size());
+    submit_info.commandBufferCount = utils::narrow_cast<uint32_t>(buffers.size());
     return *this;
   }
 

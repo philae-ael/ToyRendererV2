@@ -33,13 +33,14 @@ add_executable(ToyRenderer
     src/options.cpp
     src/gltf.h
     src/gltf.cpp
+    src/renderer/buffer.h
     src/renderer/command_pool.cpp
     src/renderer/command_pool.h
     src/renderer/constants.h
     src/renderer/debug.cpp
     src/renderer/debug.h
-    src/renderer/deletion_queue.cpp
-    src/renderer/deletion_queue.h
+    src/renderer/deletion_stack.cpp
+    src/renderer/deletion_stack.h
     src/renderer/descriptors.cpp
     src/renderer/descriptors.h
     src/renderer/device.cpp
@@ -70,8 +71,6 @@ add_executable(ToyRenderer
     src/renderer/uploader.h
     src/renderer/utils.cpp
     src/renderer/utils.h
-    src/renderer/vertex.cpp
-    src/renderer/vertex.h
     src/renderer/vma.cpp
     src/renderer/vulkan_engine.cpp
     src/renderer/vulkan_engine.h

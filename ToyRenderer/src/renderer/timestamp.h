@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <optional>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "device.h"
 #include "utils.h"
 namespace tr::renderer {

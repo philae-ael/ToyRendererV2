@@ -8,10 +8,42 @@
 #include <optional>
 #include <vector>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "ressources.h"
+#include "vertex.h"
 
 namespace tr::renderer {
+
+struct Vertex {
+  glm::vec3 pos;
+  glm::vec3 normal;
+  glm::vec3 tangent;
+  glm::vec3 color;
+  glm::vec2 uv1;
+  glm::vec2 uv2;
+
+  const static std::array<VkVertexInputAttributeDescription, 6> attributes;
+  const static std::array<VkVertexInputBindingDescription, 1> bindings;
+};
+constexpr std::array<VkVertexInputAttributeDescription, 6> Vertex::attributes =
+    AttributeBuilder<6>{}
+        .binding(0)
+        .attribute(0, offsetof(Vertex, pos), VK_FORMAT_R32G32B32_SFLOAT)
+        .attribute(1, offsetof(Vertex, normal), VK_FORMAT_R32G32B32_SFLOAT)
+        .attribute(2, offsetof(Vertex, tangent), VK_FORMAT_R32G32B32_SFLOAT)
+        .attribute(3, offsetof(Vertex, color), VK_FORMAT_R32G32B32_SFLOAT)
+        .attribute(4, offsetof(Vertex, uv1), VK_FORMAT_R32G32_SFLOAT)
+        .attribute(5, offsetof(Vertex, uv2), VK_FORMAT_R32G32_SFLOAT)
+        .build();
+
+constexpr std::array<VkVertexInputBindingDescription, 1> Vertex::bindings =
+    std::to_array<VkVertexInputBindingDescription>({
+        {
+            .binding = 0,
+            .stride = sizeof(tr::renderer::Vertex),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        },
+    });
 
 struct Material {
   tr::renderer::ImageRessource base_color_texture{};
@@ -48,9 +80,9 @@ struct Mesh {
 
 struct DirectionalLight {
   glm::vec3 direction;
-  float padding1_;
+  float padding1_ = 0.0;
   glm::vec3 color;
-  float padding2_;
+  float padding2_ = 0.0;
 };
 
 }  // namespace tr::renderer

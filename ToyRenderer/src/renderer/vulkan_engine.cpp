@@ -17,7 +17,7 @@
 #include "command_pool.h"
 #include "constants.h"
 #include "debug.h"
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "descriptors.h"
 #include "mesh.h"
 #include "passes/deferred.h"
@@ -345,7 +345,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     const auto b = bb.build_buffer(
         {
             .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            .size = utils::align(sizeof(CameraInfo), size_t(256)),
+            .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
             .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
         },
         "uniforms");

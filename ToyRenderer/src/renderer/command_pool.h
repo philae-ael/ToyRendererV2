@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "device.h"
 
 namespace tr::renderer {

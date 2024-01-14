@@ -13,7 +13,7 @@
 #include "../camera.h"
 #include "constants.h"
 #include "debug.h"
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "descriptors.h"
 #include "device.h"
 #include "instance.h"

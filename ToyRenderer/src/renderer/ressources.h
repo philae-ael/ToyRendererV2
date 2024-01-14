@@ -11,7 +11,7 @@
 #include <variant>
 
 #include "constants.h"
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "synchronisation.h"
 #include "utils/misc.h"
 

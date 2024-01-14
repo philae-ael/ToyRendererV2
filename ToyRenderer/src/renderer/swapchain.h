@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "device.h"
 #include "frame.h"
 #include "surface.h"

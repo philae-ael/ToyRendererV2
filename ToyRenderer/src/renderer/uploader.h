@@ -8,12 +8,33 @@
 #include <utility>
 #include <vector>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "frame.h"
 #include "ressources.h"
 #include "utils/assert.h"
-#include "vertex.h"
+
 namespace tr::renderer {
+struct StagingBuffer {
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation alloc = nullptr;
+  VmaAllocationInfo alloc_info{};
+
+  uint32_t offset = 0;
+  uint32_t to_upload = 0;
+
+  static auto init(VmaAllocator allocator, std::uint32_t size = 65536) -> StagingBuffer;
+  void defer_deletion(VmaDeletionStack& vma_deletion_stack) const {
+    vma_deletion_stack.defer_deletion(VmaHandle::Buffer, buffer, alloc);
+  }
+
+  [[nodiscard]] auto available(std::size_t alignement = 1) const -> std::size_t {
+    return alloc_info.size - utils::align(offset, utils::narrow_cast<uint32_t>(alignement));
+  }
+  auto consume(std::size_t size, std::size_t alignement = 1) -> std::span<std::byte>;
+  auto commit(VkCommandBuffer, VkBuffer, uint32_t offset) -> StagingBuffer&;
+  auto commit_image(VkCommandBuffer cmd, const ImageRessource& image, VkRect2D r) -> StagingBuffer&;
+  void reset();
+};
 
 struct MappedMemoryRange {
   std::span<std::byte> mapped;

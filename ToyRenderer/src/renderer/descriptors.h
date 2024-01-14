@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "utils.h"
 #include "utils/cast.h"
 

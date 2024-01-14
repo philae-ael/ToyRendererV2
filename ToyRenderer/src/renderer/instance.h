@@ -6,7 +6,7 @@
 #include <span>
 
 #include "../options.h"
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 
 namespace tr::renderer {
 

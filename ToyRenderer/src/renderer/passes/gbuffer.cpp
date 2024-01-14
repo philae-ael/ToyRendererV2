@@ -6,8 +6,8 @@
 #include <cstdint>
 #include <glm/mat4x4.hpp>
 
+#include "../mesh.h"
 #include "../pipeline.h"
-#include "../vertex.h"
 #include "utils/misc.h"
 
 const std::array gbuffer_vert_bin = std::to_array<uint32_t>({
@@ -46,11 +46,12 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
-  const std::array color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState, attachments_color.size()>({
-      PipelineColorBlendStateAllColorNoBlend.build(),
-      PipelineColorBlendStateAllColorNoBlend.build(),
-      PipelineColorBlendStateAllColorNoBlend.build(),
-  });
+  const std::array color_blend_attchment_states =
+      std::to_array<VkPipelineColorBlendAttachmentState, attachments_color.size()>({
+          PipelineColorBlendStateAllColorNoBlend.build(),
+          PipelineColorBlendStateAllColorNoBlend.build(),
+          PipelineColorBlendStateAllColorNoBlend.build(),
+      });
 
   const std::array<VkFormat, attachments_color.size()> color_formats{
       attachments_color[0].definition.vk_format(swapchain),

@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <set>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "utils/assert.h"
 #include "utils/cast.h"
 #include "utils/types.h"

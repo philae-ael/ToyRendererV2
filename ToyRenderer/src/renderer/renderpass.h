@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "deletion_queue.h"
+#include "deletion_stack.h"
 #include "swapchain.h"
 #include "utils/cast.h"
 #include "utils/misc.h"
