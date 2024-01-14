@@ -51,7 +51,6 @@ class VulkanEngine {
   auto operator=(const VulkanEngine&) -> VulkanEngine& = delete;
   auto operator=(VulkanEngine&&) -> VulkanEngine& = delete;
 
-  friend VulkanEngineDebugInfo;
   VulkanEngineDebugInfo debug_info;
 
   [[nodiscard]] auto image_builder() const -> ImageBuilder { return {device.vk_device, allocator, &swapchain}; }

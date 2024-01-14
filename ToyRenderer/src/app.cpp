@@ -89,7 +89,7 @@ void tr::App::run() {
 
       if (subsystems.imgui.start_frame()) {
         subsystems.engine.debug_info.imgui(subsystems.engine);
-        subsystems.imgui.draw(subsystems.engine, frame);
+        subsystems.imgui.draw(frame);
       }
       subsystems.engine.end_frame(std::move(frame));
     }

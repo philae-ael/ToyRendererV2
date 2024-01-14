@@ -72,15 +72,14 @@ class Imgui {
     return true;
   }
 
-  void draw(renderer::VulkanEngine &engine, renderer::Frame &frame) const {
+  void draw(renderer::Frame &frame) const {
     if (!valid) {
       return;
     }
     ImGui::Render();
 
     renderer::DebugCmdScope scope{frame.cmd.vk_cmd, "Imgui"};
-    engine.debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                          renderer::GPU_TIMESTAMP_INDEX_IMGUI_TOP);
+    frame.write_gpu_timestamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, renderer::GPU_TIMESTAMP_INDEX_IMGUI_TOP);
 
     const auto &swapchain_ressource = frame.frm.get_image(renderer::ImageRessourceId::Swapchain);
     VkRenderingAttachmentInfo colorAttachment{
@@ -111,8 +110,7 @@ class Imgui {
     vkCmdBeginRendering(frame.cmd.vk_cmd, &render_info);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), frame.cmd.vk_cmd);
     vkCmdEndRendering(frame.cmd.vk_cmd);
-    engine.debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                          renderer::GPU_TIMESTAMP_INDEX_IMGUI_BOTTOM);
+    frame.write_gpu_timestamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, renderer::GPU_TIMESTAMP_INDEX_IMGUI_BOTTOM);
 
     if ((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0) {
       ImGui::UpdatePlatformWindows();
