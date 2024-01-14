@@ -21,7 +21,6 @@
 void tr::App::update() {
   const auto dt = state.frame_timer.elapsed();  // millis
   state.camera_controller.update(subsystems.input.consume_camera_input(), dt / 1000);
-  subsystems.engine.matrices = state.camera_controller.camera.cameraMatrices();
 }
 
 tr::App::App(tr::Options options) : options(options) {
@@ -40,6 +39,8 @@ tr::App::App(tr::Options options) : options(options) {
     auto t = subsystems.engine.start_transfer();
     auto bb = subsystems.engine.buffer_builder();
     auto ib = subsystems.engine.image_builder();
+
+    rendergraph.init(subsystems.engine, t, ib, bb);
 
     std::string scene_name;
     if (options.scene.empty()) {
@@ -84,7 +85,7 @@ void tr::App::run() {
 
     if (auto frame_opt = subsystems.engine.start_frame(); frame_opt.has_value()) {
       auto& frame = frame_opt.value();
-      subsystems.engine.draw(frame, meshes);
+      rendergraph.draw(frame, meshes, state.camera_controller.camera);
 
       if (subsystems.imgui.start_frame()) {
         subsystems.engine.debug_info.imgui(subsystems.engine);

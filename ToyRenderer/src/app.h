@@ -10,6 +10,7 @@
 #include "options.h"
 #include "renderer/mesh.h"
 #include "renderer/vulkan_engine.h"
+#include "renderer/render_graph.h"
 #include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
@@ -43,5 +44,7 @@ class App {
 
   std::vector<renderer::Mesh> meshes;
   std::vector<renderer::DirectionalLight> point_lights;
+
+  renderer::RenderGraph rendergraph;
 };
 }  // namespace tr

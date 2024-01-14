@@ -33,7 +33,6 @@
 #include "renderer/ressources.h"
 #include "renderer/synchronisation.h"
 #include "renderer/uploader.h"
-#include "renderer/vertex.h"
 
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
@@ -215,23 +214,21 @@ auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, c
       }
 
       auto vertices_bytes = std::as_bytes(std::span(vertices));
-      asset_mesh.buffers.vertices = bb.build_buffer(
-          {
-              .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-              .size = utils::narrow_cast<uint32_t>(vertices_bytes.size_bytes()),
-              .flags = 0,
-          },
-          std::format("vertex buffer for {}", mesh.name));
+      asset_mesh.buffers.vertices = bb.build_buffer({
+          .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          .size = utils::narrow_cast<uint32_t>(vertices_bytes.size_bytes()),
+          .flags = 0,
+          .debug_name = std::format("vertex buffer for {}", mesh.name),
+      });
       t.upload_buffer(asset_mesh.buffers.vertices.buffer, 0, vertices_bytes);
 
       auto indices_bytes = std::as_bytes(std::span(indices));
-      asset_mesh.buffers.indices = bb.build_buffer(
-          {
-              .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-              .size = utils::narrow_cast<uint32_t>(indices_bytes.size_bytes()),
-              .flags = 0,
-          },
-          std::format("index buffer for {}", mesh.name));
+      asset_mesh.buffers.indices = bb.build_buffer({
+          .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          .size = utils::narrow_cast<uint32_t>(indices_bytes.size_bytes()),
+          .flags = 0,
+          .debug_name = std::format("index buffer for {}", mesh.name),
+      });
       t.upload_buffer(asset_mesh.buffers.indices->buffer, 0, indices_bytes);
 
       meshes.push_back(asset_mesh);

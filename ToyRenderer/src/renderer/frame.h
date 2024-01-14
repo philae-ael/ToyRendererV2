@@ -3,12 +3,15 @@
 #include <vulkan/vulkan_core.h>
 
 #include "buffer.h"
+#include "debug.h"
 #include "descriptors.h"
 #include "device.h"
 #include "queue.h"
 #include "ressources.h"
+#include "timeline_info.h"
 
 namespace tr::renderer {
+struct FrameRessourceManager;
 
 struct FrameSynchro {
   static auto init(VkDevice device) -> FrameSynchro;
@@ -17,17 +20,19 @@ struct FrameSynchro {
     device_deletion_stack.defer_deletion(DeviceHandle::Semaphore, render_semaphore);
     device_deletion_stack.defer_deletion(DeviceHandle::Semaphore, present_semaphore);
   }
-  VkFence render_fence = VK_NULL_HANDLE;
-  VkSemaphore render_semaphore = VK_NULL_HANDLE;
-  VkSemaphore present_semaphore = VK_NULL_HANDLE;
+  VkFence render_fence;
+  VkSemaphore render_semaphore;
+  VkSemaphore present_semaphore;
 };
 
 struct Frame {
-  std::uint32_t swapchain_image_index = 0;
+  std::uint32_t swapchain_image_index;
   FrameSynchro synchro;
-  OneTimeCommandBuffer cmd{};
-  DescriptorAllocator descriptor_allocator{};
-  FrameRessourceManager frm{};
+  OneTimeCommandBuffer cmd;
+  DescriptorAllocator descriptor_allocator;
+  FrameRessourceManager frm;
+
+  VulkanEngine *ctx;
 
   auto submitCmds(VkQueue queue) const -> VkResult {
     return QueueSubmit{}
@@ -50,6 +55,10 @@ struct Frame {
     };
     return vkQueuePresentKHR(device.queues.present_queue, &present_info);
   }
+
+  void write_gpu_timestamp(VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index) const;
+  void write_cpu_timestamp(CPUTimestampIndex index) const;
+  auto allocate_descriptor(VkDescriptorSetLayout layout) -> VkDescriptorSet;
 
   // A frame own the right to act on frame ressources
   Frame() = default;

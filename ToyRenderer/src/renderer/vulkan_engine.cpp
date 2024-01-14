@@ -7,19 +7,18 @@
 
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <optional>
 #include <span>
 #include <vector>
 
+#include "../camera.h"
 #include "command_pool.h"
 #include "constants.h"
 #include "debug.h"
 #include "deletion_stack.h"
 #include "descriptors.h"
-#include "mesh.h"
 #include "passes/deferred.h"
 #include "passes/gbuffer.h"
 #include "queue.h"
@@ -30,6 +29,7 @@
 #include "timestamp.h"
 #include "uploader.h"
 #include "utils.h"
+#include "utils/misc.h"
 
 auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   if (swapchain_need_to_be_rebuilt) {
@@ -42,6 +42,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
 
   // Try to get frame or bail early
   Frame frame{};
+  frame.ctx = this;
   frame.synchro = frame_synchronisation_pool[frame_id % MAX_FRAMES_IN_FLIGHT];
   VK_UNWRAP(vkWaitForFences, device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
   switch (VkResult result = swapchain.acquire_next_frame(device, &frame); result) {
@@ -59,138 +60,29 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   frame.descriptor_allocator = frame_descriptor_allocators[frame_id % MAX_FRAMES_IN_FLIGHT];
   frame.descriptor_allocator.reset(device.vk_device);
   frame.frm = rm.frame(frame_id % MAX_FRAMES_IN_FLIGHT);
+
   // TODO: better from external images
   frame.frm.get_image(ImageRessourceId::Swapchain) = ImageRessource::from_external_image(
       swapchain.images[frame.swapchain_image_index], swapchain.image_views[frame.swapchain_image_index],
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, swapchain.extent);
 
   frame.cmd = graphics_command_buffers[frame_id % MAX_FRAMES_IN_FLIGHT];
   VK_UNWRAP(frame.cmd.begin);
 
-  // Update frame id for subsystems
   vmaSetCurrentFrameIndex(allocator, frame_id);
   debug_info.set_frame_id(frame.cmd.vk_cmd, frame_id);
-  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_BOTTOM);
 
-  return frame;
-}
-
-void tr::renderer::VulkanEngine::draw(Frame& frame, std::span<const Mesh> meshes) {
-  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_TOP);
-  auto cmd = frame.cmd.vk_cmd;
-
-  debug_info.write_gpu_timestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
+  frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_BOTTOM);
 
   if (!graphic_command_buffers_for_next_frame.empty()) {
-    vkCmdExecuteCommands(cmd, graphic_command_buffers_for_next_frame.size(),
+    vkCmdExecuteCommands(frame.cmd.vk_cmd, graphic_command_buffers_for_next_frame.size(),
                          graphic_command_buffers_for_next_frame.data());
     graphic_command_buffers_for_next_frame.clear();
 
     // TODO: free the command buffers
   }
-  passes.gbuffer.draw(cmd, frame.frm, {{0, 0}, swapchain.extent}, [&] {
-    {
-      CameraInfo* map = nullptr;
-      const auto& buf = gbuffer_camera_buffer[frame_id % MAX_FRAMES_IN_FLIGHT];
-      vmaMapMemory(allocator, buf.alloc, reinterpret_cast<void**>(&map));
-      *map = matrices;
-      vmaUnmapMemory(allocator, buf.alloc);
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.gbuffer.pipeline_layout, 0, 1,
-                              &camera_descriptors[frame_id % MAX_FRAMES_IN_FLIGHT], 0, nullptr);
-    }
-    for (const auto& mesh : meshes) {
-      VkDeviceSize offset = 0;
-      vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
-      if (mesh.buffers.indices) {
-        vkCmdBindIndexBuffer(cmd, mesh.buffers.indices->buffer, 0, VK_INDEX_TYPE_UINT32);
-      }
 
-      vkCmdPushConstants(cmd, passes.gbuffer.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4),
-                         &mesh.transform);
-
-      for (auto& surface : mesh.surfaces) {
-        auto descriptor =
-            frame.descriptor_allocator.allocate(device.vk_device, passes.gbuffer.descriptor_set_layouts[1]);
-        DescriptorUpdater{descriptor, 0}
-            .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            .image_info({{
-                {
-                    .sampler = base_sampler,
-                    .imageView = surface.material->base_color_texture.view,
-                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                },
-                {
-                    .sampler = base_sampler,
-                    .imageView = surface.material->metallic_roughness_texture.value_or(default_metallic_roughness).view,
-                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                },
-                {
-                    .sampler = base_sampler,
-                    .imageView = surface.material->normal_texture.value_or(default_normal).view,
-                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                },
-            }})
-            .write(device.vk_device);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.gbuffer.pipeline_layout, 1, 1, &descriptor,
-                                0, nullptr);
-
-        if (mesh.buffers.indices) {
-          vkCmdDrawIndexed(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0, 0);
-        } else {
-          vkCmdDraw(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0);
-        }
-      }
-    }
-  });
-
-  debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                 GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
-
-  DirectionalLight light{
-      .direction = glm::normalize(glm::vec3{0, 2, -2}),
-      .color = {2, 2, 2},
-  };
-
-  {
-    // TODO: move this IN deferred.draw
-    ImageMemoryBarrier::submit<3>(
-        cmd, {{
-                 frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentStorageRead),
-                 frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentStorageRead),
-                 frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentStorageRead),
-             }});
-    auto descriptor = frame.descriptor_allocator.allocate(device.vk_device, passes.deferred.descriptor_set_layouts[0]);
-    DescriptorUpdater{descriptor, 0}
-        .type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-        .image_info({{
-            {
-                .sampler = VK_NULL_HANDLE,
-                .imageView = frame.frm.get_image(ImageRessourceId::GBuffer0).view,
-                .imageLayout = SyncFragmentStorageRead.layout,
-            },
-            {
-                .sampler = VK_NULL_HANDLE,
-                .imageView = frame.frm.get_image(ImageRessourceId::GBuffer1).view,
-                .imageLayout = SyncFragmentStorageRead.layout,
-            },
-            {
-                .sampler = VK_NULL_HANDLE,
-                .imageView = frame.frm.get_image(ImageRessourceId::GBuffer2).view,
-                .imageLayout = SyncFragmentStorageRead.layout,
-            },
-        }})
-        .write(device.vk_device);
-
-    vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, passes.deferred.pipeline_layout, 0, 1,
-                            &descriptor, 0, nullptr);
-
-    vkCmdPushConstants(cmd, passes.deferred.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DirectionalLight),
-                       &light);
-    passes.deferred.draw(frame.cmd.vk_cmd, frame.frm, {{0, 0}, swapchain.extent});
-  }
-
-  debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
-  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
+  return frame;
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
@@ -231,7 +123,8 @@ void tr::renderer::VulkanEngine::rebuild_swapchain() {
   swapchain.reinit(device, surface, window);
   swapchain.defer_deletion(swapchain_deletion_stacks.device);
 
-  rm.get_image_storage(ImageRessourceId::Swapchain).from_external_images(swapchain.images, swapchain.image_views);
+  rm.get_image_storage(ImageRessourceId::Swapchain)
+      .from_external_images(swapchain.images, swapchain.image_views, swapchain.extent);
 
   ImageBuilder ib{device.vk_device, allocator, &swapchain};
   for (auto& image_storage : rm.image_storages()) {
@@ -295,13 +188,6 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   swapchain = Swapchain::init_with_config({options.config.prefered_present_mode}, device, surface, window);
   swapchain.defer_deletion(swapchain_deletion_stacks.device);
 
-  global_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 4096,
-                                                          {{
-                                                              {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048},
-                                                              {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
-                                                          }});
-  global_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
-
   for (auto& frame_descriptor_allocator : frame_descriptor_allocators) {
     frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 8192,
                                                            {{
@@ -317,20 +203,24 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
   tr::renderer::GBuffer::register_ressources(rm);
   tr::renderer::Deferred::register_ressources(rm);
+  rm.define_buffer({
+      .definition =
+          {
+              .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+              .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
+              .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
+              .debug_name = "camera uniform",
+          },
+      .id = BufferRessourceId::Camera,
+  });
 
-  passes.gbuffer = GBuffer::init(device.vk_device, swapchain, setup_device_deletion_stack);
-  passes.gbuffer.defer_deletion(global_deletion_stacks.device);
-
-  passes.deferred = Deferred::init(device.vk_device, swapchain, setup_device_deletion_stack);
-  passes.deferred.defer_deletion(global_deletion_stacks.device);
-
-  ImageBuilder ib{device.vk_device, allocator, &swapchain};
+  auto ib = image_builder();
   for (auto& image_storage : rm.image_storages()) {
     if ((image_storage.definition.flags & IMAGE_OPTION_FLAG_EXTERNAL_BIT) != 0) {
       continue;
     }
 
-    image_storage.init(ib);  // TODO: id -> named ressource
+    image_storage.init(ib);
     if (image_storage.definition.depends_on_swapchain()) {
       image_storage.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
     } else {
@@ -339,24 +229,9 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   }
 
   auto bb = buffer_builder();
-  for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    camera_descriptors[i] =
-        global_descriptor_allocator.allocate(device.vk_device, passes.gbuffer.descriptor_set_layouts[0]);
-    const auto b = bb.build_buffer(
-        {
-            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
-            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-        },
-        "uniforms");
-    b.defer_deletion(global_deletion_stacks.allocator);
-    gbuffer_camera_buffer[i] = b;
-
-    VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
-    DescriptorUpdater{camera_descriptors[i], 0}
-        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-        .buffer_info({&buffer_info, 1})
-        .write(device.vk_device);
+  for (auto& buffer_storage : rm.buffer_storages()) {
+    buffer_storage.init(bb);
+    buffer_storage.defer_deletion(global_deletion_stacks.allocator);
   }
 
   debug_info.gpu_timestamps = decltype(debug_info.gpu_timestamps)::init(device);
@@ -369,80 +244,10 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
   setup_device_deletion_stack.cleanup(device.vk_device);
   setup_allocator_deletion_stack.cleanup(allocator);
-
-  // DEFAULT SAMPLER AND TEXTURES
-  {
-    VkSamplerCreateInfo sampler_create_info{
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .magFilter = VK_FILTER_LINEAR,
-        .minFilter = VK_FILTER_LINEAR,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .mipLodBias = 0,
-        .anisotropyEnable = VK_FALSE,
-        .maxAnisotropy = 0,
-        .compareEnable = VK_FALSE,
-        .compareOp = VK_COMPARE_OP_NEVER,
-        .minLod = 0,
-        .maxLod = 0,
-        .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
-    };
-    VK_UNWRAP(vkCreateSampler, device.vk_device, &sampler_create_info, nullptr, &base_sampler);
-    global_deletion_stacks.device.defer_deletion(DeviceHandle::Sampler, base_sampler);
-  }
-  {
-    auto t = start_transfer();
-    {
-      default_metallic_roughness = image_builder().build_image({
-          .flags = 0,
-          .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-          .size = VkExtent2D{1, 1},
-          .format = VK_FORMAT_R8G8_UNORM,
-          .debug_name = "default metallic_roughness_texture",
-      });
-      default_metallic_roughness.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
-
-      ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
-                                    {{default_metallic_roughness.prepare_barrier(tr::renderer::SyncImageTransfer)}});
-
-      std::array<uint8_t, 4> data{0xFF, 0xFF, 0xFF, 0xFF};
-      t.upload_image(default_metallic_roughness, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)), 2);
-      tr::renderer::ImageMemoryBarrier::submit<1>(
-          t.graphics_cmd.vk_cmd,
-          {{
-              default_metallic_roughness.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
-          }});
-    }
-
-    {
-      default_normal = image_builder().build_image({
-          .flags = 0,
-          .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-          .size = VkExtent2D{1, 1},
-          .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-          .debug_name = "default normal_texture",
-      });
-      default_normal.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
-
-      ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd, {{default_normal.prepare_barrier(tr::renderer::SyncImageTransfer)}});
-
-      std::array<float, 4> data{0.0, 0.0, 1.0, 0.0};
-      t.upload_image(default_normal, {{0, 0}, {1, 1}}, std::as_bytes(std::span(data)), 16);
-      tr::renderer::ImageMemoryBarrier::submit<1>(
-          t.graphics_cmd.vk_cmd, {{
-                                     default_normal.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
-                                 }});
-    }
-    end_transfer(std::move(t));
-  }
 }
 
 auto tr::renderer::VulkanEngine::start_transfer() -> Transferer {
+  utils::ignore_unused(this);
   auto cmd = OneTimeCommandBuffer::allocate(device.vk_device, transfer_command_pool);
   auto graphics_cmd = OneTimeCommandBuffer::allocate(device.vk_device, graphic_command_pool_for_next_frame, false);
 

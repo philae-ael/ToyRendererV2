@@ -6,7 +6,6 @@
 #include <cstddef>
 
 #include "constants.h"
-#include "frame.h"
 #include "timeline_info.h"
 #include "timestamp.h"
 #include "utils/timer.h"

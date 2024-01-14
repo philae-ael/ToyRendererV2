@@ -183,6 +183,7 @@ void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine
 }
 
 void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngine& engine) {
+  utils::ignore_unused(this);
   if (!ImGui::Begin("Options")) {
     ImGui::End();
     return;

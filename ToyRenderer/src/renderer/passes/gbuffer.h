@@ -3,14 +3,15 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <utility>
 
-#include "../debug.h"
 #include "../descriptors.h"
+#include "../frame.h"
+#include "../mesh.h"
 #include "../ressources.h"
 #include "utils/cast.h"
 
 namespace tr::renderer {
+struct DefaultRessources;
 
 struct GBuffer {
   std::array<VkDescriptorSetLayout, 2> descriptor_set_layouts{};
@@ -98,17 +99,12 @@ struct GBuffer {
     }
   }
 
-  void start_draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const;
+  void start_draw(Frame &frame, VkRect2D render_area) const;
   void end_draw(VkCommandBuffer cmd) const;
 
-  template <class Fn>
-  void draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area, Fn &&f) {
-    DebugCmdScope scope(cmd, "GBuffer");
+  void draw(Frame &frame, VkRect2D render_area, std::span<const Mesh> meshes, DefaultRessources default_ressources);
 
-    start_draw(cmd, rm, render_area);
-    std::forward<Fn>(f)();
-    end_draw(cmd);
-  }
+  void draw_mesh(Frame &frame, const Mesh &mesh, const DefaultRessources &default_ressources);
 };
 
 }  // namespace tr::renderer

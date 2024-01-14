@@ -48,6 +48,7 @@ add_executable(ToyRenderer
     src/renderer/extensions.cpp
     src/renderer/extensions.h
     src/renderer/frame.h
+    src/renderer/frame.cpp
     src/renderer/instance.cpp
     src/renderer/instance.h
     src/renderer/mesh.h
@@ -62,6 +63,8 @@ add_executable(ToyRenderer
     src/renderer/renderpass.h
     src/renderer/ressources.cpp
     src/renderer/ressources.h
+    src/renderer/render_graph.h
+    src/renderer/render_graph.cpp
     src/renderer/surface.cpp
     src/renderer/surface.h
     src/renderer/swapchain.cpp

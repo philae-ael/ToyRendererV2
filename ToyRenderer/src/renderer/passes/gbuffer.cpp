@@ -8,6 +8,8 @@
 
 #include "../mesh.h"
 #include "../pipeline.h"
+#include "../render_graph.h"
+#include "../vulkan_engine.h"
 #include "utils/misc.h"
 
 const std::array gbuffer_vert_bin = std::to_array<uint32_t>({
@@ -102,23 +104,28 @@ void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
   vkCmdEndRendering(cmd);
 }
 
-void tr::renderer::GBuffer::start_draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
+void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const {
   ImageMemoryBarrier::submit<attachments_color.size() + 1>(
-      cmd, {{
-               rm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-               rm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-               rm.get_image(ImageRessourceId::GBuffer2).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-               rm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
-           }});
+      frame.cmd.vk_cmd,
+      {{
+          frame.frm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+          frame.frm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+          frame.frm.get_image(ImageRessourceId::GBuffer2).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+          frame.frm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
+      }});
 
   std::array attachments = utils::to_array<VkRenderingAttachmentInfo, attachments_color.size()>({
-      rm.get_image(ImageRessourceId::GBuffer0).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-      rm.get_image(ImageRessourceId::GBuffer1).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-      rm.get_image(ImageRessourceId::GBuffer2).as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      frame.frm.get_image(ImageRessourceId::GBuffer0)
+          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      frame.frm.get_image(ImageRessourceId::GBuffer1)
+          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      frame.frm.get_image(ImageRessourceId::GBuffer2)
+          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
   });
 
   VkRenderingAttachmentInfo depthAttachment =
-      rm.get_image(ImageRessourceId::Depth).as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
+      frame.frm.get_image(ImageRessourceId::Depth)
+          .as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
 
   VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -132,7 +139,7 @@ void tr::renderer::GBuffer::start_draw(VkCommandBuffer cmd, FrameRessourceManage
       .pDepthAttachment = &depthAttachment,
       .pStencilAttachment = nullptr,
   };
-  vkCmdBeginRendering(cmd, &render_info);
+  vkCmdBeginRendering(frame.cmd.vk_cmd, &render_info);
 
   VkViewport viewport{
       static_cast<float>(render_area.offset.x),
@@ -142,7 +149,73 @@ void tr::renderer::GBuffer::start_draw(VkCommandBuffer cmd, FrameRessourceManage
       0.0,
       1.0,
   };
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &render_area);
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vkCmdSetViewport(frame.cmd.vk_cmd, 0, 1, &viewport);
+  vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
+  vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+  const auto &b = frame.frm.get_buffer(BufferRessourceId::Camera);
+  VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
+
+  auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
+  DescriptorUpdater{camera_descriptor, 0}
+      .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+      .buffer_info({&buffer_info, 1})
+      .write(frame.ctx->device.vk_device);
+
+  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &camera_descriptor,
+                          0, nullptr);
+}
+
+void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const DefaultRessources &default_ressources) {
+  auto cmd = frame.cmd.vk_cmd;
+  VkDeviceSize offset = 0;
+  vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
+  if (mesh.buffers.indices) {
+    vkCmdBindIndexBuffer(cmd, mesh.buffers.indices->buffer, 0, VK_INDEX_TYPE_UINT32);
+  }
+
+  vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4), &mesh.transform);
+
+  for (auto &surface : mesh.surfaces) {
+    auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[1]);
+
+    DescriptorUpdater{descriptor, 0}
+        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .image_info({{
+            {
+                .sampler = default_ressources.sampler,
+                .imageView = surface.material->base_color_texture.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+            {
+                .sampler = default_ressources.sampler,
+                .imageView =
+                    surface.material->metallic_roughness_texture.value_or(default_ressources.metallic_roughness).view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+            {
+                .sampler = default_ressources.sampler,
+                .imageView = surface.material->normal_texture.value_or(default_ressources.normal_map).view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+        }})
+        .write(frame.ctx->device.vk_device);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &descriptor, 0, nullptr);
+
+    if (mesh.buffers.indices) {
+      vkCmdDrawIndexed(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0, 0);
+    } else {
+      vkCmdDraw(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0);
+    }
+  }
+}
+void tr::renderer::GBuffer::draw(Frame &frame, VkRect2D render_area, std::span<const Mesh> meshes,
+                                 DefaultRessources default_ressources) {
+  DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
+
+  start_draw(frame, render_area);
+  for (const auto &mesh : meshes) {
+    draw_mesh(frame, mesh, default_ressources);
+  }
+  end_draw(frame.cmd.vk_cmd);
 }

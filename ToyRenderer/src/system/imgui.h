@@ -72,7 +72,7 @@ class Imgui {
     return true;
   }
 
-  void draw(renderer::VulkanEngine &engine, renderer::Frame& frame) const {
+  void draw(renderer::VulkanEngine &engine, renderer::Frame &frame) const {
     if (!valid) {
       return;
     }
@@ -82,11 +82,11 @@ class Imgui {
     engine.debug_info.write_gpu_timestamp(frame.cmd.vk_cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                           renderer::GPU_TIMESTAMP_INDEX_IMGUI_TOP);
 
-    renderer::Swapchain &swapchain = engine.swapchain;
+    const auto &swapchain_ressource = frame.frm.get_image(renderer::ImageRessourceId::Swapchain);
     VkRenderingAttachmentInfo colorAttachment{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
         .pNext = nullptr,
-        .imageView = swapchain.image_views[frame.swapchain_image_index],
+        .imageView = swapchain_ressource.view,
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .resolveMode = VK_RESOLVE_MODE_NONE,
         .resolveImageView = VK_NULL_HANDLE,
@@ -99,7 +99,7 @@ class Imgui {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .pNext = nullptr,
         .flags = 0,
-        .renderArea = {{0, 0}, swapchain.extent},
+        .renderArea = {{0, 0}, swapchain_ressource.extent},
         .layerCount = 1,
         .viewMask = 0,
         .colorAttachmentCount = 1,

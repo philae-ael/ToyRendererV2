@@ -75,8 +75,8 @@ auto tr::renderer::ImageRessource::invalidate() -> ImageRessource& {
 }
 
 auto tr::renderer::ImageRessource::from_external_image(VkImage image, VkImageView view, VkImageUsageFlags usage,
-                                                       SyncInfo sync_info) -> ImageRessource {
-  return {image, view, sync_info, nullptr, usage};
+                                                       VkExtent2D extent, SyncInfo sync_info) -> ImageRessource {
+  return {image, view, sync_info, nullptr, usage, extent};
 }
 auto tr::renderer::ImageDefinition::vk_format(const Swapchain& swapchain) const -> VkFormat {
   return std::visit(utils::overloaded{
@@ -190,6 +190,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -
       .sync_info = SrcImageMemoryBarrierUndefined,
       .alloc = alloc,
       .usage = definition.usage,
+      .extent = {.width = extent.width, .height = extent.height},
   };
 }
 
@@ -221,8 +222,7 @@ auto tr::renderer::BufferDefinition::vma_flags() const -> VmaAllocationCreateFla
   return 0;
 }
 
-auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition, std::string_view debug_name) const
-    -> BufferRessource {
+auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition) const -> BufferRessource {
   BufferRessource res{
       .usage = definition.usage,
       .size = definition.size,
@@ -250,7 +250,7 @@ auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition, std:
       .priority = 1.0F,
   };
   VK_UNWRAP(vmaCreateBuffer, allocator, &buffer_create_info, &allocation_create_info, &res.buffer, &res.alloc, nullptr);
-  set_debug_object_name(device, VK_OBJECT_TYPE_BUFFER, res.buffer, std::format("{} buffer", debug_name));
+  set_debug_object_name(device, VK_OBJECT_TYPE_BUFFER, res.buffer, std::format("{} buffer", definition.debug_name));
 
   return res;
 }

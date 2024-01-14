@@ -5,6 +5,8 @@
 #include <array>
 
 #include "../descriptors.h"
+#include "../frame.h"
+#include "../mesh.h"
 #include "../ressources.h"
 #include "utils/cast.h"
 
@@ -52,7 +54,7 @@ struct Deferred {
     }
   }
 
-  void draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const;
+  void draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const;
 };
 
 }  // namespace tr::renderer

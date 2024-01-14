@@ -6,8 +6,10 @@
 
 #include "../debug.h"
 #include "../descriptors.h"
+#include "../frame.h"
 #include "../mesh.h"
 #include "../pipeline.h"
+#include "../vulkan_engine.h"
 
 const std::array triangle_vert_bin = std::to_array<uint32_t>({
 #include "shaders/deferred.vert.inc"
@@ -85,16 +87,45 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
 
   return {descriptor_set_layouts, layout, pipeline};
 }
-void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm, VkRect2D render_area) const {
-  DebugCmdScope scope(cmd, "Deferred");
+void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
+  DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
 
-  ImageMemoryBarrier::submit<1>(
-      cmd, {{
-               rm.get_image(ImageRessourceId::Swapchain).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-           }});
+  ImageMemoryBarrier::submit<4>(
+      frame.cmd.vk_cmd,
+      {{
+          frame.frm.get_image(ImageRessourceId::Swapchain).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+          frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentStorageRead),
+          frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentStorageRead),
+          frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentStorageRead),
+      }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
-      rm.get_image(ImageRessourceId::Swapchain).as_attachment(ImageClearOpDontCare{}),
+      frame.frm.get_image(ImageRessourceId::Swapchain).as_attachment(ImageClearOpDontCare{}),
   };
+
+  auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
+  DescriptorUpdater{descriptor, 0}
+      .type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+      .image_info({{
+          {
+              .sampler = VK_NULL_HANDLE,
+              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer0).view,
+              .imageLayout = SyncFragmentStorageRead.layout,
+          },
+          {
+              .sampler = VK_NULL_HANDLE,
+              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer1).view,
+              .imageLayout = SyncFragmentStorageRead.layout,
+          },
+          {
+              .sampler = VK_NULL_HANDLE,
+              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer2).view,
+              .imageLayout = SyncFragmentStorageRead.layout,
+          },
+      }})
+      .write(frame.ctx->device.vk_device);
+
+  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor, 0,
+                          nullptr);
 
   VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -108,7 +139,7 @@ void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm
       .pDepthAttachment = nullptr,
       .pStencilAttachment = nullptr,
   };
-  vkCmdBeginRendering(cmd, &render_info);
+  vkCmdBeginRendering(frame.cmd.vk_cmd, &render_info);
 
   VkViewport viewport{
       static_cast<float>(render_area.offset.x),
@@ -118,9 +149,16 @@ void tr::renderer::Deferred::draw(VkCommandBuffer cmd, FrameRessourceManager &rm
       0.0,
       1.0,
   };
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &render_area);
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  vkCmdDraw(cmd, 3, 1, 0, 0);
-  vkCmdEndRendering(cmd);
+  vkCmdSetViewport(frame.cmd.vk_cmd, 0, 1, &viewport);
+  vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
+  vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  //
+  // TODO: use a vertex buffer
+  for (const auto light : lights) {
+    vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DirectionalLight),
+                       &light);
+    vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
+  }
+
+  vkCmdEndRendering(frame.cmd.vk_cmd);
 }

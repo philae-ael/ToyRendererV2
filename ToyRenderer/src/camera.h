@@ -28,8 +28,7 @@ struct Camera {
   float zNear;
   float zFar;
 
-  [[nodiscard]] auto cameraMatrices() const -> CameraInfo;
-  [[nodiscard]] auto orientation() const -> glm::quat;
+  [[nodiscard]] auto cameraInfo() const -> CameraInfo;
 };
 
 struct CameraController {
