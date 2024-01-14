@@ -134,7 +134,7 @@ auto CliParser::dispactch_action(const Entry &entry) -> ParseResult {
 }
 
 auto CliParser::parse_one(std::string_view arg) -> ParseResult {
-  std::size_t count = arg.find_first_not_of('-');
+  const std::size_t count = arg.find_first_not_of('-');
   // For now things like " -- " are not allowed
   if (count == std::string::npos) {
     return ParseResult::MalFormedInput;
@@ -151,7 +151,7 @@ auto CliParser::parse_one(std::string_view arg) -> ParseResult {
         if (entry == entries.end()) {
           return ParseResult::MalFormedInput;
         }
-        ParseResult result = dispactch_action(*entry);
+        const ParseResult result = dispactch_action(*entry);
         if (result != ParseResult::Ok) {
           return result;
         }
@@ -177,7 +177,7 @@ auto CliParser::parse(std::span<const char *> args) -> ParseResult {
 
   next();
   while (has_next()) {
-    ParseResult result = parse_one(next());
+    const ParseResult result = parse_one(next());
     if (result != ParseResult::Ok) {
       return result;
     }
@@ -321,7 +321,7 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                        },
                    }}};
 
-  if (ParseResult result = parser.parse(args); result != ParseResult::Ok) {
+  if (const ParseResult result = parser.parse(args); result != ParseResult::Ok) {
     spdlog::warn("{}", result_messages.at(result));
 
     usage(parser, nullptr);

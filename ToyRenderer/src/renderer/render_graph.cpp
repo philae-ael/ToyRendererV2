@@ -47,7 +47,7 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
   passes.deferred.defer_deletion(engine.global_deletion_stacks.device);
 
   {
-    VkSamplerCreateInfo sampler_create_info{
+    const VkSamplerCreateInfo sampler_create_info{
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,

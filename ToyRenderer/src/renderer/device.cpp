@@ -121,14 +121,14 @@ void init_physical_device(tr::renderer::Device& device, VkInstance instance, VkS
 }
 
 void init_device(tr::renderer::Device& device) {
-  std::set<std::uint32_t> queue_families{
+  const std::set<std::uint32_t> queue_families{
       device.queues.graphics_family,
       device.queues.present_family,
       device.queues.transfer_family,
   };
 
   std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
-  float queue_priority = 1.0;
+  const float queue_priority = 1.0;
   queue_create_infos.reserve(queue_families.size());
   for (auto queue_family : queue_families) {
     queue_create_infos.push_back({
@@ -157,7 +157,7 @@ void init_device(tr::renderer::Device& device) {
     extensions.push_back(extension.c_str());
   }
 
-  VkDeviceCreateInfo device_create_info{
+  const VkDeviceCreateInfo device_create_info{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .pNext = &vulkan13_features,
       .flags = 0,

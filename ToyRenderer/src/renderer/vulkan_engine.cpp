@@ -45,7 +45,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   frame.ctx = this;
   frame.synchro = frame_synchronisation_pool[frame_id % MAX_FRAMES_IN_FLIGHT];
   VK_UNWRAP(vkWaitForFences, device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
-  switch (VkResult result = swapchain.acquire_next_frame(device, &frame); result) {
+  switch (const VkResult result = swapchain.acquire_next_frame(device, &frame); result) {
     case VK_ERROR_OUT_OF_DATE_KHR:
       rebuild_swapchain();
       return std::nullopt;
@@ -100,7 +100,7 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
   // Present
   // TODO: there should be a queue ownership transfer if graphics queue != present queue
   // https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples#multiple-queues
-  VkResult result = frame.present(device, swapchain.vk_swapchain);
+  const VkResult result = frame.present(device, swapchain.vk_swapchain);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || swapchain_need_to_be_rebuilt) {
     swapchain_need_to_be_rebuilt = true;
   } else {

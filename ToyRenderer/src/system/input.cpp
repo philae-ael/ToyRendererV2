@@ -8,7 +8,7 @@
 void tr::system::Input::on_input(tr::system::InputEvent event) {
   switch (event.kind) {
     case InputEventKind::Key: {
-      bool pressed = event.key_event.action != GLFW_RELEASE;
+      const bool pressed = event.key_event.action != GLFW_RELEASE;
       switch (event.key_event.key) {
         case GLFW_KEY_SPACE:
           state.camera_input.Up = pressed;

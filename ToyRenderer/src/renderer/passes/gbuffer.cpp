@@ -62,10 +62,10 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   };
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  const auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
-                                                  .color_attachment_formats(color_formats)
-                                                  .depth_attachment(attachment_depth.definition.vk_format(swapchain))
-                                                  .build();
+  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
+                                            .color_attachment_formats(color_formats)
+                                            .depth_attachment(attachment_depth.definition.vk_format(swapchain))
+                                            .build();
 
   const auto descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_0).build(device),
@@ -114,7 +114,7 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
           frame.frm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
       }});
 
-  std::array attachments = utils::to_array<VkRenderingAttachmentInfo, attachments_color.size()>({
+  const std::array attachments = utils::to_array<VkRenderingAttachmentInfo, attachments_color.size()>({
       frame.frm.get_image(ImageRessourceId::GBuffer0)
           .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
       frame.frm.get_image(ImageRessourceId::GBuffer1)
@@ -123,11 +123,11 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
           .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
   });
 
-  VkRenderingAttachmentInfo depthAttachment =
+  const VkRenderingAttachmentInfo depthAttachment =
       frame.frm.get_image(ImageRessourceId::Depth)
           .as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
 
-  VkRenderingInfo render_info{
+  const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -141,7 +141,7 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
   };
   vkCmdBeginRendering(frame.cmd.vk_cmd, &render_info);
 
-  VkViewport viewport{
+  const VkViewport viewport{
       static_cast<float>(render_area.offset.x),
       static_cast<float>(render_area.offset.y),
       static_cast<float>(render_area.extent.width),
@@ -154,9 +154,9 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
   vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
   const auto &b = frame.frm.get_buffer(BufferRessourceId::Camera);
-  VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
+  const VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
 
-  auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
+  const auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
   DescriptorUpdater{camera_descriptor, 0}
       .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
       .buffer_info({&buffer_info, 1})
@@ -167,16 +167,16 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
 }
 
 void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const DefaultRessources &default_ressources) {
-  auto cmd = frame.cmd.vk_cmd;
-  VkDeviceSize offset = 0;
-  vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
+  const VkDeviceSize offset = 0;
+  vkCmdBindVertexBuffers(frame.cmd.vk_cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
   if (mesh.buffers.indices) {
-    vkCmdBindIndexBuffer(cmd, mesh.buffers.indices->buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(frame.cmd.vk_cmd, mesh.buffers.indices->buffer, 0, VK_INDEX_TYPE_UINT32);
   }
 
-  vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4), &mesh.transform);
+  vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4),
+                     &mesh.transform);
 
-  for (auto &surface : mesh.surfaces) {
+  for (const auto &surface : mesh.surfaces) {
     auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[1]);
 
     DescriptorUpdater{descriptor, 0}
@@ -200,7 +200,8 @@ void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const Defa
             },
         }})
         .write(frame.ctx->device.vk_device);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &descriptor, 0, nullptr);
+    vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &descriptor, 0,
+                            nullptr);
 
     if (mesh.buffers.indices) {
       vkCmdDrawIndexed(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0, 0);
@@ -211,7 +212,7 @@ void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const Defa
 }
 void tr::renderer::GBuffer::draw(Frame &frame, VkRect2D render_area, std::span<const Mesh> meshes,
                                  DefaultRessources default_ressources) {
-  DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
+  const DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
 
   start_draw(frame, render_area);
   for (const auto &mesh : meshes) {

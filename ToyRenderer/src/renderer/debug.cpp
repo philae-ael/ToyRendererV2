@@ -41,7 +41,7 @@ auto tr::renderer::Renderdoc::init() -> Renderdoc {
 #else
     auto RENDERDOC_GetAPI = reinterpret_cast<pRENDERDOC_GetAPI>(dlsym(mod, "RENDERDOC_GetAPI"));
 #endif
-    int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, reinterpret_cast<void**>(&renderdoc.rdoc_api));
+    const int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, reinterpret_cast<void**>(&renderdoc.rdoc_api));
 
     TR_ASSERT(ret == 1 && renderdoc.rdoc_api != nullptr, "Could not load renderdoc");
     spdlog::info("Renderdoc loaded!");
@@ -67,12 +67,7 @@ void tr::renderer::VulkanEngineDebugInfo::write_gpu_timestamp(VkCommandBuffer cm
   gpu_timestamps.write_cmd_query(cmd, pipelineStage, current_frame_id, index);
 }
 
-void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine& engine) {
-  if (!ImGui::Begin("Vulkan Engine")) {
-    ImGui::End();
-    return;
-  }
-
+void tr::renderer::VulkanEngineDebugInfo::timings_info() {
   if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::SeparatorText("GPU Timings:");
     if (ImGui::BeginTable("GPU Timings:", 2, ImGuiTableFlags_SizingStretchProp)) {
@@ -104,6 +99,9 @@ void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine
       ImGui::EndTable();
     }
   }
+}
+
+void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine& engine) {
   if (ImGui::CollapsingHeader("GPU memory usage", ImGuiTreeNodeFlags_DefaultOpen)) {
     if (ImGui::BeginTable("Memory usage", 2, ImGuiTableFlags_SizingStretchProp)) {
       ImGui::TableNextRow();
@@ -178,6 +176,16 @@ void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine
       vmaFreeStatsString(engine.allocator, stats_string);
     }
   }
+}
+
+void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine& engine) {
+  if (!ImGui::Begin("Vulkan Engine")) {
+    ImGui::End();
+    return;
+  }
+
+  timings_info();
+  memory_info(engine);
 
   ImGui::End();
 }
@@ -225,8 +233,8 @@ void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEn
   {
     gpu_timestamps.get(engine.device.vk_device, current_frame_id - 1);
     for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
-      auto& period = GPU_TIME_PERIODS[i];
-      auto dt = gpu_timestamps.fetch_elsapsed(current_frame_id - 1, period.from, period.to);
+      const auto& period = GPU_TIME_PERIODS[i];
+      const auto dt = gpu_timestamps.fetch_elsapsed(current_frame_id - 1, period.from, period.to);
 
       if (dt) {
         avg_gpu_timelines[i].update(*dt);
@@ -238,8 +246,8 @@ void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEn
   }
 
   for (std::size_t i = 0; i < CPU_TIME_PERIODS.size(); i++) {
-    auto& period = CPU_TIME_PERIODS[i];
-    float dt =
+    const auto& period = CPU_TIME_PERIODS[i];
+    const float dt =
         std::chrono::duration<float, std::milli>(cpu_timestamps[period.to] - cpu_timestamps[period.from]).count();
     avg_cpu_timelines[i].update(dt);
     cpu_timelines[i].push(avg_cpu_timelines[i].state);

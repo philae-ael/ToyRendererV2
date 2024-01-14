@@ -22,6 +22,11 @@ static_assert(0 == static_cast<std::uint32_t>(0), "to remove warning about unuse
 
 namespace tr::renderer {
 
+struct VkBaseInOutStructure {
+  VkStructureType sType;
+  const VkBaseInStructure* pNext;
+};
+
 template <class Child, class T>
 struct VkBuilder : T {
   [[nodiscard]] constexpr auto inner() const -> const T& { return *this; }
@@ -31,13 +36,11 @@ struct VkBuilder : T {
 
   constexpr auto copy() -> Child { return *this; }
 
-  // Can't constexpr without modifying pNext->pNext i guess
-  /*constexpr*/ auto chain(const VkBaseInStructure* pNext) -> Child& {
-    auto* next = reinterpret_cast<VkBaseOutStructure*>(inner_ptr());
-    while (next->pNext != nullptr) {
-      next = next->pNext;
-    }
-    reinterpret_cast<VkBaseInStructure*>(next)->pNext = pNext;
+  template <class Next>
+  constexpr auto chain(Next* next) -> Child& {
+    next->pNext = inner().pNext;
+    inner().pNext = next;
+
     return static_cast<Child&>(*this);
   }
 };

@@ -21,7 +21,7 @@ auto tr::renderer::CommandPool::init(Device &device, CommandPool::TargetQueue ta
       queue_family_index = device.queues.transfer_family;
       break;
   }
-  VkCommandPoolCreateInfo command_pool_create_info{
+  const VkCommandPoolCreateInfo command_pool_create_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,

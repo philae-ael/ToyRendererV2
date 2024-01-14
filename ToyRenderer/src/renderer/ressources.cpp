@@ -124,7 +124,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -
   const auto aspect_mask = definition.vk_aspect_mask();
   const auto extent = definition.vk_extent(*swapchain);
 
-  VkImageCreateInfo image_create_info{
+  const VkImageCreateInfo image_create_info{
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -141,7 +141,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -
       .pQueueFamilyIndices = nullptr,
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
-  VmaAllocationCreateInfo allocation_create_info{
+  const VmaAllocationCreateInfo allocation_create_info{
       .flags = 0,
       .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
       .requiredFlags = 0,
@@ -157,7 +157,7 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -
   VK_UNWRAP(vmaCreateImage, allocator, &image_create_info, &allocation_create_info, &image, &alloc, &alloc_info);
   set_debug_object_name(device, VK_OBJECT_TYPE_IMAGE, image, std::format("{} image", definition.debug_name));
 
-  VkImageViewCreateInfo view_create_info{
+  const VkImageViewCreateInfo view_create_info{
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -228,7 +228,7 @@ auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition) cons
       .size = definition.size,
   };
 
-  VkBufferCreateInfo buffer_create_info{
+  const VkBufferCreateInfo buffer_create_info{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -239,7 +239,7 @@ auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition) cons
       .pQueueFamilyIndices = nullptr,
   };
 
-  VmaAllocationCreateInfo allocation_create_info{
+  const VmaAllocationCreateInfo allocation_create_info{
       .flags = definition.vma_flags(),
       .usage = definition.vma_usage(),
       .requiredFlags = definition.vma_required_flags(),

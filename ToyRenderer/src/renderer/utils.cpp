@@ -22,7 +22,7 @@ auto tr::renderer::check_extensions(const char* kind, std::span<const char* cons
   }
 
   // Required
-  std::set<std::string> required_set{required.begin(), required.end()};
+  const std::set<std::string> required_set{required.begin(), required.end()};
   spdlog::debug("Required {} extensions:", kind);
   for (const auto& required_extension : required) {
     spdlog::debug("\t{}", required_extension);
@@ -41,7 +41,7 @@ auto tr::renderer::check_extensions(const char* kind, std::span<const char* cons
   }
 
   // Optional
-  std::set<std::string> optional_set{optional.begin(), optional.end()};
+  const std::set<std::string> optional_set{optional.begin(), optional.end()};
   spdlog::debug("Optional {} extensions:", kind);
   for (const auto& optional_extension : optional) {
     spdlog::debug("\t{}", optional_extension);

@@ -105,6 +105,8 @@ struct VulkanEngineDebugInfo {
 
  private:
   void stat_window(VulkanEngine &);
+  void timings_info();
+  void memory_info(VulkanEngine &);
   void option_window(VulkanEngine &);
 };
 

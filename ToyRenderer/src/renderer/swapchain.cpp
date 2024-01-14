@@ -98,7 +98,7 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
     sharing_queue_families.push_back(device.queues.present_family);
   }
 
-  VkSwapchainCreateInfoKHR create_info{
+  const VkSwapchainCreateInfoKHR create_info{
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .pNext = nullptr,
       .flags = 0,
@@ -132,7 +132,7 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
 
   s.image_views.resize(s.images.size());
   for (std::size_t i = 0; i < s.images.size(); i++) {
-    VkImageViewCreateInfo image_view_create_info{
+    const VkImageViewCreateInfo image_view_create_info{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,

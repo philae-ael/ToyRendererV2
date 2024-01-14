@@ -54,8 +54,7 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  const auto pipeline_rendering_create_info =
-      PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
+  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
 
   const auto descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Deferred::bindings).build(device),
@@ -88,7 +87,7 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
   return {descriptor_set_layouts, layout, pipeline};
 }
 void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
-  DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
+  const DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
 
   ImageMemoryBarrier::submit<4>(
       frame.cmd.vk_cmd,
@@ -102,7 +101,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
       frame.frm.get_image(ImageRessourceId::Swapchain).as_attachment(ImageClearOpDontCare{}),
   };
 
-  auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
+  const auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
   DescriptorUpdater{descriptor, 0}
       .type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
       .image_info({{
@@ -127,7 +126,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
   vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor, 0,
                           nullptr);
 
-  VkRenderingInfo render_info{
+  const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -141,7 +140,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
   };
   vkCmdBeginRendering(frame.cmd.vk_cmd, &render_info);
 
-  VkViewport viewport{
+  const VkViewport viewport{
       static_cast<float>(render_area.offset.x),
       static_cast<float>(render_area.offset.y),
       static_cast<float>(render_area.extent.width),

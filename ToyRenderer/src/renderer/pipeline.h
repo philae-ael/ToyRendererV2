@@ -63,8 +63,8 @@ struct PipelineBuilder : VkBuilder<PipelineBuilder, VkGraphicsPipelineCreateInfo
     return *this;
   }
 
-  auto pipeline_rendering_create_info(const VkPipelineRenderingCreateInfo* infos) -> PipelineBuilder& {
-    return chain(reinterpret_cast<const VkBaseInStructure*>(infos));
+  constexpr auto pipeline_rendering_create_info(VkPipelineRenderingCreateInfo* infos) -> PipelineBuilder& {
+    return chain(infos);
   }
 
   constexpr auto stages(const std::span<const VkPipelineShaderStageCreateInfo> stages) -> PipelineBuilder& {

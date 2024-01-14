@@ -11,7 +11,7 @@ auto Camera::cameraInfo() const -> CameraInfo {
   // opengl / gtlf style
   projMatrix[1][1] *= -1;
 
-  glm::quat orientation = glm::angleAxis(eulerAngles.x, glm::vec3{-1.0, 0.0, 0.0}) *
+  const glm::quat orientation = glm::angleAxis(eulerAngles.x, glm::vec3{-1.0, 0.0, 0.0}) *
                           glm::angleAxis(eulerAngles.y, glm::vec3{0.0, -1.0, 0.0}) *
                           glm::angleAxis(eulerAngles.z, glm::vec3{0.0, 0.0, -1.0});
 
@@ -38,7 +38,7 @@ void CameraController::update(CameraInput input, float Dt) {
   const glm::vec3 RotVelocity = glm::vec3{rotSpeed * RotX, rotSpeed * RotY, 0.0};
   camera.eulerAngles += Dt * RotVelocity;
 
-  glm::quat orientation = glm::angleAxis(camera.eulerAngles.x, glm::vec3{1.0, 0.0, 0.0}) *
+  const glm::quat orientation = glm::angleAxis(camera.eulerAngles.x, glm::vec3{1.0, 0.0, 0.0}) *
                           glm::angleAxis(camera.eulerAngles.y, glm::vec3{0.0, 1.0, 0.0}) *
                           glm::angleAxis(camera.eulerAngles.z, glm::vec3{0.0, 0.0, 1.0});
 

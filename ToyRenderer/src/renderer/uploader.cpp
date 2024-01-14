@@ -5,7 +5,7 @@
 #include "utils/assert.h"
 
 auto tr::renderer::StagingBuffer::commit(VkCommandBuffer cmd, VkBuffer dst, uint32_t dst_offset) -> StagingBuffer& {
-  VkBufferCopy region{
+  const VkBufferCopy region{
       .srcOffset = offset,
       .dstOffset = dst_offset,
       .size = to_upload,
@@ -17,7 +17,7 @@ auto tr::renderer::StagingBuffer::commit(VkCommandBuffer cmd, VkBuffer dst, uint
 }
 auto tr::renderer::StagingBuffer::commit_image(VkCommandBuffer cmd, const ImageRessource& image, VkRect2D r)
     -> StagingBuffer& {
-  VkBufferImageCopy region{
+  const VkBufferImageCopy region{
       .bufferOffset = offset,
       .bufferRowLength = 0,
       .bufferImageHeight = 0,
@@ -53,7 +53,7 @@ void tr::renderer::StagingBuffer::reset() { to_upload = offset = 0; }
 auto tr::renderer::StagingBuffer::init(VmaAllocator allocator, uint32_t size) -> StagingBuffer {
   VkBuffer buf = VK_NULL_HANDLE;
 
-  VkBufferCreateInfo buffer_create_info{
+  const VkBufferCreateInfo buffer_create_info{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -63,7 +63,7 @@ auto tr::renderer::StagingBuffer::init(VmaAllocator allocator, uint32_t size) ->
       .queueFamilyIndexCount = 0,
       .pQueueFamilyIndices = nullptr,
   };
-  VmaAllocationCreateInfo allocation_create_info{
+  const VmaAllocationCreateInfo allocation_create_info{
       .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
       .usage = VMA_MEMORY_USAGE_AUTO,
       .requiredFlags = 0,

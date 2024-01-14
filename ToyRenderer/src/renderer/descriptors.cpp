@@ -27,7 +27,7 @@ auto tr::renderer::DescriptorAllocator::init(VkDevice device, uint32_t max_sets,
 }
 
 auto tr::renderer::DescriptorAllocator::allocate(VkDevice device, VkDescriptorSetLayout layout) -> VkDescriptorSet {
-  VkDescriptorSetAllocateInfo alloc_info{
+  const VkDescriptorSetAllocateInfo alloc_info{
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
       .pNext = nullptr,
       .descriptorPool = pool,

@@ -7,14 +7,14 @@
 
 auto tr::renderer::FrameSynchro::init(VkDevice device) -> FrameSynchro {
   FrameSynchro synchro{};
-  VkFenceCreateInfo fence_create_info{
+  const VkFenceCreateInfo fence_create_info{
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
       .pNext = nullptr,
       .flags = VK_FENCE_CREATE_SIGNALED_BIT,
   };
   VK_UNWRAP(vkCreateFence, device, &fence_create_info, nullptr, &synchro.render_fence);
 
-  VkSemaphoreCreateInfo semaphore_create_info{
+  const VkSemaphoreCreateInfo semaphore_create_info{
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,

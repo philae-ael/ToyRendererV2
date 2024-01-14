@@ -59,8 +59,6 @@ add_executable(ToyRenderer
     src/renderer/pipeline.cpp
     src/renderer/pipeline.h
     src/renderer/queue.h
-    src/renderer/renderpass.cpp
-    src/renderer/renderpass.h
     src/renderer/ressources.cpp
     src/renderer/ressources.h
     src/renderer/render_graph.h
@@ -87,8 +85,8 @@ add_executable(ToyRenderer
 target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator fastgltf::fastgltf)
 target_include_directories(ToyRenderer PRIVATE ${Stb_INCLUDE_DIR})
 
-# set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy")
-# set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")
+# set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy" "--fix")
+set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")
 
 if (MSVC)
     target_compile_options(ToyRenderer PRIVATE /W4)

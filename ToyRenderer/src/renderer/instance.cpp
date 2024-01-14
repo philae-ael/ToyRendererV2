@@ -51,7 +51,7 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
       for (const auto& wanted_layer : OPTIONAL_VALIDATION_LAYERS) {
         spdlog::debug("\t{}", wanted_layer);
       }
-      std::set<std::string> wanted_set{OPTIONAL_VALIDATION_LAYERS.begin(), OPTIONAL_VALIDATION_LAYERS.end()};
+      const std::set<std::string> wanted_set{OPTIONAL_VALIDATION_LAYERS.begin(), OPTIONAL_VALIDATION_LAYERS.end()};
 
       std::set_intersection(wanted_set.begin(), wanted_set.end(), layers_set.begin(), layers_set.end(),
                             std::inserter(instance.validation_layers, instance.validation_layers.begin()));
@@ -75,7 +75,7 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
   }
 
   {
-    VkDebugUtilsMessengerCreateInfoEXT createInfoDebugUtils{
+    const VkDebugUtilsMessengerCreateInfoEXT createInfoDebugUtils{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .pNext = nullptr,
         .flags = 0,
@@ -89,7 +89,7 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
         .pUserData = nullptr,
     };
 
-    VkApplicationInfo appInfo{
+    const VkApplicationInfo appInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pNext = nullptr,
         .pApplicationName = "ToyRenderer",
