@@ -59,13 +59,5 @@ struct Frame {
   void write_gpu_timestamp(VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index) const;
   void write_cpu_timestamp(CPUTimestampIndex index) const;
   auto allocate_descriptor(VkDescriptorSetLayout layout) -> VkDescriptorSet;
-
-  // A frame own the right to act on frame ressources
-  Frame() = default;
-  Frame(Frame &) = delete;
-  auto operator=(const Frame &) -> Frame & = delete;
-  auto operator=(Frame &&) -> Frame & = default;
-  Frame(Frame &&) = default;
-  ~Frame() = default;
 };
 }  // namespace tr::renderer

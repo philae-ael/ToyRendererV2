@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <optional>
@@ -39,11 +40,21 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   frame_id += 1;
 
   // Try to get frame or bail early
-  Frame frame{};
-  frame.ctx = this;
-  frame.synchro = frame_synchronisation_pool[frame_id % MAX_FRAMES_IN_FLIGHT];
+  Frame frame{
+      .swapchain_image_index = static_cast<uint32_t>(-1),
+      .synchro = frame_synchronisation_pool[frame_id % MAX_FRAMES_IN_FLIGHT],
+      .cmd = graphics_command_buffers[frame_id % MAX_FRAMES_IN_FLIGHT],
+      .descriptor_allocator = frame_descriptor_allocators[frame_id % MAX_FRAMES_IN_FLIGHT],
+      .frm = rm.frame(frame_id % MAX_FRAMES_IN_FLIGHT),
+      .ctx = this,
+  };
+
   VK_UNWRAP(vkWaitForFences, device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
-  switch (const VkResult result = swapchain.acquire_next_frame(device, &frame); result) {
+
+  VkResult result =
+      vkAcquireNextImageKHR(device.vk_device, swapchain.vk_swapchain, 1000000000, frame.synchro.present_semaphore,
+                            VK_NULL_HANDLE, &frame.swapchain_image_index);
+  switch (result) {
     case VK_ERROR_OUT_OF_DATE_KHR:
       rebuild_swapchain();
       return std::nullopt;
@@ -51,24 +62,19 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
     default:
       VK_CHECK(result, swapchain.acquire_next_frame);
   }
+
   VK_UNWRAP(vkResetFences, device.vk_device, 1, &frame.synchro.render_fence);
-
   VK_UNWRAP(vkResetCommandPool, device.vk_device, graphic_command_pools[frame_id % MAX_FRAMES_IN_FLIGHT], 0);
-
-  frame.descriptor_allocator = frame_descriptor_allocators[frame_id % MAX_FRAMES_IN_FLIGHT];
+  VK_UNWRAP(frame.cmd.begin);
   frame.descriptor_allocator.reset(device.vk_device);
-  frame.frm = rm.frame(frame_id % MAX_FRAMES_IN_FLIGHT);
+
+  vmaSetCurrentFrameIndex(allocator, frame_id);
+  debug_info.set_frame_id(frame.cmd.vk_cmd, frame_id);
 
   // TODO: better from external images
   frame.frm.get_image(ImageRessourceId::Swapchain) = ImageRessource::from_external_image(
       swapchain.images[frame.swapchain_image_index], swapchain.image_views[frame.swapchain_image_index],
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, swapchain.extent);
-
-  frame.cmd = graphics_command_buffers[frame_id % MAX_FRAMES_IN_FLIGHT];
-  VK_UNWRAP(frame.cmd.begin);
-
-  vmaSetCurrentFrameIndex(allocator, frame_id);
-  debug_info.set_frame_id(frame.cmd.vk_cmd, frame_id);
 
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_BOTTOM);
 

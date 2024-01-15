@@ -231,8 +231,7 @@ class RessourceManager {
 };
 
 struct FrameRessourceManager {
-  // TODO: Create a thing like gsl::non_null
-  RessourceManager* rm;
+  utils::types::not_null_pointer<RessourceManager> rm;
   uint32_t frame_index;
 
   [[nodiscard]] auto get_image(ImageRessourceId id) -> ImageRessource& {

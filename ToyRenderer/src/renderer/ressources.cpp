@@ -8,6 +8,7 @@
 #include "swapchain.h"
 #include "synchronisation.h"
 #include "utils/misc.h"
+#include "utils/types.h"
 
 auto tr::renderer::ImageRessource::as_attachment(
     std::variant<VkClearValue, ImageClearOpLoad, ImageClearOpDontCare> clearOp) -> VkRenderingAttachmentInfo {
@@ -259,7 +260,7 @@ auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition) cons
 
 auto tr::renderer::RessourceManager::frame(uint32_t frame_index) -> FrameRessourceManager {
   return {
-      this,
+      utils::types::not_null_pointer(*this),
       frame_index,
   };
 }
