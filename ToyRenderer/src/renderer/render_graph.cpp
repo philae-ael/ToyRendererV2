@@ -4,6 +4,7 @@
 
 #include "../camera.h"
 #include "mesh.h"
+#include "passes/shadow_map.h"
 #include "ressources.h"
 #include "timeline_info.h"
 #include "vulkan_engine.h"
@@ -24,14 +25,15 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
   const std::array lights = std::to_array<DirectionalLight>({
       {
-          .direction = glm::normalize(glm::vec3{0, 2, -2}),
-          .color = {2, 2, 2},
-      },
-      {
-          .direction = glm::normalize(glm::vec3{1, 2, -1}),
+          .direction = glm::normalize(glm::vec3{1, 5, -3}),
           .color = {2, 2, 2},
       },
   });
+  passes.shadow_map.draw(frame, lights[0], meshes);
+
+  frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_SHADOW_BOTTOM);
+  frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_SHADOW_BOTTOM);
+
   passes.deferred.draw(frame, {{0, 0}, swapchain_extent}, lights);
 
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
@@ -42,6 +44,9 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
                                      BufferBuilder& /*bb*/) {
   passes.gbuffer = GBuffer::init(engine.device.vk_device, engine.swapchain, engine.frame_deletion_stacks.device);
   passes.gbuffer.defer_deletion(engine.global_deletion_stacks.device);
+
+  passes.shadow_map = ShadowMap::init(engine.device.vk_device, engine.swapchain, engine.frame_deletion_stacks.device);
+  passes.shadow_map.defer_deletion(engine.global_deletion_stacks.device);
 
   passes.deferred = Deferred::init(engine.device.vk_device, engine.swapchain, engine.frame_deletion_stacks.device);
   passes.deferred.defer_deletion(engine.global_deletion_stacks.device);

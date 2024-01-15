@@ -46,7 +46,8 @@ auto tr::renderer::ImageRessource::prepare_barrier(SyncInfo dst) -> std::optiona
       aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
     }
     if ((usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
-      aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+      // WARN: this is an hack ! It seems aspect can't be deduced, it should be given
+      aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     }
 
     barrier = sync_info.barrier(dst, image,
@@ -95,7 +96,8 @@ auto tr::renderer::ImageDefinition::vk_aspect_mask() const -> VkImageAspectFlags
     aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
   }
   if ((usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
-    aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    // WARN: this is an hack ! It seems aspect can't be deduced, it should be given
+    aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
   }
 
   return aspectMask;

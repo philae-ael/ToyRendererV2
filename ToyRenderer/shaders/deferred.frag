@@ -4,11 +4,14 @@
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 Fragcolor;
 
-layout(set = 0, binding = 0, rgba32f) uniform readonly image2D[3] gbuffers;
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D[4] gbuffers;
+layout(set = 0, binding = 1) uniform sampler2D shadow_map;
 
 const float PI = 3.14159265359;
 
 layout(push_constant) uniform light{
+    mat4 LightProjMatrix;
+    mat4 LightViewMatrix;
     vec3 LightPosition;
     vec3 LightColor;
 };
@@ -45,10 +48,12 @@ float Fd_Burley(float NoV, float NoL, float LoH, float roughness) {
 
 struct PixelData {
     vec3 normal;
+    vec3 pos;
     vec3 albedo;
     vec3 view;
     float perceptualRoughness;
     float metallic;
+    float shadow;
 };
 
 vec3 saturate(vec3 v) {
@@ -59,6 +64,13 @@ float saturate(float v) {
     return clamp(v, 0.0, 1.0);
 }
 
+float compute_shadow(vec3 pos) {
+    vec4 f = LightProjMatrix * LightViewMatrix * vec4(pos, 1.0);
+    vec3 d = f.xyz / f.w;
+    float v = texture(shadow_map, 0.5 * f.xy + vec2(0.5)).x;
+    return  v >= (d.z - 0.05) ? 1.0 : 0.0;
+}
+
 PixelData getPixelData(){
     PixelData pixel;
     ivec2 size = imageSize(gbuffers[0]);
@@ -67,6 +79,7 @@ PixelData getPixelData(){
     vec4 t0 = imageLoad(gbuffers[0], screen_coordinate);
     vec4 t1 = imageLoad(gbuffers[1], screen_coordinate);
     vec4 t2 = imageLoad(gbuffers[2], screen_coordinate);
+    vec4 t3 = imageLoad(gbuffers[3], screen_coordinate);
 
     // TODO: more complex packing
     pixel.albedo =  t0.xyz;
@@ -74,6 +87,9 @@ PixelData getPixelData(){
     pixel.normal =  t1.xyz;
     pixel.metallic = t1.a;
     pixel.view = t2.xyz;
+    pixel.pos = t3.xyz;
+
+    pixel.shadow = compute_shadow(pixel.pos);
 
     return pixel;
 }
@@ -102,7 +118,7 @@ vec3 sampleBRDF(vec3 l, PixelData pixel) {
 
 vec3 direction_light(vec3 light_direction, PixelData pixel) {
     float NoL = saturate(dot(pixel.normal, light_direction));
-    return sampleBRDF(light_direction, pixel) * NoL;
+    return pixel.shadow * sampleBRDF(light_direction, pixel) * NoL;
 }
 
 // vec3 point_light(vec3 light_pos, PixelData pixel) {
@@ -115,6 +131,6 @@ vec3 direction_light(vec3 light_direction, PixelData pixel) {
 void main() {
     PixelData pixel = getPixelData();
 
-    vec3 color = LightColor * direction_light(LightPosition, pixel);
+    vec3 color = 0.1*pixel.albedo + LightColor * direction_light(LightPosition, pixel);
     Fragcolor = vec4(color, 1.0);
 } 

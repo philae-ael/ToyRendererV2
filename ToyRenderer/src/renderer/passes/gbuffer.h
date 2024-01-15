@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include "../../camera.h"
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
@@ -69,6 +70,18 @@ struct GBuffer {
           },
           ImageRessourceId::GBuffer2,
       },
+        {
+          // RGB: ViewDir
+          {
+              .flags = 0,
+              .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+              .size = FramebufferExtent{},
+              .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+              .debug_name = "GBuffer3 (RGB: Position)",
+          },
+          ImageRessourceId::GBuffer3,
+      },
+
   });
 
   static constexpr ImageRessourceDefinition attachment_depth{
@@ -89,6 +102,16 @@ struct GBuffer {
       rm.define_image(attachment);
     }
     rm.define_image(attachment_depth);
+    rm.define_buffer({
+        .definition =
+            {
+                .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
+                .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
+                .debug_name = "camera uniform",
+            },
+        .id = BufferRessourceId::Camera,
+    });
   }
 
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {

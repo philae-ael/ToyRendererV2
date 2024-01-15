@@ -19,6 +19,7 @@ target_compile_shader(Shaders
     shaders/gbuffer.vert
     shaders/deferred.frag
     shaders/deferred.vert
+    shaders/shadow_map.vert
 )
 
 target_include_directories(Shaders INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/include)
@@ -56,6 +57,8 @@ add_executable(ToyRenderer
     src/renderer/passes/deferred.h
     src/renderer/passes/gbuffer.cpp
     src/renderer/passes/gbuffer.h
+    src/renderer/passes/shadow_map.cpp
+    src/renderer/passes/shadow_map.h
     src/renderer/pipeline.cpp
     src/renderer/pipeline.h
     src/renderer/queue.h

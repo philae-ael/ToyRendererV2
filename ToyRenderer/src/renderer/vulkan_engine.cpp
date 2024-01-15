@@ -13,7 +13,6 @@
 #include <span>
 #include <vector>
 
-#include "../camera.h"
 #include "command_pool.h"
 #include "constants.h"
 #include "debug.h"
@@ -21,6 +20,7 @@
 #include "descriptors.h"
 #include "passes/deferred.h"
 #include "passes/gbuffer.h"
+#include "passes/shadow_map.h"
 #include "queue.h"
 #include "ressources.h"
 #include "swapchain.h"
@@ -202,17 +202,8 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   // It should not happen but it could happen, who knows when?
 
   tr::renderer::GBuffer::register_ressources(rm);
+  tr::renderer::ShadowMap::register_ressources(rm);
   tr::renderer::Deferred::register_ressources(rm);
-  rm.define_buffer({
-      .definition =
-          {
-              .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-              .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
-              .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-              .debug_name = "camera uniform",
-          },
-      .id = BufferRessourceId::Camera,
-  });
 
   auto ib = image_builder();
   for (auto& image_storage : rm.image_storages()) {

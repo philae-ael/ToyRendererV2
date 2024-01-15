@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
 #include <glm/mat4x4.hpp>
@@ -8,6 +9,7 @@
 #include <optional>
 #include <vector>
 
+#include "../camera.h"
 #include "deletion_stack.h"
 #include "ressources.h"
 #include "vertex.h"
@@ -83,6 +85,17 @@ struct DirectionalLight {
   float padding1_ = 0.0;
   glm::vec3 color;
   float padding2_ = 0.0;
+
+  [[nodiscard]] auto camera_info() const -> CameraInfo {
+    const glm::vec3 pos = 40.F * direction;
+    auto projMat = glm::ortho(-10., 10., -10., 10., 0.1, 50.);
+    projMat[1][1] *= -1;
+    return {
+        .projMatrix = projMat,
+        .viewMatrix = glm::lookAt(pos, -direction, glm::vec3(0, 1, 0)),
+        .cameraPosition = pos,
+    };
+  }
 };
 
 }  // namespace tr::renderer

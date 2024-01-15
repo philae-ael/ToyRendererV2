@@ -11,6 +11,7 @@ layout(location = 0) out mat3 TBN;
 layout(location = 3) out vec3 fragViewDir;
 layout(location = 4) out vec2 fragUV1;
 layout(location = 5) out vec2 fragUV2;
+layout(location = 6) out vec4 fragWorldPos;
 
 layout(set = 0, binding = 0) uniform Global{
     mat4 projMat;
@@ -36,4 +37,5 @@ void main() {
     fragUV1 = uv1;
     fragUV2 = uv2;
     fragViewDir = normalize(view);
+    fragWorldPos = WorldPos;
 }

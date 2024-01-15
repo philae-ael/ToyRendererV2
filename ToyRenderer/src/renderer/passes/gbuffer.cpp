@@ -53,12 +53,14 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
           PipelineColorBlendStateAllColorNoBlend.build(),
           PipelineColorBlendStateAllColorNoBlend.build(),
           PipelineColorBlendStateAllColorNoBlend.build(),
+          PipelineColorBlendStateAllColorNoBlend.build(),
       });
 
   const std::array<VkFormat, attachments_color.size()> color_formats{
       attachments_color[0].definition.vk_format(swapchain),
       attachments_color[1].definition.vk_format(swapchain),
       attachments_color[2].definition.vk_format(swapchain),
+      attachments_color[3].definition.vk_format(swapchain),
   };
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
@@ -111,6 +113,7 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
           frame.frm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachmentOutput),
           frame.frm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachmentOutput),
           frame.frm.get_image(ImageRessourceId::GBuffer2).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+          frame.frm.get_image(ImageRessourceId::GBuffer3).invalidate().prepare_barrier(SyncColorAttachmentOutput),
           frame.frm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
       }});
 
@@ -120,6 +123,8 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
       frame.frm.get_image(ImageRessourceId::GBuffer1)
           .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
       frame.frm.get_image(ImageRessourceId::GBuffer2)
+          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      frame.frm.get_image(ImageRessourceId::GBuffer3)
           .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
   });
 

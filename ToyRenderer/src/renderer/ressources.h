@@ -37,7 +37,7 @@ enum BufferOptionFlagsBits {
 
 using BufferOptionFlags = std::uint32_t;
 
-enum class BufferRessourceId { Camera, MAX };
+enum class BufferRessourceId { Camera, ShadowCamera, MAX };
 
 struct BufferDefinition {
   VkBufferUsageFlags usage;
@@ -129,7 +129,9 @@ enum class ImageRessourceId {
   GBuffer0,
   GBuffer1,
   GBuffer2,
+  GBuffer3,
   Depth,
+  ShadowMap,
   MAX,
 };
 

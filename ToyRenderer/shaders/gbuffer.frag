@@ -4,10 +4,12 @@ layout(location = 0) in mat3 TBN;
 layout(location = 3) in vec3 fragViewDir;
 layout(location = 4) in vec2 fragUV1;
 layout(location = 5) in vec2 fragUV2;
+layout(location = 6) in vec4 fragPos;
 
 layout(location = 0) out vec4 g1;
 layout(location = 1) out vec4 g2;
 layout(location = 2) out vec4 g3;
+layout(location = 3) out vec4 g4;
 
 layout(set = 1, binding = 0) uniform sampler2D[3] texs;
 
@@ -27,4 +29,7 @@ void main() {
 
     // TODO: not necessary, remove it and deduce from matrix + depth in deferred
     g3.xyz = fragViewDir;
+
+    // TODO: not necessary, remove it and deduce from matrix + depth in deferred
+    g4.xyz = fragPos.xyz;
 }
