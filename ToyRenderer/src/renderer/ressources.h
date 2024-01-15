@@ -211,8 +211,14 @@ class RessourceManager {
   void define_image(ImageRessourceDefinition def) {
     image_storages_[static_cast<size_t>(def.id)].definition = def.definition;
   }
+  [[nodiscard]] auto image_definition(ImageRessourceId id) const -> ImageDefinition {
+    return image_storages_[static_cast<size_t>(id)].definition;
+  }
   void define_buffer(BufferRessourceDefinition def) {
     buffer_storages_[static_cast<size_t>(def.id)].definition = def.definition;
+  }
+  [[nodiscard]] auto buffer_definition(BufferRessourceId id) const -> BufferDefinition {
+    return buffer_storages_[static_cast<size_t>(id)].definition;
   }
 
   auto frame(uint32_t frame_index) -> FrameRessourceManager;

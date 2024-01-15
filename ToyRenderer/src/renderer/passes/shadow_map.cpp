@@ -8,6 +8,7 @@
 
 #include "../mesh.h"
 #include "../pipeline.h"
+#include "../ressource_definition.h"
 #include "../vulkan_engine.h"
 #include "utils/misc.h"
 
@@ -15,8 +16,8 @@ const std::array gbuffer_vert_bin = std::to_array<uint32_t>({
 #include "shaders/shadow_map.vert.inc"
 });
 
-auto tr::renderer::ShadowMap::init(VkDevice &device, Swapchain &swapchain, DeviceDeletionStack &device_deletion_stack)
-    -> ShadowMap {
+auto tr::renderer::ShadowMap::init(VkDevice &device, const RessourceManager &rm, const Swapchain &swapchain,
+                                   DeviceDeletionStack &device_deletion_stack) -> ShadowMap {
   const auto vert = Shader::init_from_src(device, gbuffer_vert_bin);
   vert.defer_deletion(device_deletion_stack);
 
@@ -41,7 +42,9 @@ auto tr::renderer::ShadowMap::init(VkDevice &device, Swapchain &swapchain, Devic
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
   auto pipeline_rendering_create_info =
-      PipelineRenderingBuilder{}.depth_attachment(attachment_depth.definition.vk_format(swapchain)).build();
+      PipelineRenderingBuilder{}
+          .depth_attachment(rm.image_definition(ImageRessourceId::ShadowMap).vk_format(swapchain))
+          .build();
 
   const auto descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::ShadowMap::set_0).build(device),
@@ -80,15 +83,16 @@ void tr::renderer::ShadowMap::end_draw(VkCommandBuffer cmd) const {
 
 void tr::renderer::ShadowMap::start_draw(Frame &frame) const {
   ImageMemoryBarrier::submit<1>(
-      frame.cmd.vk_cmd, {{
-                            frame.frm.get_image(ImageRessourceId::ShadowMap).invalidate().prepare_barrier(SyncLateDepth),
-                        }});
+      frame.cmd.vk_cmd,
+      {{
+          frame.frm.get_image(ImageRessourceId::ShadowMap).invalidate().prepare_barrier(SyncLateDepth),
+      }});
 
   const VkRenderingAttachmentInfo depthAttachment =
       frame.frm.get_image(ImageRessourceId::ShadowMap)
           .as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
 
-  const VkRect2D render_area{{0, 0}, {map_size, map_size}};
+  const VkRect2D render_area{{0, 0}, {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE}};
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,

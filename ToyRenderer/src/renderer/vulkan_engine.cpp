@@ -18,10 +18,8 @@
 #include "debug.h"
 #include "deletion_stack.h"
 #include "descriptors.h"
-#include "passes/deferred.h"
-#include "passes/gbuffer.h"
-#include "passes/shadow_map.h"
 #include "queue.h"
+#include "ressource_definition.h"
 #include "ressources.h"
 #include "swapchain.h"
 #include "synchronisation.h"
@@ -198,12 +196,13 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
   }
 
-  // Passes pipelines should be rebuilt everytime there the swapchain changes format
-  // It should not happen but it could happen, who knows when?
-
-  tr::renderer::GBuffer::register_ressources(rm);
-  tr::renderer::ShadowMap::register_ressources(rm);
-  tr::renderer::Deferred::register_ressources(rm);
+  // Rm could take care of this
+  for (const auto& def : image_definition) {
+    rm.define_image(def);
+  }
+  for (const auto& def : buffer_definition) {
+    rm.define_buffer(def);
+  }
 
   auto ib = image_builder();
   for (auto& image_storage : rm.image_storages()) {

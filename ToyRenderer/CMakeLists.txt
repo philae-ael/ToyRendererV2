@@ -64,6 +64,7 @@ add_executable(ToyRenderer
     src/renderer/queue.h
     src/renderer/ressources.cpp
     src/renderer/ressources.h
+    src/renderer/ressource_definition.h
     src/renderer/render_graph.h
     src/renderer/render_graph.cpp
     src/renderer/surface.cpp

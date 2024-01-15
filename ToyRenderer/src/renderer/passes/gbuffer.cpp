@@ -20,8 +20,8 @@ const std::array gbuffer_frag_bin = std::to_array<uint32_t>({
 #include "shaders/gbuffer.frag.inc"
 });
 
-auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceDeletionStack &device_deletion_stack)
-    -> GBuffer {
+auto tr::renderer::GBuffer::init(VkDevice &device, const RessourceManager &rm, const Swapchain &swapchain,
+                                 DeviceDeletionStack &device_deletion_stack) -> GBuffer {
   const auto frag = Shader::init_from_src(device, gbuffer_frag_bin);
   const auto vert = Shader::init_from_src(device, gbuffer_vert_bin);
   frag.defer_deletion(device_deletion_stack);
@@ -48,26 +48,26 @@ auto tr::renderer::GBuffer::init(VkDevice &device, Swapchain &swapchain, DeviceD
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
-  const std::array color_blend_attchment_states =
-      std::to_array<VkPipelineColorBlendAttachmentState, attachments_color.size()>({
-          PipelineColorBlendStateAllColorNoBlend.build(),
-          PipelineColorBlendStateAllColorNoBlend.build(),
-          PipelineColorBlendStateAllColorNoBlend.build(),
-          PipelineColorBlendStateAllColorNoBlend.build(),
-      });
+  const std::array color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState, 4>({
+      PipelineColorBlendStateAllColorNoBlend.build(),
+      PipelineColorBlendStateAllColorNoBlend.build(),
+      PipelineColorBlendStateAllColorNoBlend.build(),
+      PipelineColorBlendStateAllColorNoBlend.build(),
+  });
 
-  const std::array<VkFormat, attachments_color.size()> color_formats{
-      attachments_color[0].definition.vk_format(swapchain),
-      attachments_color[1].definition.vk_format(swapchain),
-      attachments_color[2].definition.vk_format(swapchain),
-      attachments_color[3].definition.vk_format(swapchain),
+  const std::array<VkFormat, 4> color_formats{
+      rm.image_definition(ImageRessourceId::GBuffer0).vk_format(swapchain),
+      rm.image_definition(ImageRessourceId::GBuffer1).vk_format(swapchain),
+      rm.image_definition(ImageRessourceId::GBuffer2).vk_format(swapchain),
+      rm.image_definition(ImageRessourceId::GBuffer3).vk_format(swapchain),
   };
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
-                                            .color_attachment_formats(color_formats)
-                                            .depth_attachment(attachment_depth.definition.vk_format(swapchain))
-                                            .build();
+  auto pipeline_rendering_create_info =
+      PipelineRenderingBuilder{}
+          .color_attachment_formats(color_formats)
+          .depth_attachment(rm.image_definition(ImageRessourceId::Depth).vk_format(swapchain))
+          .build();
 
   const auto descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_0).build(device),
@@ -107,7 +107,7 @@ void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
 }
 
 void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const {
-  ImageMemoryBarrier::submit<attachments_color.size() + 1>(
+  ImageMemoryBarrier::submit<5>(
       frame.cmd.vk_cmd,
       {{
           frame.frm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachmentOutput),
@@ -117,7 +117,7 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
           frame.frm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
       }});
 
-  const std::array attachments = utils::to_array<VkRenderingAttachmentInfo, attachments_color.size()>({
+  const std::array attachments = utils::to_array<VkRenderingAttachmentInfo, 4>({
       frame.frm.get_image(ImageRessourceId::GBuffer0)
           .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
       frame.frm.get_image(ImageRessourceId::GBuffer1)

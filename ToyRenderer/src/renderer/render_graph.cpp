@@ -42,13 +42,16 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
 void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transferer& t, ImageBuilder& ib,
                                      BufferBuilder& /*bb*/) {
-  passes.gbuffer = GBuffer::init(engine.device.vk_device, engine.swapchain, engine.frame_deletion_stacks.device);
+  passes.gbuffer =
+      GBuffer::init(engine.device.vk_device, engine.rm, engine.swapchain, engine.frame_deletion_stacks.device);
   passes.gbuffer.defer_deletion(engine.global_deletion_stacks.device);
 
-  passes.shadow_map = ShadowMap::init(engine.device.vk_device, engine.swapchain, engine.frame_deletion_stacks.device);
+  passes.shadow_map =
+      ShadowMap::init(engine.device.vk_device, engine.rm, engine.swapchain, engine.frame_deletion_stacks.device);
   passes.shadow_map.defer_deletion(engine.global_deletion_stacks.device);
 
-  passes.deferred = Deferred::init(engine.device.vk_device, engine.swapchain, engine.frame_deletion_stacks.device);
+  passes.deferred =
+      Deferred::init(engine.device.vk_device, engine.rm, engine.swapchain, engine.frame_deletion_stacks.device);
   passes.deferred.defer_deletion(engine.global_deletion_stacks.device);
 
   {

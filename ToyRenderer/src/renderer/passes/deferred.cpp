@@ -25,8 +25,8 @@ struct PushConstant {
   glm::vec3 color;
   float padding = 0.0;
 };
-auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, DeviceDeletionStack &device_deletion_stack)
-    -> Deferred {
+auto tr::renderer::Deferred::init(VkDevice &device, const RessourceManager &rm, const Swapchain &swapchain,
+                                  DeviceDeletionStack &device_deletion_stack) -> Deferred {
   const auto frag = Shader::init_from_src(device, triangle_frag_bin);
   const auto vert = Shader::init_from_src(device, triangle_vert_bin);
   frag.defer_deletion(device_deletion_stack);
@@ -56,7 +56,7 @@ auto tr::renderer::Deferred::init(VkDevice &device, Swapchain &swapchain, Device
   });
 
   const auto color_formats = std::to_array<VkFormat>({
-      attachments_color[0].definition.vk_format(swapchain),
+      rm.image_definition(ImageRessourceId::Swapchain).vk_format(swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();

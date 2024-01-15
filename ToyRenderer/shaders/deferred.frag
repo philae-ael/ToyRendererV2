@@ -68,7 +68,7 @@ float compute_shadow(vec3 pos) {
     vec4 f = LightProjMatrix * LightViewMatrix * vec4(pos, 1.0);
     vec3 d = f.xyz / f.w;
     float v = texture(shadow_map, 0.5 * f.xy + vec2(0.5)).x;
-    return  v >= (d.z - 0.05) ? 1.0 : 0.0;
+    return  v >= (d.z - 0.001) ? 1.0 : 0.0;
 }
 
 PixelData getPixelData(){

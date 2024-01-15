@@ -4,7 +4,6 @@
 
 #include <array>
 
-#include "../../camera.h"
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
@@ -19,8 +18,6 @@ struct ShadowMap {
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
 
-  static constexpr uint32_t map_size = 4096;
-
   static constexpr std::array set_0 = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
@@ -30,32 +27,8 @@ struct ShadowMap {
           .build(),
   });
 
-  static constexpr ImageRessourceDefinition attachment_depth{
-      {
-          .flags = 0,
-          .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-          .size = VkExtent2D{map_size, map_size},
-          .format = VK_FORMAT_D16_UNORM,
-          .debug_name = "Shadow Map",
-      },
-      ImageRessourceId::ShadowMap,
-  };
-
-  static auto init(VkDevice &device, Swapchain &Swapchain, DeviceDeletionStack &device_deletion_stack) -> ShadowMap;
-
-  static void register_ressources(RessourceManager &rm) {
-    rm.define_image(attachment_depth);
-    rm.define_buffer({
-        .definition =
-            {
-                .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
-                .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-                .debug_name = "shadow camera uniforms",
-            },
-        .id = BufferRessourceId::ShadowCamera,
-    });
-  }
+  static auto init(VkDevice &device, const RessourceManager &rm, const Swapchain &Swapchain,
+                   DeviceDeletionStack &device_deletion_stack) -> ShadowMap;
 
   void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {
     device_deletion_stack.defer_deletion(DeviceHandle::Pipeline, pipeline);
