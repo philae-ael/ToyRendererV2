@@ -15,18 +15,11 @@ namespace tr::renderer {
 
 struct Swapchain {
   struct SwapchainConfig;
-  void reinit(Device &device, VkSurfaceKHR surface, GLFWwindow *window) {
-    *this = init_with_config(config, device, surface, window);
+  void reinit(Lifetime &lifetime, Device &device, VkSurfaceKHR surface, GLFWwindow *window) {
+    *this = init_with_config(lifetime, config, device, surface, window);
   }
-  static auto init_with_config(SwapchainConfig config, Device &device, VkSurfaceKHR surface, GLFWwindow *window)
-      -> Swapchain;
-
-  void defer_deletion(DeviceDeletionStack &device_deletion_stack) {
-    for (auto view : image_views) {
-      device_deletion_stack.defer_deletion(DeviceHandle::ImageView, view);
-    }
-    device_deletion_stack.defer_deletion(DeviceHandle::SwapchainKHR, vk_swapchain);
-  }
+  static auto init_with_config(Lifetime &lifetime, SwapchainConfig config, const Device &device, VkSurfaceKHR surface,
+                               GLFWwindow *window) -> Swapchain;
 
   VkSwapchainKHR vk_swapchain = VK_NULL_HANDLE;
 

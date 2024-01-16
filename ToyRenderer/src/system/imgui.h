@@ -38,27 +38,27 @@ class Imgui {
     pool_info.pPoolSizes = pool_sizes.data();
 
     VkDescriptorPool imgui_pool{};
-    VK_UNWRAP(vkCreateDescriptorPool, engine.device.vk_device, &pool_info, nullptr, &imgui_pool);
+    VK_UNWRAP(vkCreateDescriptorPool, engine.ctx.device.vk_device, &pool_info, nullptr, &imgui_pool);
 
     ImGui_ImplGlfw_InitForVulkan(window, true);
 
     ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = engine.instance.vk_instance;
-    init_info.PhysicalDevice = engine.device.physical_device;
-    init_info.Device = engine.device.vk_device;
-    init_info.Queue = engine.device.queues.graphics_queue;
+    init_info.Instance = engine.ctx.instance.vk_instance;
+    init_info.PhysicalDevice = engine.ctx.device.physical_device;
+    init_info.Device = engine.ctx.device.vk_device;
+    init_info.Queue = engine.ctx.device.queues.graphics_queue;
     init_info.DescriptorPool = imgui_pool;
     init_info.MinImageCount = 3;
     init_info.ImageCount = 3;
     init_info.UseDynamicRendering = true;
-    init_info.ColorAttachmentFormat = engine.swapchain.surface_format.format;
+    init_info.ColorAttachmentFormat = engine.ctx.swapchain.surface_format.format;
     init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
     ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE);
 
     ImGui_ImplVulkan_CreateFontsTexture();
 
-    engine.global_deletion_stacks.device.defer_deletion(renderer::DeviceHandle::DescriptorPool, imgui_pool);
+    engine.lifetime.global.tie(renderer::DeviceHandle::DescriptorPool, imgui_pool);
     valid = true;
   }
 

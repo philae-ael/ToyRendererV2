@@ -27,16 +27,8 @@ struct ShadowMap {
           .build(),
   });
 
-  static auto init(VkDevice &device, const RessourceManager &rm, const Swapchain &Swapchain,
-                   DeviceDeletionStack &device_deletion_stack) -> ShadowMap;
-
-  void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {
-    device_deletion_stack.defer_deletion(DeviceHandle::Pipeline, pipeline);
-    device_deletion_stack.defer_deletion(DeviceHandle::PipelineLayout, pipeline_layout);
-    for (auto descriptor_set_layout : descriptor_set_layouts) {
-      device_deletion_stack.defer_deletion(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
-    }
-  }
+  static auto init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device, const RessourceManager &rm,
+                   const Swapchain &Swapchain) -> ShadowMap;
 
   void start_draw(Frame &frame) const;
   void end_draw(VkCommandBuffer cmd) const;

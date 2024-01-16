@@ -13,7 +13,7 @@ namespace tr::renderer {
 
 template <const size_t FRAMES, const size_t QUERY_COUNT>
 struct GPUTimestamp {
-  static auto init(Device &device) -> GPUTimestamp {
+  static auto init(Lifetime &lifetime, Device &device) -> GPUTimestamp {
     GPUTimestamp t{};
     VkQueryPoolCreateInfo create_info{
         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
@@ -27,6 +27,8 @@ struct GPUTimestamp {
     VK_UNWRAP(vkCreateQueryPool, device.vk_device, &create_info, nullptr, &t.query_pool);
     vkResetQueryPool(device.vk_device, t.query_pool, 0, FRAMES * QUERY_COUNT);
     t.to_ms = device.device_properties.limits.timestampPeriod / 1000000.0F;
+
+    lifetime.tie(DeviceHandle::QueryPool, t.query_pool);
     return t;
   }
   void reinit(Device &device) { *this = init(device); }
@@ -37,13 +39,6 @@ struct GPUTimestamp {
       return;
     }
     vkCmdWriteTimestamp(cmd, pipelineStage, query_pool, utils::narrow_cast<uint32_t>(query_index(frame_id, index)));
-  }
-
-  void defer_deletion(DeviceDeletionStack &device_deletion_stack) {
-    if (query_pool == VK_NULL_HANDLE) {
-      return;
-    }
-    device_deletion_stack.defer_deletion(DeviceHandle::QueryPool, query_pool);
   }
 
   void reset_queries(VkCommandBuffer cmd, std::size_t frame_id) {

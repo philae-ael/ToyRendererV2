@@ -14,12 +14,8 @@ namespace tr::renderer {
 struct FrameRessourceManager;
 
 struct FrameSynchro {
-  static auto init(VkDevice device) -> FrameSynchro;
-  void defer_deletion(DeviceDeletionStack &device_deletion_stack) const {
-    device_deletion_stack.defer_deletion(DeviceHandle::Fence, render_fence);
-    device_deletion_stack.defer_deletion(DeviceHandle::Semaphore, render_semaphore);
-    device_deletion_stack.defer_deletion(DeviceHandle::Semaphore, present_semaphore);
-  }
+  static auto init(Lifetime &lifetime, VkDevice device) -> FrameSynchro;
+
   VkFence render_fence;
   VkSemaphore render_semaphore;
   VkSemaphore present_semaphore;

@@ -55,7 +55,7 @@ enum class DeviceHandle {
   DescriptorPool,
   ShaderModule,
   DescriptorSetLayout,
-    Sampler,
+  Sampler,
 };
 
 class DeviceDeletionStack : public DeletionStack<DeviceHandle> {
@@ -76,6 +76,26 @@ class VmaDeletionStack : public DeletionStack<VmaHandle, std::pair<uint64_t, Vma
   }
 
   void cleanup(VmaAllocator allocator);
+};
+
+struct Lifetime {
+  DeviceDeletionStack device;
+  VmaDeletionStack allocator;
+
+  template <class T>
+  void tie(VmaHandle type, T handle, VmaAllocation alloc) {
+    allocator.defer_deletion(type, handle, alloc);
+  }
+
+  template <class T>
+  void tie(DeviceHandle type, T handle) {
+    device.defer_deletion(type, handle);
+  }
+
+  void cleanup(VkDevice device_, VmaAllocator allocator_) {
+    device.cleanup(device_);
+    allocator.cleanup(allocator_);
+  }
 };
 
 }  // namespace tr::renderer

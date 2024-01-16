@@ -20,12 +20,10 @@ const std::array gbuffer_frag_bin = std::to_array<uint32_t>({
 #include "shaders/gbuffer.frag.inc"
 });
 
-auto tr::renderer::GBuffer::init(VkDevice &device, const RessourceManager &rm, const Swapchain &swapchain,
-                                 DeviceDeletionStack &device_deletion_stack) -> GBuffer {
-  const auto frag = Shader::init_from_src(device, gbuffer_frag_bin);
-  const auto vert = Shader::init_from_src(device, gbuffer_vert_bin);
-  frag.defer_deletion(device_deletion_stack);
-  vert.defer_deletion(device_deletion_stack);
+auto tr::renderer::GBuffer::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
+                                 const RessourceManager &rm, const Swapchain &swapchain) -> GBuffer {
+  const auto frag = Shader::init_from_src(setup_lifetime, device, gbuffer_frag_bin);
+  const auto vert = Shader::init_from_src(setup_lifetime, device, gbuffer_vert_bin);
 
   const std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages{{
       frag.pipeline_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, "main"),
@@ -99,8 +97,15 @@ auto tr::renderer::GBuffer::init(VkDevice &device, const RessourceManager &rm, c
                             .dynamic_state(&dynamic_state_state)
                             .build(device);
 
+  lifetime.tie(DeviceHandle::Pipeline, pipeline);
+  lifetime.tie(DeviceHandle::PipelineLayout, layout);
+  for (auto descriptor_set_layout : descriptor_set_layouts) {
+    lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
+  }
+
   return {descriptor_set_layouts, layout, pipeline};
 }
+
 void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
   utils::ignore_unused(this);
   vkCmdEndRendering(cmd);
@@ -165,7 +170,7 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
   DescriptorUpdater{camera_descriptor, 0}
       .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
       .buffer_info({&buffer_info, 1})
-      .write(frame.ctx->device.vk_device);
+      .write(frame.ctx->ctx.device.vk_device);
 
   vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &camera_descriptor,
                           0, nullptr);
@@ -204,7 +209,7 @@ void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const Defa
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
         }})
-        .write(frame.ctx->device.vk_device);
+        .write(frame.ctx->ctx.device.vk_device);
     vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &descriptor, 0,
                             nullptr);
 

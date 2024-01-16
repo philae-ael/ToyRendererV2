@@ -3,6 +3,7 @@
 #include <array>
 
 #include "../camera.h"
+#include "deletion_stack.h"
 #include "mesh.h"
 #include "passes/shadow_map.h"
 #include "ressources.h"
@@ -42,17 +43,18 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
 void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transferer& t, ImageBuilder& ib,
                                      BufferBuilder& /*bb*/) {
-  passes.gbuffer =
-      GBuffer::init(engine.device.vk_device, engine.rm, engine.swapchain, engine.frame_deletion_stacks.device);
-  passes.gbuffer.defer_deletion(engine.global_deletion_stacks.device);
-
-  passes.shadow_map =
-      ShadowMap::init(engine.device.vk_device, engine.rm, engine.swapchain, engine.frame_deletion_stacks.device);
-  passes.shadow_map.defer_deletion(engine.global_deletion_stacks.device);
-
-  passes.deferred =
-      Deferred::init(engine.device.vk_device, engine.rm, engine.swapchain, engine.frame_deletion_stacks.device);
-  passes.deferred.defer_deletion(engine.global_deletion_stacks.device);
+  {
+    Lifetime setup_lifetime;
+    passes = {
+        .gbuffer = GBuffer::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
+                                 engine.ctx.swapchain),
+        .shadow_map = ShadowMap::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
+                                      engine.ctx.swapchain),
+        .deferred = Deferred::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
+                                   engine.ctx.swapchain),
+    };
+    setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
+  }
 
   {
     const VkSamplerCreateInfo sampler_create_info{
@@ -75,30 +77,28 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
         .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    VK_UNWRAP(vkCreateSampler, engine.device.vk_device, &sampler_create_info, nullptr, &default_ressources.sampler);
-    engine.global_deletion_stacks.device.defer_deletion(DeviceHandle::Sampler, default_ressources.sampler);
+    VK_UNWRAP(vkCreateSampler, engine.ctx.device.vk_device, &sampler_create_info, nullptr, &default_ressources.sampler);
+    engine.lifetime.global.tie(DeviceHandle::Sampler, default_ressources.sampler);
   }
 
   {
-    default_ressources.metallic_roughness = ib.build_image({
-        .flags = 0,
-        .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .size = VkExtent2D{1, 1},
-        .format = VK_FORMAT_R8G8_UNORM,
-        .debug_name = "default metallic_roughness_texture",
-    });
-    default_ressources.metallic_roughness.defer_deletion(engine.global_deletion_stacks.allocator,
-                                                         engine.global_deletion_stacks.device);
+    default_ressources.metallic_roughness = ib.build_image(
+        engine.lifetime.global, {
+                                    .flags = 0,
+                                    .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                    .size = VkExtent2D{1, 1},
+                                    .format = VK_FORMAT_R8G8_UNORM,
+                                    .debug_name = "default metallic_roughness_texture",
+                                });
 
-    default_ressources.normal_map = ib.build_image({
-        .flags = 0,
-        .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .size = VkExtent2D{1, 1},
-        .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-        .debug_name = "default normal_texture",
-    });
-    default_ressources.normal_map.defer_deletion(engine.global_deletion_stacks.allocator,
-                                                 engine.global_deletion_stacks.device);
+    default_ressources.normal_map = ib.build_image(
+        engine.lifetime.global, {
+                                    .flags = 0,
+                                    .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                    .size = VkExtent2D{1, 1},
+                                    .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+                                    .debug_name = "default normal_texture",
+                                });
 
     ImageMemoryBarrier::submit<2>(
         t.cmd.vk_cmd, {{

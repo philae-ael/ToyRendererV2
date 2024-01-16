@@ -1,5 +1,6 @@
 #include "vulkan_engine.h"
 
+#include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <vk_mem_alloc.h>
@@ -30,6 +31,27 @@
 #include "utils.h"
 #include "utils/misc.h"
 
+auto tr::renderer::VulkanContext::init(Lifetime& swapchain_lifetime, tr::Options& options,
+                                       std::span<const char*> required_instance_extensions, GLFWwindow* w)
+    -> VulkanContext {
+  const auto instance = Instance::init(options, required_instance_extensions);
+  const auto surface = Surface::init(instance.vk_instance, w);
+  const auto device = Device::init(instance.vk_instance, surface);
+  const auto swapchain =
+      Swapchain::init_with_config(swapchain_lifetime, {options.config.prefered_present_mode}, device, surface, w);
+
+  return {
+      .instance = instance,
+      .surface = surface,
+      .device = device,
+      .swapchain = swapchain,
+  };
+}
+
+void tr::renderer::VulkanContext::rebuild_swapchain(Lifetime& swapchain_lifetime, GLFWwindow* w) {
+  swapchain.reinit(swapchain_lifetime, device, surface, w);
+}
+
 auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   if (swapchain_need_to_be_rebuilt) {
     rebuild_swapchain();
@@ -49,11 +71,11 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
       .ctx = this,
   };
 
-  VK_UNWRAP(vkWaitForFences, device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
+  VK_UNWRAP(vkWaitForFences, ctx.device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
 
   VkResult result =
-      vkAcquireNextImageKHR(device.vk_device, swapchain.vk_swapchain, 1000000000, frame.synchro.present_semaphore,
-                            VK_NULL_HANDLE, &frame.swapchain_image_index);
+      vkAcquireNextImageKHR(ctx.device.vk_device, ctx.swapchain.vk_swapchain, 1000000000,
+                            frame.synchro.present_semaphore, VK_NULL_HANDLE, &frame.swapchain_image_index);
   switch (result) {
     case VK_ERROR_OUT_OF_DATE_KHR:
       rebuild_swapchain();
@@ -63,18 +85,18 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
       VK_CHECK(result, swapchain.acquire_next_frame);
   }
 
-  VK_UNWRAP(vkResetFences, device.vk_device, 1, &frame.synchro.render_fence);
-  VK_UNWRAP(vkResetCommandPool, device.vk_device, graphic_command_pools[frame_id % MAX_FRAMES_IN_FLIGHT], 0);
+  VK_UNWRAP(vkResetFences, ctx.device.vk_device, 1, &frame.synchro.render_fence);
+  VK_UNWRAP(vkResetCommandPool, ctx.device.vk_device, graphic_command_pools[frame_id % MAX_FRAMES_IN_FLIGHT], 0);
   VK_UNWRAP(frame.cmd.begin);
-  frame.descriptor_allocator.reset(device.vk_device);
+  frame.descriptor_allocator.reset(ctx.device.vk_device);
 
   vmaSetCurrentFrameIndex(allocator, frame_id);
   debug_info.set_frame_id(frame.cmd.vk_cmd, frame_id);
 
   // TODO: better from external images
   frame.frm.get_image(ImageRessourceId::Swapchain) = ImageRessource::from_external_image(
-      swapchain.images[frame.swapchain_image_index], swapchain.image_views[frame.swapchain_image_index],
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, swapchain.extent);
+      ctx.swapchain.images[frame.swapchain_image_index], ctx.swapchain.image_views[frame.swapchain_image_index],
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, ctx.swapchain.extent);
 
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_BOTTOM);
 
@@ -99,12 +121,12 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
                                 }});
 
   VK_UNWRAP(frame.cmd.end);
-  VK_UNWRAP(frame.submitCmds, device.queues.graphics_queue);
+  VK_UNWRAP(frame.submitCmds, ctx.device.queues.graphics_queue);
 
   // Present
   // TODO: there should be a queue ownership transfer if graphics queue != present queue
   // https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples#multiple-queues
-  const VkResult result = frame.present(device, swapchain.vk_swapchain);
+  const VkResult result = frame.present(ctx.device, ctx.swapchain.vk_swapchain);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || swapchain_need_to_be_rebuilt) {
     swapchain_need_to_be_rebuilt = true;
   } else {
@@ -112,8 +134,8 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
   }
 
   // per frame cleanup
-  frame_deletion_stacks.device.cleanup(device.vk_device);
-  frame_deletion_stacks.allocator.cleanup(allocator);
+  lifetime.frame.device.cleanup(ctx.device.vk_device);
+  lifetime.frame.allocator.cleanup(allocator);
 
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_BOTTOM);
 }
@@ -121,20 +143,17 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
 void tr::renderer::VulkanEngine::rebuild_swapchain() {
   spdlog::info("rebuilding swapchain");
   sync();
-  swapchain_deletion_stacks.device.cleanup(device.vk_device);
-  swapchain_deletion_stacks.allocator.cleanup(allocator);
 
-  swapchain.reinit(device, surface, window);
-  swapchain.defer_deletion(swapchain_deletion_stacks.device);
+  lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
+  ctx.rebuild_swapchain(lifetime.swapchain, window);
 
   rm.get_image_storage(ImageRessourceId::Swapchain)
-      .from_external_images(swapchain.images, swapchain.image_views, swapchain.extent);
+      .from_external_images(ctx.swapchain.images, ctx.swapchain.image_views, ctx.swapchain.extent);
 
-  ImageBuilder ib{device.vk_device, allocator, &swapchain};
+  auto ib = image_builder();
   for (auto& image_storage : rm.image_storages()) {
     if (image_storage.definition.depends_on_swapchain()) {
-      image_storage.init(ib);
-      image_storage.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
+      image_storage.init(lifetime.swapchain, ib);
     }
   }
 }
@@ -146,60 +165,44 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   }
 
   window = w;
-  instance = Instance::init(options, required_instance_extensions);
-  instance.defer_deletion(global_deletion_stacks.instance);
-
-  surface = Surface::init(instance.vk_instance, w);
-  Surface::defer_deletion(surface, global_deletion_stacks.instance);
-
-  device = Device::init(instance.vk_instance, surface);
-  device.defer_deletion(global_deletion_stacks.instance);
+  ctx = VulkanContext::init(lifetime.swapchain, options, required_instance_extensions, w);
 
   VmaAllocatorCreateInfo allocator_create_info{
       .flags = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT,
-      .physicalDevice = device.physical_device,
-      .device = device.vk_device,
+      .physicalDevice = ctx.device.physical_device,
+      .device = ctx.device.vk_device,
       .preferredLargeHeapBlockSize = 0,
       .pAllocationCallbacks = nullptr,
       .pDeviceMemoryCallbacks = nullptr,
       .pHeapSizeLimit = nullptr,
       .pVulkanFunctions = nullptr,
-      .instance = instance.vk_instance,
+      .instance = ctx.instance.vk_instance,
       .vulkanApiVersion = VK_API_VERSION_1_3,
       .pTypeExternalMemoryHandleTypes = nullptr,
   };
-  if (device.extensions.contains(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME)) {
+  if (ctx.device.extensions.contains(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME)) {
     allocator_create_info.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
     spdlog::debug("VMA flag VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT is set");
   }
 
   VK_UNWRAP(vmaCreateAllocator, &allocator_create_info, &allocator);
 
-  DeviceDeletionStack setup_device_deletion_stack;
-  VmaDeletionStack setup_allocator_deletion_stack;
-
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    graphic_command_pools[i] = CommandPool::init(device, CommandPool::TargetQueue::Graphics);
-    CommandPool::defer_deletion(graphic_command_pools[i], global_deletion_stacks.device);
-    graphics_command_buffers[i] = OneTimeCommandBuffer::allocate(device.vk_device, graphic_command_pools[i]);
+    graphic_command_pools[i] = CommandPool::init(lifetime.global, ctx.device, CommandPool::TargetQueue::Graphics);
+    graphics_command_buffers[i] = OneTimeCommandBuffer::allocate(ctx.device.vk_device, graphic_command_pools[i]);
   }
-  graphic_command_pool_for_next_frame = CommandPool::init(device, CommandPool::TargetQueue::Graphics);
-  CommandPool::defer_deletion(graphic_command_pool_for_next_frame, global_deletion_stacks.device);
+  graphic_command_pool_for_next_frame =
+      CommandPool::init(lifetime.global, ctx.device, CommandPool::TargetQueue::Graphics);
 
-  transfer_command_pool = CommandPool::init(device, CommandPool::TargetQueue::Transfer);
-  CommandPool::defer_deletion(transfer_command_pool, global_deletion_stacks.device);
-
-  swapchain = Swapchain::init_with_config({options.config.prefered_present_mode}, device, surface, window);
-  swapchain.defer_deletion(swapchain_deletion_stacks.device);
+  transfer_command_pool = CommandPool::init(lifetime.global, ctx.device, CommandPool::TargetQueue::Transfer);
 
   for (auto& frame_descriptor_allocator : frame_descriptor_allocators) {
-    frame_descriptor_allocator = DescriptorAllocator::init(device.vk_device, 8192,
+    frame_descriptor_allocator = DescriptorAllocator::init(lifetime.global, ctx.device.vk_device, 8192,
                                                            {{
                                                                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048},
                                                                {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2048},
                                                                {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2048},
                                                            }});
-    frame_descriptor_allocator.defer_deletion(global_deletion_stacks.device);
   }
 
   // Rm could take care of this
@@ -216,36 +219,29 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
       continue;
     }
 
-    image_storage.init(ib);
     if (image_storage.definition.depends_on_swapchain()) {
-      image_storage.defer_deletion(swapchain_deletion_stacks.allocator, swapchain_deletion_stacks.device);
+      image_storage.init(lifetime.swapchain, ib);
     } else {
-      image_storage.defer_deletion(global_deletion_stacks.allocator, global_deletion_stacks.device);
+      image_storage.init(lifetime.global, ib);
     }
   }
 
   auto bb = buffer_builder();
   for (auto& buffer_storage : rm.buffer_storages()) {
-    buffer_storage.init(bb);
-    buffer_storage.defer_deletion(global_deletion_stacks.allocator);
+    buffer_storage.init(lifetime.global, bb);
   }
 
-  debug_info.gpu_timestamps = decltype(debug_info.gpu_timestamps)::init(device);
-  debug_info.gpu_timestamps.defer_deletion(global_deletion_stacks.device);
+  debug_info.gpu_timestamps = decltype(debug_info.gpu_timestamps)::init(lifetime.global, ctx.device);
 
   for (auto& synchro : frame_synchronisation_pool) {
-    synchro = FrameSynchro::init(device.vk_device);
-    synchro.defer_deletion(global_deletion_stacks.device);
+    synchro = FrameSynchro::init(lifetime.global, ctx.device.vk_device);
   }
-
-  setup_device_deletion_stack.cleanup(device.vk_device);
-  setup_allocator_deletion_stack.cleanup(allocator);
 }
 
 auto tr::renderer::VulkanEngine::start_transfer() -> Transferer {
   utils::ignore_unused(this);
-  auto cmd = OneTimeCommandBuffer::allocate(device.vk_device, transfer_command_pool);
-  auto graphics_cmd = OneTimeCommandBuffer::allocate(device.vk_device, graphic_command_pool_for_next_frame, false);
+  auto cmd = OneTimeCommandBuffer::allocate(ctx.device.vk_device, transfer_command_pool);
+  auto graphics_cmd = OneTimeCommandBuffer::allocate(ctx.device.vk_device, graphic_command_pool_for_next_frame, false);
 
   VK_UNWRAP(cmd.begin);
   VK_UNWRAP(graphics_cmd.begin);
@@ -261,25 +257,31 @@ void tr::renderer::VulkanEngine::end_transfer(Transferer&& t_in) {
   VK_UNWRAP(t.graphics_cmd.end);
   graphic_command_buffers_for_next_frame.push_back(t.graphics_cmd.vk_cmd);
 
-  QueueSubmit{}.command_buffers({{t.cmd.vk_cmd}}).submit(device.queues.transfer_queue, VK_NULL_HANDLE);
+  QueueSubmit{}.command_buffers({{t.cmd.vk_cmd}}).submit(ctx.device.queues.transfer_queue, VK_NULL_HANDLE);
 
   // WARN: THIS IS BAD: we should keep the uploader until all the uploads are done
   // Maybe within a deletion queue with a fence ? Or smthg like that
   sync();
-  t.uploader.defer_trim(frame_deletion_stacks.allocator);
+  t.uploader.defer_trim(lifetime.frame.allocator);
 }
 
 tr::renderer::VulkanEngine::~VulkanEngine() {
   sync();
 
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    vkFreeCommandBuffers(device.vk_device, graphic_command_pools[i], 1, &graphics_command_buffers[i].vk_cmd);
+    vkFreeCommandBuffers(ctx.device.vk_device, graphic_command_pools[i], 1, &graphics_command_buffers[i].vk_cmd);
   }
-  swapchain_deletion_stacks.device.cleanup(device.vk_device);
-  swapchain_deletion_stacks.allocator.cleanup(allocator);
-  global_deletion_stacks.device.cleanup(device.vk_device);
-  global_deletion_stacks.allocator.cleanup(allocator);
+
+  lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
+  lifetime.global.cleanup(ctx.device.vk_device, allocator);
+
   vmaDestroyAllocator(allocator);
-  global_deletion_stacks.instance.cleanup(instance.vk_instance);
-  vkDestroyInstance(instance.vk_instance, nullptr);
+
+  InstanceDeletionStack instance_deletion_stack;
+  ctx.device.defer_deletion(instance_deletion_stack);
+  Surface::defer_deletion(ctx.surface, instance_deletion_stack);
+  ctx.instance.defer_deletion(instance_deletion_stack);
+
+  instance_deletion_stack.cleanup(ctx.instance.vk_instance);
+  vkDestroyInstance(ctx.instance.vk_instance, nullptr);
 }

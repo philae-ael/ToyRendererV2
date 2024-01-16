@@ -29,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+#include "renderer/deletion_stack.h"
 #include "renderer/mesh.h"
 #include "renderer/ressources.h"
 #include "renderer/synchronisation.h"
@@ -37,8 +38,8 @@
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
 
-auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, const fastgltf::Image& image,
-                  std::string_view debug_name) -> tr::renderer::ImageRessource {
+auto load_texture(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t,
+                  const fastgltf::Image& image, std::string_view debug_name) -> tr::renderer::ImageRessource {
   uint32_t width = 0;
   uint32_t height = 0;
   std::span<const std::byte> image_data;
@@ -63,20 +64,21 @@ auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, c
              },
              image.data);
 
-  auto image_ressource = ib.build_image(tr::renderer::ImageDefinition{
-      .flags = 0,
-      .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-      .size =
-          VkExtent2D{
-              .width = width,
-              .height = height,
+  auto image_ressource =
+      ib.build_image(lifetime, tr::renderer::ImageDefinition{
+                                   .flags = 0,
+                                   .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                   .size =
+                                       VkExtent2D{
+                                           .width = width,
+                                           .height = height,
 
-          },
-      // TODO: How to deal with RBG (non alpha images?)
-      // and more generally with unsupported formats
-      .format = VK_FORMAT_R8G8B8A8_UNORM,
-      .debug_name = debug_name,
-  });
+                                       },
+                                   // TODO: How to deal with RBG (non alpha images?)
+                                   // and more generally with unsupported formats
+                                   .format = VK_FORMAT_R8G8B8A8_UNORM,
+                                   .debug_name = debug_name,
+                               });
 
   tr::renderer::ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
                                               {{
@@ -90,8 +92,8 @@ auto load_texture(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, c
   return image_ressource;
 }
 
-auto load_materials(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t, const fastgltf::Asset& asset)
-    -> std::vector<std::shared_ptr<tr::renderer::Material>> {
+auto load_materials(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t,
+                    const fastgltf::Asset& asset) -> std::vector<std::shared_ptr<tr::renderer::Material>> {
   std::vector<std::shared_ptr<tr::renderer::Material>> materials;
 
   for (const auto& material : asset.materials) {
@@ -100,19 +102,19 @@ auto load_materials(tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t,
     TR_ASSERT(material.pbrData.baseColorTexture, "no base color texture, not supported");
     const auto& color_texture = asset.textures[material.pbrData.baseColorTexture->textureIndex];
     TR_ASSERT(color_texture.imageIndex, "no image index, not supported");
-    mat->base_color_texture = load_texture(ib, t, asset.images[*color_texture.imageIndex], "base color");
+    mat->base_color_texture = load_texture(lifetime, ib, t, asset.images[*color_texture.imageIndex], "base color");
 
     if (material.pbrData.metallicRoughnessTexture) {
       const auto& metallic_roughness_texture = asset.textures[material.pbrData.metallicRoughnessTexture->textureIndex];
       TR_ASSERT(metallic_roughness_texture.imageIndex, "no image index, not supported");
       mat->metallic_roughness_texture =
-          load_texture(ib, t, asset.images[*metallic_roughness_texture.imageIndex], "metal roughness");
+          load_texture(lifetime, ib, t, asset.images[*metallic_roughness_texture.imageIndex], "metal roughness");
     }
 
     if (material.normalTexture) {
       const auto& normal_texture = asset.textures[material.normalTexture->textureIndex];
       TR_ASSERT(normal_texture.imageIndex, "no image index, not supported");
-      mat->normal_texture = load_texture(ib, t, asset.images[*normal_texture.imageIndex], "normal map");
+      mat->normal_texture = load_texture(lifetime, ib, t, asset.images[*normal_texture.imageIndex], "normal map");
     }
 
     materials.push_back(std::move(mat));
@@ -159,8 +161,9 @@ auto load_attribute(const fastgltf::Asset& asset, std::vector<tr::renderer::Vert
   std::call_once(warn_once_flags[attribute], [&] { spdlog::warn("Unknown attribute {}", attribute); });
 }
 
-auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, const fastgltf::Asset& asset,
-                 std::span<std::shared_ptr<tr::renderer::Material>> materials) -> std::vector<tr::renderer::Mesh> {
+auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
+                 const fastgltf::Asset& asset, std::span<std::shared_ptr<tr::renderer::Material>> materials)
+    -> std::vector<tr::renderer::Mesh> {
   std::vector<tr::renderer::Mesh> meshes;
   for (const auto& scene : asset.scenes) {
     for (auto idx : scene.nodeIndices) {
@@ -214,21 +217,23 @@ auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, c
       }
 
       auto vertices_bytes = std::as_bytes(std::span(vertices));
-      asset_mesh.buffers.vertices = bb.build_buffer({
-          .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-          .size = utils::narrow_cast<uint32_t>(vertices_bytes.size_bytes()),
-          .flags = 0,
-          .debug_name = std::format("vertex buffer for {}", mesh.name),
-      });
+      asset_mesh.buffers.vertices =
+          bb.build_buffer(lifetime, {
+                                        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                        .size = utils::narrow_cast<uint32_t>(vertices_bytes.size_bytes()),
+                                        .flags = 0,
+                                        .debug_name = std::format("vertex buffer for {}", mesh.name),
+                                    });
       t.upload_buffer(asset_mesh.buffers.vertices.buffer, 0, vertices_bytes);
 
       auto indices_bytes = std::as_bytes(std::span(indices));
-      asset_mesh.buffers.indices = bb.build_buffer({
-          .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-          .size = utils::narrow_cast<uint32_t>(indices_bytes.size_bytes()),
-          .flags = 0,
-          .debug_name = std::format("index buffer for {}", mesh.name),
-      });
+      asset_mesh.buffers.indices =
+          bb.build_buffer(lifetime, {
+                                        .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                        .size = utils::narrow_cast<uint32_t>(indices_bytes.size_bytes()),
+                                        .flags = 0,
+                                        .debug_name = std::format("index buffer for {}", mesh.name),
+                                    });
       t.upload_buffer(asset_mesh.buffers.indices->buffer, 0, indices_bytes);
 
       meshes.push_back(asset_mesh);
@@ -237,8 +242,8 @@ auto load_meshes(tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t, c
 
   return meshes;
 }
-auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
-          const fastgltf::Asset& asset)
+auto load(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb,
+          tr::renderer::Transferer& t, const fastgltf::Asset& asset)
     -> std::pair<std::vector<std::shared_ptr<tr::renderer::Material>>, std::vector<tr::renderer::Mesh>> {
   {
     const auto err = fastgltf::validate(asset);
@@ -247,15 +252,16 @@ auto load(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb, tr::r
   }
 
   // TODO: use an id rather than a pointer -> Allows to sort and more
-  std::vector<std::shared_ptr<tr::renderer::Material>> materials = load_materials(ib, t, asset);
+  std::vector<std::shared_ptr<tr::renderer::Material>> materials = load_materials(lifetime, ib, t, asset);
   return {
       materials,
-      load_meshes(bb, t, asset, materials),
+      load_meshes(lifetime, bb, t, asset, materials),
   };
 }
 
-auto tr::Gltf::load_from_file(tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb,
-                              tr::renderer::Transferer& t, const std::filesystem::path& path)
+auto tr::Gltf::load_from_file(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib,
+                              tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
+                              const std::filesystem::path& path)
     -> std::pair<std::vector<std::shared_ptr<tr::renderer::Material>>, std::vector<tr::renderer::Mesh>> {
   fastgltf::Parser parser;
   fastgltf::GltfDataBuffer data;
@@ -288,5 +294,5 @@ auto tr::Gltf::load_from_file(tr::renderer::ImageBuilder& ib, tr::renderer::Buff
                 fastgltf::getErrorMessage(err));
     }
   }
-  return load(ib, bb, t, asset);
+  return load(lifetime, ib, bb, t, asset);
 }

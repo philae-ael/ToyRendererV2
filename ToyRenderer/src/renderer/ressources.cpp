@@ -5,6 +5,7 @@
 #include <variant>
 
 #include "debug.h"
+#include "deletion_stack.h"
 #include "swapchain.h"
 #include "synchronisation.h"
 #include "utils/misc.h"
@@ -122,7 +123,7 @@ auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const 
                     size);
 }
 
-auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -> ImageRessource {
+auto tr::renderer::ImageBuilder::build_image(Lifetime& lifetime, ImageDefinition definition) const -> ImageRessource {
   const auto format = definition.vk_format(*swapchain);
   const auto aspect_mask = definition.vk_aspect_mask();
   const auto extent = definition.vk_extent(*swapchain);
@@ -187,6 +188,9 @@ auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -
   VK_UNWRAP(vkCreateImageView, device, &view_create_info, nullptr, &view);
   set_debug_object_name(device, VK_OBJECT_TYPE_IMAGE_VIEW, view, std::format("{} view", definition.debug_name));
 
+  lifetime.tie(VmaHandle::Image, image, alloc);
+  lifetime.tie(DeviceHandle::ImageView, view);
+
   return ImageRessource{
       .image = image,
       .view = view,
@@ -225,7 +229,8 @@ auto tr::renderer::BufferDefinition::vma_flags() const -> VmaAllocationCreateFla
   return 0;
 }
 
-auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition) const -> BufferRessource {
+auto tr::renderer::BufferBuilder::build_buffer(Lifetime& lifetime, BufferDefinition definition) const
+    -> BufferRessource {
   BufferRessource res{
       .usage = definition.usage,
       .size = definition.size,
@@ -255,6 +260,7 @@ auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition) cons
   VK_UNWRAP(vmaCreateBuffer, allocator, &buffer_create_info, &allocation_create_info, &res.buffer, &res.alloc, nullptr);
   set_debug_object_name(device, VK_OBJECT_TYPE_BUFFER, res.buffer, std::format("{} buffer", definition.debug_name));
 
+  lifetime.tie(VmaHandle::Buffer, res.buffer, res.alloc);
   return res;
 }
 

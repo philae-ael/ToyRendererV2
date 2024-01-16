@@ -8,7 +8,7 @@
 #include "utils.h"
 #include "utils/cast.h"
 
-auto tr::renderer::DescriptorAllocator::init(VkDevice device, uint32_t max_sets,
+auto tr::renderer::DescriptorAllocator::init(Lifetime& lifetime, VkDevice device, uint32_t max_sets,
                                              std::span<const VkDescriptorPoolSize> pool_sizes) -> DescriptorAllocator {
   DescriptorAllocator allocator{};
 
@@ -22,6 +22,7 @@ auto tr::renderer::DescriptorAllocator::init(VkDevice device, uint32_t max_sets,
   };
 
   VK_UNWRAP(vkCreateDescriptorPool, device, &create_info, nullptr, &allocator.pool);
+  lifetime.tie(DeviceHandle::DescriptorPool, allocator.pool);
 
   return allocator;
 }
@@ -38,10 +39,6 @@ auto tr::renderer::DescriptorAllocator::allocate(VkDevice device, VkDescriptorSe
   VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
   VK_UNWRAP(vkAllocateDescriptorSets, device, &alloc_info, &descriptor_set);
   return descriptor_set;
-}
-
-void tr::renderer::DescriptorAllocator::defer_deletion(DeviceDeletionStack& device_deletion_stack) {
-  device_deletion_stack.defer_deletion(DeviceHandle::DescriptorPool, pool);
 }
 
 void tr::renderer::DescriptorAllocator::reset(VkDevice device) { VK_UNWRAP(vkResetDescriptorPool, device, pool, 0); }

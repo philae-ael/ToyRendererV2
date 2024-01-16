@@ -11,12 +11,8 @@
 namespace tr::renderer {
 
 struct Shader {
-  static auto init_from_src(VkDevice, std::span<const uint32_t>) -> Shader;
-  static auto init_from_filename(VkDevice, const std::filesystem::path&) -> Shader;
-
-  void defer_deletion(DeviceDeletionStack& device_deletion_stack) const {
-    device_deletion_stack.defer_deletion(DeviceHandle::ShaderModule, module);
-  }
+  static auto init_from_src(Lifetime& lifetime, VkDevice, std::span<const uint32_t>) -> Shader;
+  static auto init_from_filename(Lifetime& lifetime, VkDevice, const std::filesystem::path&) -> Shader;
 
   VkShaderModule module;
 

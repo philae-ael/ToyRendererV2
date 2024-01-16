@@ -25,10 +25,6 @@ struct BufferRessource {
 
   VkBufferUsageFlags usage = 0;
   uint32_t size = 0;
-
-  void defer_deletion(VmaDeletionStack& vma_deletion_stack) const {
-    vma_deletion_stack.defer_deletion(VmaHandle::Buffer, buffer, alloc);
-  }
 };
 
 enum BufferOptionFlagsBits {
@@ -54,7 +50,7 @@ struct BufferDefinition {
 class BufferBuilder {
  public:
   BufferBuilder(VkDevice device, VmaAllocator allocator) : device(device), allocator(allocator) {}
-  [[nodiscard]] auto build_buffer(BufferDefinition definition) const -> BufferRessource;
+  [[nodiscard]] auto build_buffer(Lifetime& lifetime, BufferDefinition definition) const -> BufferRessource;
 
  private:
   VkDevice device;
@@ -79,11 +75,6 @@ struct ImageRessource {
 
   auto as_attachment(std::variant<VkClearValue, ImageClearOpLoad, ImageClearOpDontCare> clearOp)
       -> VkRenderingAttachmentInfo;
-
-  void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) const {
-    device_deletion_stack.defer_deletion(DeviceHandle::ImageView, view);
-    vma_deletion_stack.defer_deletion(VmaHandle::Image, image, alloc);
-  }
 };
 
 enum ImageOptionsFlagBits {
@@ -116,7 +107,7 @@ class ImageBuilder {
   ImageBuilder(VkDevice device, VmaAllocator allocator, const Swapchain* swapchain)
       : device(device), allocator(allocator), swapchain(swapchain) {}
 
-  [[nodiscard]] auto build_image(ImageDefinition definition) const -> ImageRessource;
+  [[nodiscard]] auto build_image(Lifetime& lifetime, ImageDefinition definition) const -> ImageRessource;
 
  private:
   VkDevice device;
@@ -153,21 +144,12 @@ struct ImageRessourceStorage {
   auto store(uint32_t frame_id, ImageRessource ressource) { ressources[frame_id % MAX_FRAMES_IN_FLIGHT] = ressource; }
   auto get(uint32_t frame_id) -> ImageRessource { return ressources[frame_id % MAX_FRAMES_IN_FLIGHT]; }
 
-  void init(ImageBuilder& rb) {
+  void init(Lifetime& lifetime, ImageBuilder& rb) {
     if ((definition.flags & IMAGE_OPTION_FLAG_EXTERNAL_BIT) != 0) {
       return;
     }
     for (auto& res : ressources) {
-      res = rb.build_image(definition);
-    }
-  }
-
-  void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) {
-    if ((definition.flags & IMAGE_OPTION_FLAG_EXTERNAL_BIT) != 0) {
-      return;
-    }
-    for (auto& res : ressources) {
-      res.defer_deletion(vma_deletion_stack, device_deletion_stack);
+      res = rb.build_image(lifetime, definition);
     }
   }
 
@@ -188,15 +170,9 @@ struct BufferRessourceStorage {
   auto store(uint32_t frame_id, BufferRessource ressource) { ressources[frame_id % MAX_FRAMES_IN_FLIGHT] = ressource; }
   auto get(uint32_t frame_id) -> BufferRessource { return ressources[frame_id % MAX_FRAMES_IN_FLIGHT]; }
 
-  void init(BufferBuilder& bb) {
+  void init(Lifetime& lifetime, BufferBuilder& bb) {
     for (auto& res : ressources) {
-      res = bb.build_buffer(definition);
-    }
-  }
-
-  void defer_deletion(VmaDeletionStack& vma_deletion_stack) {
-    for (auto& res : ressources) {
-      res.defer_deletion(vma_deletion_stack);
+      res = bb.build_buffer(lifetime, definition);
     }
   }
 };

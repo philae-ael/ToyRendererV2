@@ -8,8 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "buffer.h"
 #include "deletion_stack.h"
-#include "frame.h"
 #include "ressources.h"
 #include "utils/assert.h"
 

@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "../camera.h"
-#include "deletion_stack.h"
 #include "ressources.h"
 #include "vertex.h"
 
@@ -27,7 +26,7 @@ struct Vertex {
   const static std::array<VkVertexInputAttributeDescription, 6> attributes;
   const static std::array<VkVertexInputBindingDescription, 1> bindings;
 };
-constexpr std::array<VkVertexInputAttributeDescription, 6> Vertex::attributes =
+inline constexpr std::array<VkVertexInputAttributeDescription, 6> Vertex::attributes =
     AttributeBuilder<6>{}
         .binding(0)
         .attribute(0, offsetof(Vertex, pos), VK_FORMAT_R32G32B32_SFLOAT)
@@ -38,7 +37,7 @@ constexpr std::array<VkVertexInputAttributeDescription, 6> Vertex::attributes =
         .attribute(5, offsetof(Vertex, uv2), VK_FORMAT_R32G32_SFLOAT)
         .build();
 
-constexpr std::array<VkVertexInputBindingDescription, 1> Vertex::bindings =
+inline constexpr std::array<VkVertexInputBindingDescription, 1> Vertex::bindings =
     std::to_array<VkVertexInputBindingDescription>({
         {
             .binding = 0,
@@ -51,16 +50,6 @@ struct Material {
   tr::renderer::ImageRessource base_color_texture{};
   std::optional<tr::renderer::ImageRessource> metallic_roughness_texture;
   std::optional<tr::renderer::ImageRessource> normal_texture;
-
-  void defer_deletion(VmaDeletionStack& vma_deletion_stack, DeviceDeletionStack& device_deletion_stack) const {
-    base_color_texture.defer_deletion(vma_deletion_stack, device_deletion_stack);
-    if (metallic_roughness_texture) {
-      metallic_roughness_texture->defer_deletion(vma_deletion_stack, device_deletion_stack);
-    }
-    if (normal_texture) {
-      normal_texture->defer_deletion(vma_deletion_stack, device_deletion_stack);
-    }
-  }
 };
 
 struct Mesh {

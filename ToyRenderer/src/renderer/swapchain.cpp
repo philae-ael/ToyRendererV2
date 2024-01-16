@@ -35,8 +35,9 @@ auto tr::renderer::Swapchain::compute_extent(GLFWwindow* window) const -> VkExte
   return new_extent;
 }
 
-auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::renderer::Device& device,
-                                               VkSurfaceKHR surface, GLFWwindow* window) -> Swapchain {
+auto tr::renderer::Swapchain::init_with_config(Lifetime& lifetime, SwapchainConfig config,
+                                               const tr::renderer::Device& device, VkSurfaceKHR surface,
+                                               GLFWwindow* window) -> Swapchain {
   Swapchain s{};
   s.config = config;
 
@@ -162,5 +163,10 @@ auto tr::renderer::Swapchain::init_with_config(SwapchainConfig config, tr::rende
     set_debug_object_name(device.vk_device, VK_OBJECT_TYPE_IMAGE_VIEW, s.image_views[i],
                           std::format("Swapchain view {}", i));
   }
+
+  for (auto view : s.image_views) {
+    lifetime.tie(DeviceHandle::ImageView, view);
+  }
+  lifetime.tie(DeviceHandle::SwapchainKHR, s.vk_swapchain);
   return s;
 }

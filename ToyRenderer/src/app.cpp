@@ -48,21 +48,8 @@ tr::App::App(tr::Options options) : options(options) {
     } else {
       scene_name = options.scene;
     }
-    const auto [mats, scene] = Gltf::load_from_file(ib, bb, t, scene_name);
+    const auto [_, scene] = Gltf::load_from_file(subsystems.engine.lifetime.global, ib, bb, t, scene_name);
     meshes.insert(meshes.end(), scene.begin(), scene.end());
-
-    for (const auto& mat : mats) {
-      mat->defer_deletion(subsystems.engine.global_deletion_stacks.allocator,
-                          subsystems.engine.global_deletion_stacks.device);
-    }
-
-    for (const auto& mesh : meshes) {
-      mesh.buffers.vertices.defer_deletion(subsystems.engine.global_deletion_stacks.allocator);
-      if (mesh.buffers.indices) {
-        mesh.buffers.indices->defer_deletion(subsystems.engine.global_deletion_stacks.allocator);
-      }
-    }
-
     subsystems.engine.end_transfer(std::move(t));
   }
   subsystems.engine.sync();

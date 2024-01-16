@@ -14,9 +14,8 @@ class DescriptorAllocator {
   VkDescriptorPool pool;
 
  public:
-  static auto init(VkDevice device, uint32_t max_sets, std::span<const VkDescriptorPoolSize> pool_sizes)
-      -> DescriptorAllocator;
-  void defer_deletion(DeviceDeletionStack&);
+  static auto init(Lifetime& lifetime, VkDevice device, uint32_t max_sets,
+                   std::span<const VkDescriptorPoolSize> pool_sizes) -> DescriptorAllocator;
 
   auto allocate(VkDevice device, VkDescriptorSetLayout layout) -> VkDescriptorSet;
   void reset(VkDevice device);

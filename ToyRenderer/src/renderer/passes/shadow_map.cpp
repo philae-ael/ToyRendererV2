@@ -16,10 +16,9 @@ const std::array gbuffer_vert_bin = std::to_array<uint32_t>({
 #include "shaders/shadow_map.vert.inc"
 });
 
-auto tr::renderer::ShadowMap::init(VkDevice &device, const RessourceManager &rm, const Swapchain &swapchain,
-                                   DeviceDeletionStack &device_deletion_stack) -> ShadowMap {
-  const auto vert = Shader::init_from_src(device, gbuffer_vert_bin);
-  vert.defer_deletion(device_deletion_stack);
+auto tr::renderer::ShadowMap::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
+                                   const RessourceManager &rm, const Swapchain &swapchain) -> ShadowMap {
+  const auto vert = Shader::init_from_src(setup_lifetime, device, gbuffer_vert_bin);
 
   const std::array shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
       vert.pipeline_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, "main"),
@@ -74,6 +73,12 @@ auto tr::renderer::ShadowMap::init(VkDevice &device, const RessourceManager &rm,
                             .dynamic_state(&dynamic_state_state)
                             .build(device);
 
+  lifetime.tie(DeviceHandle::Pipeline, pipeline);
+  lifetime.tie(DeviceHandle::PipelineLayout, layout);
+  for (auto descriptor_set_layout : descriptor_set_layouts) {
+    lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
+  }
+
   return {descriptor_set_layouts, layout, pipeline};
 }
 void tr::renderer::ShadowMap::end_draw(VkCommandBuffer cmd) const {
@@ -127,7 +132,7 @@ void tr::renderer::ShadowMap::start_draw(Frame &frame) const {
   DescriptorUpdater{camera_descriptor, 0}
       .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
       .buffer_info({&buffer_info, 1})
-      .write(frame.ctx->device.vk_device);
+      .write(frame.ctx->ctx.device.vk_device);
 
   vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &camera_descriptor,
                           0, nullptr);
@@ -165,7 +170,7 @@ void tr::renderer::ShadowMap::draw(Frame &frame, const DirectionalLight &light, 
   DescriptorUpdater{camera_descriptor, 0}
       .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
       .buffer_info({&buffer_info, 1})
-      .write(frame.ctx->device.vk_device);
+      .write(frame.ctx->ctx.device.vk_device);
 
   vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &camera_descriptor,
                           0, nullptr);

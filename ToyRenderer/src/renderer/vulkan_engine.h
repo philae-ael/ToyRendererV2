@@ -28,6 +28,18 @@ class Imgui;
 }
 
 namespace tr::renderer {
+struct VulkanContext {
+  Instance instance;
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  Device device;
+  Swapchain swapchain;
+
+  // TODO: window is not needed, an extent is enough
+  // For both
+  static auto init(Lifetime& swapchain_lifetime, tr::Options& options,
+                   std::span<const char*> required_instance_extensions, GLFWwindow* w) -> VulkanContext;
+  void rebuild_swapchain(Lifetime& swapchain_lifetime, GLFWwindow* w);
+};
 
 class VulkanEngine {
  public:
@@ -42,7 +54,10 @@ class VulkanEngine {
   auto start_transfer() -> Transferer;
   void end_transfer(Transferer&&);
 
-  void sync() const { VK_UNWRAP(vkDeviceWaitIdle, device.vk_device); }
+  void sync() const { VK_UNWRAP(vkDeviceWaitIdle, ctx.device.vk_device); }
+
+  [[nodiscard]] auto image_builder() const -> ImageBuilder { return {ctx.device.vk_device, allocator, &ctx.swapchain}; }
+  [[nodiscard]] auto buffer_builder() const -> BufferBuilder { return {ctx.device.vk_device, allocator}; }
 
   ~VulkanEngine();
 
@@ -51,27 +66,13 @@ class VulkanEngine {
   auto operator=(const VulkanEngine&) -> VulkanEngine& = delete;
   auto operator=(VulkanEngine&&) -> VulkanEngine& = delete;
 
-  VulkanEngineDebugInfo debug_info;
+  struct Lifetimes {
+    Lifetime global;
+    Lifetime swapchain;
+    Lifetime frame;
+  } lifetime;
 
-  [[nodiscard]] auto image_builder() const -> ImageBuilder { return {device.vk_device, allocator, &swapchain}; }
-  [[nodiscard]] auto buffer_builder() const -> BufferBuilder { return {device.vk_device, allocator}; }
-
-  // Lifetimes
-  struct {  // Cleaned at exit
-    InstanceDeletionStack instance;
-    DeviceDeletionStack device;
-    VmaDeletionStack allocator;
-  } global_deletion_stacks;
-
-  struct {  // Cleaned on swapchain recreation
-    DeviceDeletionStack device;
-    VmaDeletionStack allocator;
-  } swapchain_deletion_stacks;
-
-  struct {
-    DeviceDeletionStack device;
-    VmaDeletionStack allocator;
-  } frame_deletion_stacks;
+  VulkanContext ctx;
 
   void rebuild_swapchain();
   void build_ressources();
@@ -79,15 +80,12 @@ class VulkanEngine {
   GLFWwindow* window{};
 
   RessourceManager rm{};
+  VulkanEngineDebugInfo debug_info;
 
-  Instance instance;
-  VkSurfaceKHR surface = VK_NULL_HANDLE;
-  Device device;
   VmaAllocator allocator = nullptr;
   std::array<DescriptorAllocator, MAX_FRAMES_IN_FLIGHT> frame_descriptor_allocators{};
 
   // Swapchain related
-  Swapchain swapchain;
   bool swapchain_need_to_be_rebuilt = false;
 
   // FRAME STUFF

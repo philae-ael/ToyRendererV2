@@ -25,12 +25,10 @@ struct PushConstant {
   glm::vec3 color;
   float padding = 0.0;
 };
-auto tr::renderer::Deferred::init(VkDevice &device, const RessourceManager &rm, const Swapchain &swapchain,
-                                  DeviceDeletionStack &device_deletion_stack) -> Deferred {
-  const auto frag = Shader::init_from_src(device, triangle_frag_bin);
-  const auto vert = Shader::init_from_src(device, triangle_vert_bin);
-  frag.defer_deletion(device_deletion_stack);
-  vert.defer_deletion(device_deletion_stack);
+auto tr::renderer::Deferred::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
+                                  const RessourceManager &rm, const Swapchain &swapchain) -> Deferred {
+  const auto frag = Shader::init_from_src(setup_lifetime, device, triangle_frag_bin);
+  const auto vert = Shader::init_from_src(setup_lifetime, device, triangle_vert_bin);
 
   const auto shader_stages = std::to_array({
       frag.pipeline_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, "main"),
@@ -113,6 +111,13 @@ auto tr::renderer::Deferred::init(VkDevice &device, const RessourceManager &rm, 
   };
   VK_UNWRAP(vkCreateSampler, device, &sampler_create_info, nullptr, &shadow_map_sampler);
 
+  lifetime.tie(DeviceHandle::Pipeline, pipeline);
+  lifetime.tie(DeviceHandle::PipelineLayout, layout);
+  lifetime.tie(DeviceHandle::Sampler, shadow_map_sampler);
+  for (auto descriptor_set_layout : descriptor_set_layouts) {
+    lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
+  }
+
   return {descriptor_set_layouts, layout, pipeline, shadow_map_sampler};
 }
 void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
@@ -157,7 +162,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
               .imageLayout = SyncFragmentStorageRead.layout,
           },
       }})
-      .write(frame.ctx->device.vk_device);
+      .write(frame.ctx->ctx.device.vk_device);
   DescriptorUpdater{descriptor, 1}
       .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
       .image_info({{
@@ -167,7 +172,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
               .imageLayout = SyncFragmentStorageRead.layout,
           },
       }})
-      .write(frame.ctx->device.vk_device);
+      .write(frame.ctx->ctx.device.vk_device);
 
   vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor, 0,
                           nullptr);

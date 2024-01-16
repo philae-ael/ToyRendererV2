@@ -115,7 +115,7 @@ void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine
         ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
       }
 
-      for (std::size_t i = 0; i < engine.device.memory_properties.memoryHeapCount; i++) {
+      for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
 
@@ -141,7 +141,7 @@ void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine
       ImGui::TableSetupColumn("Block Bytes");
       ImGui::TableSetupColumn("Block Count");
       ImGui::TableHeadersRow();
-      for (std::size_t i = 0; i < engine.device.memory_properties.memoryHeapCount; i++) {
+      for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
         auto& budget = budgets[i];
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
@@ -205,7 +205,7 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
   });
   int present_mode_selected = -1;
   for (int i = 0; i < utils::narrow_cast<int>(present_modes.size()); i++) {
-    if (engine.swapchain.config.prefered_present_mode == present_modes[i].second) {
+    if (engine.ctx.swapchain.config.prefered_present_mode == present_modes[i].second) {
       present_mode_selected = i;
       break;
     }
@@ -215,7 +215,7 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
     for (int i = 0; i < utils::narrow_cast<int>(present_modes.size()); i++) {
       if (ImGui::Selectable(present_modes[i].first, i == present_mode_selected)) {
         present_mode_selected = i;
-        engine.swapchain.config.prefered_present_mode = present_modes[i].second;
+        engine.ctx.swapchain.config.prefered_present_mode = present_modes[i].second;
         engine.swapchain_need_to_be_rebuilt = true;
       }
     }
@@ -231,7 +231,7 @@ void tr::renderer::VulkanEngineDebugInfo::imgui(tr::renderer::VulkanEngine& engi
 
 void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEngine& engine) {
   {
-    gpu_timestamps.get(engine.device.vk_device, current_frame_id - 1);
+    gpu_timestamps.get(engine.ctx.device.vk_device, current_frame_id - 1);
     for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
       const auto& period = GPU_TIME_PERIODS[i];
       const auto dt = gpu_timestamps.fetch_elsapsed(current_frame_id - 1, period.from, period.to);
@@ -259,7 +259,7 @@ void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEn
   std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
   vmaGetHeapBudgets(engine.allocator, budgets.data());
   float global_memory_usage{};
-  for (std::size_t i = 0; i < engine.device.memory_properties.memoryHeapCount; i++) {
+  for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
     gpu_heaps_usage[i].push(utils::narrow_cast<float>(budgets[i].usage));
     global_memory_usage += utils::narrow_cast<float>(budgets[i].usage);
   }

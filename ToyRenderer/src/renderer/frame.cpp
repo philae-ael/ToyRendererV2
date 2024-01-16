@@ -5,7 +5,7 @@
 
 #include "vulkan_engine.h"
 
-auto tr::renderer::FrameSynchro::init(VkDevice device) -> FrameSynchro {
+auto tr::renderer::FrameSynchro::init(Lifetime& lifetime, VkDevice device) -> FrameSynchro {
   FrameSynchro synchro{};
   const VkFenceCreateInfo fence_create_info{
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -24,6 +24,11 @@ auto tr::renderer::FrameSynchro::init(VkDevice device) -> FrameSynchro {
 
   set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore, " render_semaphore");
   set_debug_object_name(device, VK_OBJECT_TYPE_SEMAPHORE, synchro.present_semaphore, " present_semaphore");
+
+  lifetime.tie(DeviceHandle::Fence, synchro.render_fence);
+  lifetime.tie(DeviceHandle::Semaphore, synchro.render_semaphore);
+  lifetime.tie(DeviceHandle::Semaphore, synchro.present_semaphore);
+
   return synchro;
 }
 void tr::renderer::Frame::write_cpu_timestamp(CPUTimestampIndex index) const {
@@ -34,5 +39,5 @@ void tr::renderer::Frame::write_gpu_timestamp(VkPipelineStageFlagBits pipelineSt
   ctx->debug_info.write_gpu_timestamp(cmd.vk_cmd, pipelineStage, index);
 }
 auto tr::renderer::Frame::allocate_descriptor(VkDescriptorSetLayout layout) -> VkDescriptorSet {
-  return descriptor_allocator.allocate(ctx->device.vk_device, layout);
+  return descriptor_allocator.allocate(ctx->ctx.device.vk_device, layout);
 };

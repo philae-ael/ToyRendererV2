@@ -6,7 +6,8 @@
 #include "device.h"
 #include "utils.h"
 
-auto tr::renderer::CommandPool::init(Device &device, CommandPool::TargetQueue target_queue) -> VkCommandPool {
+auto tr::renderer::CommandPool::init(Lifetime& lifetime, Device& device, CommandPool::TargetQueue target_queue)
+    -> VkCommandPool {
   VkCommandPool command_pool = VK_NULL_HANDLE;
 
   std::uint32_t queue_family_index{};
@@ -29,5 +30,6 @@ auto tr::renderer::CommandPool::init(Device &device, CommandPool::TargetQueue ta
   };
 
   VK_UNWRAP(vkCreateCommandPool, device.vk_device, &command_pool_create_info, nullptr, &command_pool);
+  lifetime.tie(DeviceHandle::CommandPool, command_pool);
   return command_pool;
 }
