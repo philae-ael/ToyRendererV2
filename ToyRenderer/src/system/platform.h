@@ -12,7 +12,7 @@ namespace tr::system {
 class Platform {
  public:
   Platform() = default;
-  auto init(tr::App *)->utils::types::Extent2d<int>;
+  auto init(tr::App *) -> utils::types::Extent2d<int>;
 
   ~Platform() { destroy(); }
   void destroy();

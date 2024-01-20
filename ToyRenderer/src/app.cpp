@@ -12,7 +12,6 @@
 #include "camera.h"
 #include "gltf.h"
 #include "options.h"
-#include "renderer/mesh.h"
 #include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
@@ -23,7 +22,7 @@ void tr::App::update() {
   state.camera_controller.update(subsystems.input.consume_camera_input(), dt / 1000);
 }
 
-tr::App::App(tr::Options options) : options(options) {
+tr::App::App(tr::Options options_) : options(options_) {
   auto win_size = subsystems.platform.init(this);
   state.camera_controller.camera.aspectRatio = win_size.aspect_ratio();
 

@@ -80,7 +80,7 @@ class Uploader {
   auto operator=(Uploader&& other) -> Uploader& = delete;
 
  private:
-  explicit Uploader(VmaAllocator allocator) : allocator(allocator) {}
+  explicit Uploader(VmaAllocator allocator_) : allocator(allocator_) {}
 
   VmaAllocator allocator;
   std::vector<tr::renderer::StagingBuffer> staging_buffers{};

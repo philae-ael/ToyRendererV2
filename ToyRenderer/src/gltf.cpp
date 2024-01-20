@@ -13,6 +13,7 @@
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
+#include <functional>
 #include <glm/detail/qualifier.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
@@ -56,8 +57,8 @@ auto load_texture(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& 
                                              utils::narrow_cast<int>(bytes.size_bytes()), &x, &y, &channels, 4);
                    TR_ASSERT(im != nullptr, "Could not load image");
 
-                   width = x;
-                   height = y;
+                   width = utils::narrow_cast<uint32_t>(x);
+                   height = utils::narrow_cast<uint32_t>(y);
                    image_data = std::as_bytes(std::span{im, static_cast<size_t>(x * y * 4)});
                  },
                  [](const auto&) { TR_ASSERT(false, "MEH"); },
@@ -122,39 +123,45 @@ auto load_materials(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder
   return materials;
 }
 
-auto load_attribute(const fastgltf::Asset& asset, std::vector<tr::renderer::Vertex>& vertices,
-                    const std::string& attribute, const fastgltf::Accessor& accessor, size_t start_v_idx) {
-  vertices.resize(std::max(vertices.size(), start_v_idx + accessor.count));
+template <class T, class Fn>
+void load_attribute_into(const fastgltf::Asset& asset, const fastgltf::Accessor& accessor,
+                         std::span<tr::renderer::Vertex> vertices, Fn&& proj) {
+  auto f = std::forward<Fn>(proj);
+  fastgltf::iterateAccessorWithIndex<T>(asset, accessor,
+                                        [&](T t, size_t v_idx) { std::invoke(f, vertices[v_idx], t); });
+}
 
-  if (attribute == "POSITION") {
-    fastgltf::iterateAccessorWithIndex<glm::vec3>(
-        asset, accessor, [&](glm::vec3 pos, size_t v_idx) { vertices[start_v_idx + v_idx].pos = pos; });
-    return;
+template <class T, T tr::renderer::Vertex::*proj>
+auto make_vertex_attribute_setter() -> void (*)(tr::renderer::Vertex&, T) {
+  return [](tr::renderer::Vertex& vertex, T t) { std::invoke(proj, vertex) = t; };
+}
+
+template <class T>
+using vertex_attribute_setter = void (*)(tr::renderer::Vertex&, T);
+
+const std::unordered_map<std::string, vertex_attribute_setter<glm::vec2>> vertex_projs_vec2{
+    {"TEXCOORD_0", make_vertex_attribute_setter<glm::vec2, &tr::renderer::Vertex::uv1>()},
+    {"TEXCOORD_1", make_vertex_attribute_setter<glm::vec2, &tr::renderer::Vertex::uv2>()},
+};
+const std::unordered_map<std::string, vertex_attribute_setter<glm::vec3>> vertex_projs_vec3{
+    {"POSITION", make_vertex_attribute_setter<glm::vec3, &tr::renderer::Vertex::pos>()},
+    {"NORMAL", make_vertex_attribute_setter<glm::vec3, &tr::renderer::Vertex::normal>()},
+    {"COLOR_0", make_vertex_attribute_setter<glm::vec3, &tr::renderer::Vertex::color>()},
+};
+const std::unordered_map<std::string, vertex_attribute_setter<glm::vec4>> vertex_projs_vec4{
+    {"TANGENT", [](tr::renderer::Vertex& vertex, glm::vec4 tangent) { vertex.tangent = tangent; }},
+};
+
+void load_attribute(const fastgltf::Asset& asset, const fastgltf::Accessor& accessor,
+                    std::span<tr::renderer::Vertex> vertices, const std::string& attribute) {
+  if (const auto proj_it = vertex_projs_vec2.find(attribute); proj_it != vertex_projs_vec2.end()) {
+    return load_attribute_into<glm::vec2>(asset, accessor, vertices, proj_it->second);
   }
-  if (attribute == "NORMAL") {
-    fastgltf::iterateAccessorWithIndex<glm::vec3>(
-        asset, accessor, [&](glm::vec3 normal, size_t v_idx) { vertices[start_v_idx + v_idx].normal = normal; });
-    return;
+  if (const auto proj_it = vertex_projs_vec3.find(attribute); proj_it != vertex_projs_vec3.end()) {
+    return load_attribute_into<glm::vec3>(asset, accessor, vertices, proj_it->second);
   }
-  if (attribute == "TANGENT") {
-    fastgltf::iterateAccessorWithIndex<glm::vec4>(
-        asset, accessor, [&](glm::vec3 tangent, size_t v_idx) { vertices[start_v_idx + v_idx].tangent = tangent; });
-    return;
-  }
-  if (attribute == "TEXCOORD_0") {
-    fastgltf::iterateAccessorWithIndex<glm::vec2>(
-        asset, accessor, [&](glm::vec2 uv, size_t v_idx) { vertices[start_v_idx + v_idx].uv1 = uv; });
-    return;
-  }
-  if (attribute == "TEXCOORD_1") {
-    fastgltf::iterateAccessorWithIndex<glm::vec2>(
-        asset, accessor, [&](glm::vec2 uv, size_t v_idx) { vertices[start_v_idx + v_idx].uv2 = uv; });
-    return;
-  }
-  if (attribute == "COLOR_0") {
-    fastgltf::iterateAccessorWithIndex<glm::vec4>(
-        asset, accessor, [&](glm::vec4 color, size_t v_idx) { vertices[start_v_idx + v_idx].color = color; });
-    return;
+  if (const auto proj_it = vertex_projs_vec4.find(attribute); proj_it != vertex_projs_vec4.end()) {
+    return load_attribute_into<glm::vec4>(asset, accessor, vertices, proj_it->second);
   }
 
   static std::unordered_map<std::string, std::once_flag> warn_once_flags;
@@ -166,8 +173,8 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
     -> std::vector<tr::renderer::Mesh> {
   std::vector<tr::renderer::Mesh> meshes;
   for (const auto& scene : asset.scenes) {
-    for (auto idx : scene.nodeIndices) {
-      const auto& node = asset.nodes[idx];
+    for (auto node_idx : scene.nodeIndices) {
+      const auto& node = asset.nodes[node_idx];
 
       tr::renderer::Mesh asset_mesh;
       std::visit(
@@ -190,8 +197,7 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
       std::vector<uint32_t> indices{};
       std::vector<tr::renderer::Vertex> vertices;
       for (const auto& primitive : mesh.primitives) {
-        const auto start_v_idx = vertices.size();
-
+        const auto vertex_idx_offset = utils::narrow_cast<uint32_t>(vertices.size());
         {
           TR_ASSERT(primitive.indicesAccessor, "index buffer");
           const auto& accessor = asset.accessors[*primitive.indicesAccessor];
@@ -204,15 +210,19 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
               .material = materials[*primitive.materialIndex],
           });
 
-          indices.reserve(indices.size() + accessor.count);
-          fastgltf::iterateAccessor<uint32_t>(asset, accessor, [&](uint32_t idx) {
-            indices.push_back(utils::narrow_cast<uint32_t>(start_v_idx) + idx);
+          const auto index_idx_offset = utils::narrow_cast<uint32_t>(indices.size());
+          indices.resize(index_idx_offset + accessor.count);
+          auto primitive_indices = std::span(indices).subspan(index_idx_offset);
+
+          fastgltf::iterateAccessorWithIndex<uint32_t>(asset, accessor, [&](uint32_t idx, std::size_t i_idx) {
+            primitive_indices[i_idx] = vertex_idx_offset + idx;
           });
         }
 
         for (const auto& [attribute, accessor_index] : primitive.attributes) {
           const auto& accessor = asset.accessors[accessor_index];
-          load_attribute(asset, vertices, std::string{attribute}, accessor, start_v_idx);
+          vertices.resize(std::max(vertices.size(), vertex_idx_offset + accessor.count));
+          load_attribute(asset, accessor, std::span(vertices).subspan(vertex_idx_offset), std::string{attribute});
         }
       }
 

@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <format>
 #include <fstream>
+#include <optional>
 
 #include "swapchain.h"
 #include "utils/cast.h"
@@ -203,23 +204,19 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
       {"FIFO", VK_PRESENT_MODE_FIFO_KHR},
       {"FIFO Relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
   });
-  int present_mode_selected = -1;
-  for (int i = 0; i < utils::narrow_cast<int>(present_modes.size()); i++) {
-    if (engine.ctx.swapchain.config.prefered_present_mode == present_modes[i].second) {
-      present_mode_selected = i;
-      break;
-    }
-  }
 
-  if (present_mode_selected >= 0 && ImGui::BeginCombo("Present mode", present_modes[present_mode_selected].first)) {
-    for (int i = 0; i < utils::narrow_cast<int>(present_modes.size()); i++) {
-      if (ImGui::Selectable(present_modes[i].first, i == present_mode_selected)) {
-        present_mode_selected = i;
-        engine.ctx.swapchain.config.prefered_present_mode = present_modes[i].second;
-        engine.swapchain_need_to_be_rebuilt = true;
+  if (const auto present_mode_it = std::ranges::find(present_modes, engine.ctx.swapchain.config.prefered_present_mode,
+                                                     &decltype(present_modes)::value_type::second);
+      present_mode_it != present_modes.end()) {
+    if (ImGui::BeginCombo("Present mode", present_mode_it->first)) {
+      for (const auto& present_mode : present_modes) {
+        if (ImGui::Selectable(present_mode.first, present_mode_it->second == present_mode.second)) {
+          engine.ctx.swapchain.config.prefered_present_mode = present_mode.second;
+          engine.swapchain_need_to_be_rebuilt = true;
+        }
       }
+      ImGui::EndCombo();
     }
-    ImGui::EndCombo();
   }
 
   ImGui::End();

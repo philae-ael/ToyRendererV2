@@ -50,7 +50,7 @@ constexpr auto to_spdlog_format_string(format_string<Args...> fmt) {
 
 struct logger {
   std::source_location loc;
-  explicit logger(const std::source_location loc = std::source_location::current()) : loc(loc) {}
+  explicit logger(const std::source_location loc_ = std::source_location::current()) : loc(loc_) {}
 
   template <typename... Args>
   [[noreturn]] void fail(const char *expr, format_string<Args...> fmt, Args &&...args) {

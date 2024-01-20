@@ -12,8 +12,8 @@ auto Camera::cameraInfo() const -> CameraInfo {
   projMatrix[1][1] *= -1;
 
   const glm::quat orientation = glm::angleAxis(eulerAngles.x, glm::vec3{-1.0, 0.0, 0.0}) *
-                          glm::angleAxis(eulerAngles.y, glm::vec3{0.0, -1.0, 0.0}) *
-                          glm::angleAxis(eulerAngles.z, glm::vec3{0.0, 0.0, -1.0});
+                                glm::angleAxis(eulerAngles.y, glm::vec3{0.0, -1.0, 0.0}) *
+                                glm::angleAxis(eulerAngles.z, glm::vec3{0.0, 0.0, -1.0});
 
   return {
       .projMatrix = projMatrix,
@@ -39,8 +39,8 @@ void CameraController::update(CameraInput input, float Dt) {
   camera.eulerAngles += Dt * RotVelocity;
 
   const glm::quat orientation = glm::angleAxis(camera.eulerAngles.x, glm::vec3{1.0, 0.0, 0.0}) *
-                          glm::angleAxis(camera.eulerAngles.y, glm::vec3{0.0, 1.0, 0.0}) *
-                          glm::angleAxis(camera.eulerAngles.z, glm::vec3{0.0, 0.0, 1.0});
+                                glm::angleAxis(camera.eulerAngles.y, glm::vec3{0.0, 1.0, 0.0}) *
+                                glm::angleAxis(camera.eulerAngles.z, glm::vec3{0.0, 0.0, 1.0});
 
   const glm::vec3 CamWorldVelocity =
       speed * (glm::rotate(orientation, CamLocalDirectionHorizontal) + CamLocalDirectionUpDown);

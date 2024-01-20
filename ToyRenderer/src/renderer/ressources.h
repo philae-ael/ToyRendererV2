@@ -49,7 +49,7 @@ struct BufferDefinition {
 
 class BufferBuilder {
  public:
-  BufferBuilder(VkDevice device, VmaAllocator allocator) : device(device), allocator(allocator) {}
+  BufferBuilder(VkDevice device_, VmaAllocator allocator_) : device(device_), allocator(allocator_) {}
   [[nodiscard]] auto build_buffer(Lifetime& lifetime, BufferDefinition definition) const -> BufferRessource;
 
  private:
@@ -104,8 +104,8 @@ struct ImageDefinition {
 
 class ImageBuilder {
  public:
-  ImageBuilder(VkDevice device, VmaAllocator allocator, const Swapchain* swapchain)
-      : device(device), allocator(allocator), swapchain(swapchain) {}
+  ImageBuilder(VkDevice device_, VmaAllocator allocator_, const Swapchain* swapchain_)
+      : device(device_), allocator(allocator_), swapchain(swapchain_) {}
 
   [[nodiscard]] auto build_image(Lifetime& lifetime, ImageDefinition definition) const -> ImageRessource;
 

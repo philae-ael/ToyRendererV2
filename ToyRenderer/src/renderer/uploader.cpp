@@ -1,8 +1,10 @@
 #include "uploader.h"
 
 #include <cstddef>
+#include <cstdint>
 
 #include "utils/assert.h"
+#include "utils/cast.h"
 
 auto tr::renderer::StagingBuffer::commit(VkCommandBuffer cmd, VkBuffer dst, uint32_t dst_offset) -> StagingBuffer& {
   const VkBufferCopy region{
@@ -40,7 +42,7 @@ auto tr::renderer::StagingBuffer::commit_image(VkCommandBuffer cmd, const ImageR
 
 auto tr::renderer::StagingBuffer::consume(std::size_t size, std::size_t alignement) -> std::span<std::byte> {
   TR_ASSERT(available(alignement) >= size, "StagingBuffer already filled");
-  offset = utils::align(offset, utils::narrow_cast<uint32_t>(alignement));
+  offset = utils::align<std::uint32_t>(offset, utils::narrow_cast<uint32_t>(alignement));
 
   auto out = std::as_writable_bytes(std::span{reinterpret_cast<std::byte*>(alloc_info.pMappedData), alloc_info.size})
                  .subspan(offset, size);
@@ -93,7 +95,7 @@ void tr::renderer::Uploader::defer_trim(VmaDeletionStack& allocator_deletion_que
 auto tr::renderer::Uploader::map(std::size_t size, std::size_t alignement) -> MappedMemoryRange {
   TR_ASSERT(staging_buffer_size > size, "Buffer too big: staging_buffer_size {}, size {}", staging_buffer_size, size);
   if (staging_buffers.empty() || staging_buffers.back().available() < size) {
-    staging_buffers.push_back(StagingBuffer::init(allocator, staging_buffer_size));
+    staging_buffers.push_back(StagingBuffer::init(allocator, utils::narrow_cast<uint32_t>(staging_buffer_size)));
   }
 
   return {staging_buffers.back().consume(size, alignement)};

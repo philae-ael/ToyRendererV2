@@ -42,7 +42,7 @@ class not_null_pointer {
   T* ptr_;
 };
 
-template<class T>
+template <class T>
 not_null_pointer(T&) -> not_null_pointer<T>;
 
 template <class T>

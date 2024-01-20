@@ -145,8 +145,8 @@ auto CliParser::parse_one(std::string_view arg) -> ParseResult {
     // while they should not be
     case 1:  // short args -h
       for (auto c : arg.substr(1)) {
-        auto entry = std::find_if(entries.begin(), entries.end(), [&](auto &entry) {
-          return entry.info.short_name != 0 && c == entry.info.short_name;
+        auto entry = std::find_if(entries.begin(), entries.end(), [&](auto &entry_) {
+          return entry_.info.short_name != 0 && c == entry_.info.short_name;
         });
         if (entry == entries.end()) {
           return ParseResult::MalFormedInput;
@@ -159,7 +159,7 @@ auto CliParser::parse_one(std::string_view arg) -> ParseResult {
       return ParseResult::Ok;
     case 2: {  // long args --help
       auto entry = std::find_if(entries.begin(), entries.end(),
-                                [&](auto &entry) { return arg.substr(2) == entry.info.long_name; });
+                                [&](auto &entry_) { return arg.substr(2) == entry_.info.long_name; });
 
       if (entry == entries.end()) {
         return ParseResult::MalFormedInput;

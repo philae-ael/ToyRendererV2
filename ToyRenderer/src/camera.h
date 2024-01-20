@@ -15,9 +15,9 @@ struct CameraInfo {
 };
 
 struct CameraInput {
+  glm::vec2 MouseDelta{0.0F, 0.0F};
   bool Forward = false, Backward = false, Left = false, Right = false, Up = false, Down = false;
   bool RotUp = false, RotDown = false, RotLeft = false, RotRight = false;
-  glm::vec2 MouseDelta{0.0F, 0.0F};
 };
 
 struct Camera {

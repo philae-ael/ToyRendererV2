@@ -28,7 +28,7 @@
 //
 // playing too much in this file may crash clangd (OOM) so be careful
 
-#define EXTENSIONS                                      \
+#define EXTENSIONS                                                     \
   LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkSetDebugUtilsObjectNameEXT, 2)    \
   LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkSetDebugUtilsObjectTagEXT, 2)     \
   LOAD(EXTENSION_FLAG_DEBUG_UTILS, vkQueueBeginDebugUtilsLabelEXT, 2)  \

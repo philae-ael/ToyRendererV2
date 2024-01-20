@@ -14,14 +14,14 @@ namespace tr::renderer {
 
 class DebugCmdScope {
  public:
-  explicit DebugCmdScope(VkCommandBuffer cmd, const char *label) : cmd(cmd) {
+  explicit DebugCmdScope(VkCommandBuffer cmd_, const char *label) : cmd(cmd_) {
     const VkDebugUtilsLabelEXT label_info{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
         .pNext = nullptr,
         .pLabelName = label,
         .color = {0.0, 0.0, 0.0, 1.0},
     };
-    vkCmdBeginDebugUtilsLabelEXT(cmd, &label_info);
+    vkCmdBeginDebugUtilsLabelEXT(cmd_, &label_info);
   }
   ~DebugCmdScope() { vkCmdEndDebugUtilsLabelEXT(cmd); }
   VkCommandBuffer cmd;
@@ -34,14 +34,14 @@ class DebugCmdScope {
 
 class DebugQueueScope {
  public:
-  explicit DebugQueueScope(VkQueue queue, const char *label) : queue(queue) {
+  explicit DebugQueueScope(VkQueue queue_, const char *label) : queue(queue_) {
     const VkDebugUtilsLabelEXT label_info{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
         .pNext = nullptr,
         .pLabelName = label,
         .color = {0.0, 0.0, 0.0, 1.0},
     };
-    vkQueueBeginDebugUtilsLabelEXT(queue, &label_info);
+    vkQueueBeginDebugUtilsLabelEXT(queue_, &label_info);
   }
   ~DebugQueueScope() { vkQueueEndDebugUtilsLabelEXT(queue); }
   VkQueue queue;

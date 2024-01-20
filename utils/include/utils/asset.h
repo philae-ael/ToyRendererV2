@@ -8,7 +8,7 @@
 #include "./assert.h"
 #include "utils/cast.h"
 
-template<class T>
+template <class T>
 static auto read_file(const std::string& path) -> std::vector<T> {
   std::ifstream f(path, std::ios::ate | std::ios::binary);
 

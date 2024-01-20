@@ -29,6 +29,7 @@
 #include "timestamp.h"
 #include "uploader.h"
 #include "utils.h"
+#include "utils/cast.h"
 #include "utils/misc.h"
 
 auto tr::renderer::VulkanContext::init(Lifetime& swapchain_lifetime, tr::Options& options,
@@ -101,7 +102,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_BOTTOM);
 
   if (!graphic_command_buffers_for_next_frame.empty()) {
-    vkCmdExecuteCommands(frame.cmd.vk_cmd, graphic_command_buffers_for_next_frame.size(),
+    vkCmdExecuteCommands(frame.cmd.vk_cmd, utils::narrow_cast<uint32_t>(graphic_command_buffers_for_next_frame.size()),
                          graphic_command_buffers_for_next_frame.data());
     graphic_command_buffers_for_next_frame.clear();
 

@@ -137,6 +137,6 @@ class Imgui {
   auto operator=(const Imgui &) -> Imgui & = delete;
 
  private:
-  explicit Imgui(bool valid) : valid(valid) {}
+  explicit Imgui(bool valid_) : valid(valid_) {}
 };
 }  // namespace tr::system

@@ -84,7 +84,7 @@ auto tr::renderer::ImageRessource::from_external_image(VkImage image, VkImageVie
 auto tr::renderer::ImageDefinition::vk_format(const Swapchain& swapchain) const -> VkFormat {
   return std::visit(utils::overloaded{
                         [&](FramebufferFormat) { return swapchain.surface_format.format; },
-                        [](VkFormat format) { return format; },
+                        [](VkFormat format_) { return format_; },
                     },
                     format);
 }
