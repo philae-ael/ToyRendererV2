@@ -12,6 +12,7 @@
 
 void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera) {
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_TOP);
+  auto internal_extent = frame.frm.get_image(ImageRessourceId::Rendered).extent;
   auto swapchain_extent = frame.frm.get_image(ImageRessourceId::Swapchain).extent;
 
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
@@ -19,7 +20,7 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
   frame.frm.update_buffer<CameraInfo>(frame.ctx->allocator, BufferRessourceId::Camera,
                                       [&](CameraInfo* info) { *info = camera.cameraInfo(); });
 
-  passes.gbuffer.draw(frame, {{0, 0}, swapchain_extent}, meshes, default_ressources);
+  passes.gbuffer.draw(frame, {{0, 0}, internal_extent}, meshes, default_ressources);
 
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
@@ -35,7 +36,11 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_SHADOW_BOTTOM);
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_SHADOW_BOTTOM);
 
-  passes.deferred.draw(frame, {{0, 0}, swapchain_extent}, lights);
+  passes.deferred.draw(frame, {{0, 0}, internal_extent}, lights);
+
+  frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_DEFERRED_BOTTOM);
+
+  passes.present.draw(frame, {{0, 0}, swapchain_extent});
 
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_BOTTOM);
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
@@ -52,6 +57,8 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
                                       engine.ctx.swapchain),
         .deferred = Deferred::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
                                    engine.ctx.swapchain),
+        .present = Present::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
+                                 engine.ctx.swapchain),
     };
     setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
   }

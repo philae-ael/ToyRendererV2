@@ -1,32 +1,23 @@
-#include "deferred.h"
+#include "present.h"
 
 #include <vulkan/vulkan_core.h>
 
 #include <array>
 #include <glm/fwd.hpp>
 
-#include "../debug.h"
-#include "../descriptors.h"
-#include "../frame.h"
-#include "../mesh.h"
 #include "../pipeline.h"
 #include "../vulkan_engine.h"
 
 const std::array triangle_vert_bin = std::to_array<uint32_t>({
-#include "shaders/deferred.vert.inc"
+#include "shaders/present.vert.inc"
 });
 
 const std::array triangle_frag_bin = std::to_array<uint32_t>({
-#include "shaders/deferred.frag.inc"
+#include "shaders/present.frag.inc"
 });
 
-struct PushConstant {
-  tr::CameraInfo info;
-  glm::vec3 color;
-  float padding = 0.0;
-};
-auto tr::renderer::Deferred::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
-                                  const RessourceManager &rm, const Swapchain &swapchain) -> Deferred {
+auto tr::renderer::Present::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
+                                 const RessourceManager &rm, const Swapchain &swapchain) -> Present {
   const auto frag = Shader::init_from_src(setup_lifetime, device, triangle_frag_bin);
   const auto vert = Shader::init_from_src(setup_lifetime, device, triangle_vert_bin);
 
@@ -54,26 +45,16 @@ auto tr::renderer::Deferred::init(Lifetime &setup_lifetime, Lifetime &lifetime, 
   });
 
   const auto color_formats = std::to_array<VkFormat>({
-      rm.image_definition(ImageRessourceId::Rendered).vk_format(swapchain),
+      rm.image_definition(ImageRessourceId::Swapchain).vk_format(swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
 
   const auto descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Deferred::bindings).build(device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Present::bindings).build(device),
   });
-  const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
-      {
-          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .offset = 0,
-          .size = sizeof(PushConstant),
-      },
-  });
-  const auto layout = PipelineLayoutBuilder{}
-                          .set_layouts(descriptor_set_layouts)
-                          .push_constant_ranges(push_constant_ranges)
-                          .build(device);
+  const auto layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
                             .layout_(layout)
@@ -120,55 +101,26 @@ auto tr::renderer::Deferred::init(Lifetime &setup_lifetime, Lifetime &lifetime, 
 
   return {descriptor_set_layouts, layout, pipeline, shadow_map_sampler};
 }
-void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
-  const DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
+void tr::renderer::Present::draw(Frame &frame, VkRect2D render_area) const {
+  const DebugCmdScope scope(frame.cmd.vk_cmd, "Present");
 
-  ImageMemoryBarrier::submit<6>(
+  ImageMemoryBarrier::submit<2>(
       frame.cmd.vk_cmd,
       {{
-          frame.frm.get_image(ImageRessourceId::Rendered).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer3).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::ShadowMap).prepare_barrier(SyncFragmentStorageRead),
+          frame.frm.get_image(ImageRessourceId::Swapchain).invalidate().prepare_barrier(SyncColorAttachmentOutput),
+          frame.frm.get_image(ImageRessourceId::Rendered).prepare_barrier(SyncFragmentStorageRead),
       }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
-      frame.frm.get_image(ImageRessourceId::Rendered).as_attachment(ImageClearOpDontCare{}),
+      frame.frm.get_image(ImageRessourceId::Swapchain).as_attachment(ImageClearOpDontCare{}),
   };
 
   const auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
   DescriptorUpdater{descriptor, 0}
-      .type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-      .image_info({{
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer0).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer1).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer2).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer3).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-      }})
-      .write(frame.ctx->ctx.device.vk_device);
-  DescriptorUpdater{descriptor, 1}
       .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
       .image_info({{
           {
-              .sampler = shadow_map_sampler,
-              .imageView = frame.frm.get_image(ImageRessourceId::ShadowMap).view,
+              .sampler = scalling_sampler,
+              .imageView = frame.frm.get_image(ImageRessourceId::Rendered).view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
       }})
@@ -202,17 +154,8 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
   vkCmdSetViewport(frame.cmd.vk_cmd, 0, 1, &viewport);
   vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
   vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  //
-  // TODO: use a vertex buffer
-  for (const auto light : lights) {
-    PushConstant data{
-        light.camera_info(),
-        light.color,
-    };
 
-    vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(data), &data);
-    vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
-  }
+  vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
 
   vkCmdEndRendering(frame.cmd.vk_cmd);
 }

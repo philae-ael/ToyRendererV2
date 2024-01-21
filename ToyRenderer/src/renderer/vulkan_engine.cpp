@@ -24,7 +24,6 @@
 #include "ressource_definition.h"
 #include "ressources.h"
 #include "swapchain.h"
-#include "synchronisation.h"
 #include "timeline_info.h"
 #include "timestamp.h"
 #include "uploader.h"
@@ -38,8 +37,12 @@ auto tr::renderer::VulkanContext::init(Lifetime& swapchain_lifetime, tr::Options
   const auto instance = Instance::init(options, required_instance_extensions);
   const auto surface = Surface::init(instance.vk_instance, w);
   const auto device = Device::init(instance.vk_instance, surface);
-  const auto swapchain =
-      Swapchain::init_with_config(swapchain_lifetime, {options.config.prefered_present_mode}, device, surface, w);
+  const auto swapchain = Swapchain::init_with_config(swapchain_lifetime,
+                                                     {
+                                                         options.config.prefered_present_mode,
+                                                         options.config.internal_resolution_scale,
+                                                     },
+                                                     device, surface, w);
 
   return {
       .instance = instance,
@@ -106,7 +109,9 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
                          graphic_command_buffers_for_next_frame.data());
     graphic_command_buffers_for_next_frame.clear();
 
-    // TODO: free the command buffers
+    // TODO: free the command buffers we need to wait until they are not used anymore?
+    // we could use a fence for this
+    // std::queue<std::pair<VkFence, std::vector<VkCommandBuffer>>>
   }
 
   return frame;

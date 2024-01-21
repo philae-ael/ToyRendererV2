@@ -19,6 +19,8 @@ target_compile_shader(Shaders
     shaders/gbuffer.vert
     shaders/deferred.frag
     shaders/deferred.vert
+    shaders/present.frag
+    shaders/present.vert
     shaders/shadow_map.vert
 )
 
@@ -57,6 +59,8 @@ add_executable(ToyRenderer
     src/renderer/passes/deferred.h
     src/renderer/passes/gbuffer.cpp
     src/renderer/passes/gbuffer.h
+    src/renderer/passes/present.cpp
+    src/renderer/passes/present.h
     src/renderer/passes/shadow_map.cpp
     src/renderer/passes/shadow_map.h
     src/renderer/pipeline.cpp
@@ -95,5 +99,5 @@ set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")
 if (MSVC)
     target_compile_options(ToyRenderer PRIVATE /W4)
 else ()
-target_compile_options(ToyRenderer PRIVATE -Wall -Wextra -fdiagnostics-color=always -ggdb -Werror=conversion -Werror=shadow )# -Wpadded)
+    target_compile_options(ToyRenderer PRIVATE -Wall -Wextra -fdiagnostics-color=always -ggdb -Werror=conversion -Werror=shadow ) # -Wpadded)
 endif ()

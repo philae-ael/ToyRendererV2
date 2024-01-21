@@ -6,12 +6,15 @@
 #include <utils/misc.h>
 #include <vulkan/vulkan_core.h>
 
+#include <array>
 #include <cstddef>
 #include <format>
 #include <fstream>
 #include <optional>
+#include <utility>
 
 #include "swapchain.h"
+#include "timeline_info.h"
 #include "utils/cast.h"
 #include "vulkan_engine.h"
 
@@ -71,6 +74,8 @@ void tr::renderer::VulkanEngineDebugInfo::write_gpu_timestamp(VkCommandBuffer cm
 void tr::renderer::VulkanEngineDebugInfo::timings_info() {
   if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::SeparatorText("GPU Timings:");
+    ImGui::Text("%s", std::format("{:.1f}FPS", 1000.F / avg_cpu_timelines[0].state).c_str());
+
     if (ImGui::BeginTable("GPU Timings:", 2, ImGuiTableFlags_SizingStretchProp)) {
       for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
         ImGui::TableNextRow();
@@ -198,20 +203,48 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
     return;
   }
 
-  std::array present_modes = utils::to_array<std::pair<const char*, VkPresentModeKHR> >({
-      {"Immediate", VK_PRESENT_MODE_IMMEDIATE_KHR},
-      {"MailBox", VK_PRESENT_MODE_MAILBOX_KHR},
-      {"FIFO", VK_PRESENT_MODE_FIFO_KHR},
-      {"FIFO Relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
-  });
+  {
+    std::array internal_resolutions = utils::to_array<std::pair<const char*, VkPresentModeKHR>>({
+        {"Immediate", VK_PRESENT_MODE_IMMEDIATE_KHR},
+        {"MailBox", VK_PRESENT_MODE_MAILBOX_KHR},
+        {"FIFO", VK_PRESENT_MODE_FIFO_KHR},
+        {"FIFO Relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
+    });
 
-  if (const auto present_mode_it = std::ranges::find(present_modes, engine.ctx.swapchain.config.prefered_present_mode,
-                                                     &decltype(present_modes)::value_type::second);
-      present_mode_it != present_modes.end()) {
-    if (ImGui::BeginCombo("Present mode", present_mode_it->first)) {
-      for (const auto& present_mode : present_modes) {
-        if (ImGui::Selectable(present_mode.first, present_mode_it->second == present_mode.second)) {
+    const auto current_present_mode = INLINE_LAMBDA->std::pair<const char*, VkPresentModeKHR> {
+      const auto present_mode_it =
+          std::ranges::find(internal_resolutions, engine.ctx.swapchain.config.prefered_present_mode,
+                            &decltype(internal_resolutions)::value_type::second);
+      if (present_mode_it != internal_resolutions.end()) {
+        return *present_mode_it;
+      }
+      return {"", engine.ctx.swapchain.config.prefered_present_mode};
+    };
+
+    if (ImGui::BeginCombo("Present mode", current_present_mode.first)) {
+      for (const auto& present_mode : internal_resolutions) {
+        if (ImGui::Selectable(present_mode.first, current_present_mode.second == present_mode.second)) {
           engine.ctx.swapchain.config.prefered_present_mode = present_mode.second;
+          engine.swapchain_need_to_be_rebuilt = true;
+        }
+      }
+      ImGui::EndCombo();
+    }
+  }
+  {
+    std::array internal_resolutions = std::to_array<std::pair<const char*, float>>({
+        {"0.5x", 0.5},
+        {"0.8x", 0.8},
+        {"1x", 1},
+        {"2x", 2},
+        {"4x", 4},
+    });
+    const auto current_internal_resolution = engine.ctx.swapchain.config.internal_resolution_scale;
+
+    if (ImGui::BeginCombo("internal resolution scale", std::format("{:.1}x", current_internal_resolution).c_str())) {
+      for (const auto& internal_resolution : internal_resolutions) {
+        if (ImGui::Selectable(internal_resolution.first, current_internal_resolution == internal_resolution.second)) {
+          engine.ctx.swapchain.config.internal_resolution_scale = internal_resolution.second;
           engine.swapchain_need_to_be_rebuilt = true;
         }
       }

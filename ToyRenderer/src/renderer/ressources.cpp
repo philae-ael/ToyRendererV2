@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
 #include <variant>
 
 #include "debug.h"
@@ -106,21 +107,25 @@ auto tr::renderer::ImageDefinition::vk_aspect_mask() const -> VkImageAspectFlags
 }
 
 auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const -> VkExtent3D {
-  return std::visit(utils::overloaded{[&](FramebufferExtent) {
-                                        return VkExtent3D{
-                                            .width = swapchain.extent.width,
-                                            .height = swapchain.extent.height,
-                                            .depth = 1,
-                                        };
-                                      },
-                                      [](VkExtent2D extent) {
-                                        return VkExtent3D{
-                                            .width = extent.width,
-                                            .height = extent.height,
-                                            .depth = 1,
-                                        };
-                                      }},
-                    size);
+  return std::visit(
+      utils::overloaded{
+          [&](FramebufferExtent) {
+            return VkExtent3D{
+                .width = swapchain.extent.width,
+                .height = swapchain.extent.height,
+                .depth = 1,
+            };
+          },
+          [&](InternalResolution) {
+            const auto w = static_cast<uint32_t>(static_cast<float>(swapchain.extent.width) *
+                                                 swapchain.config.internal_resolution_scale);
+            const auto h = static_cast<uint32_t>(static_cast<float>(swapchain.extent.height) *
+                                                 swapchain.config.internal_resolution_scale);
+
+            return VkExtent3D{.width = w, .height = h, .depth = 1};
+          },
+          [](VkExtent2D extent) { return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1}; }},
+      size);
 }
 
 auto tr::renderer::ImageBuilder::build_image(Lifetime& lifetime, ImageDefinition definition) const -> ImageRessource {

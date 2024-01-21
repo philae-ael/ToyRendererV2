@@ -86,11 +86,12 @@ using ImageOptionsFlags = std::uint32_t;
 
 struct FramebufferFormat {};
 struct FramebufferExtent {};
+struct InternalResolution {};
 
 struct ImageDefinition {
   ImageOptionsFlags flags;
   VkImageUsageFlags usage;
-  std::variant<FramebufferExtent, VkExtent2D> size;
+  std::variant<FramebufferExtent, InternalResolution, VkExtent2D> size;
   std::variant<FramebufferFormat, VkFormat> format;
   std::string_view debug_name;
 
@@ -98,7 +99,8 @@ struct ImageDefinition {
   [[nodiscard]] auto vk_aspect_mask() const -> VkImageAspectFlags;
   [[nodiscard]] auto vk_extent(const Swapchain& swapchain) const -> VkExtent3D;
   [[nodiscard]] auto depends_on_swapchain() const -> bool {
-    return std::holds_alternative<FramebufferExtent>(size) || std::holds_alternative<FramebufferFormat>(format);
+    return std::holds_alternative<FramebufferExtent>(size) || std::holds_alternative<InternalResolution>(size) ||
+           std::holds_alternative<FramebufferFormat>(format);
   }
 };
 
@@ -117,6 +119,7 @@ class ImageBuilder {
 
 enum class ImageRessourceId {
   Swapchain,
+  Rendered,
   GBuffer0,
   GBuffer1,
   GBuffer2,

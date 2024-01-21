@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vulkan/vulkan_core.h>
+
 #include <array>
 #include <cstdint>
 
@@ -25,8 +27,18 @@ static constexpr std::array image_definition = utils::to_array<tr::renderer::Ima
     {
         {
             .flags = 0,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            .size = InternalResolution{},
+            .format = FramebufferFormat{},
+            .debug_name = "rendered",
+        },
+        ImageRessourceId::Rendered,
+    },
+    {
+        {
+            .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = FramebufferExtent{},
+            .size = InternalResolution{},
             .format = VK_FORMAT_R32G32B32A32_SFLOAT,
             .debug_name = "GBuffer0 (RGB: color, A: roughness)",
         },
@@ -37,7 +49,7 @@ static constexpr std::array image_definition = utils::to_array<tr::renderer::Ima
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = FramebufferExtent{},
+            .size = InternalResolution{},
             .format = VK_FORMAT_R32G32B32A32_SFLOAT,
             .debug_name = "GBuffer1 (RGB: normal, A: metallic)",
         },
@@ -48,7 +60,7 @@ static constexpr std::array image_definition = utils::to_array<tr::renderer::Ima
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = FramebufferExtent{},
+            .size = InternalResolution{},
             .format = VK_FORMAT_R32G32B32A32_SFLOAT,
             .debug_name = "GBuffer2 (RGB: viewDir)",
         },
@@ -59,7 +71,7 @@ static constexpr std::array image_definition = utils::to_array<tr::renderer::Ima
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = FramebufferExtent{},
+            .size = InternalResolution{},
             .format = VK_FORMAT_R32G32B32A32_SFLOAT,
             .debug_name = "GBuffer3 (RGB: Position)",
         },
@@ -69,7 +81,7 @@ static constexpr std::array image_definition = utils::to_array<tr::renderer::Ima
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .size = FramebufferExtent{},
+            .size = InternalResolution{},
             .format = VK_FORMAT_D16_UNORM,
             .debug_name = "Depth",
         },

@@ -6,6 +6,7 @@
 #include "mesh.h"
 #include "passes/deferred.h"
 #include "passes/gbuffer.h"
+#include "passes/present.h"
 #include "passes/shadow_map.h"
 #include "ressources.h"
 #include "uploader.h"
@@ -24,6 +25,7 @@ struct RenderGraph {
     GBuffer gbuffer;
     ShadowMap shadow_map;
     Deferred deferred;
+    Present present;
   } passes;
 
   DefaultRessources default_ressources;

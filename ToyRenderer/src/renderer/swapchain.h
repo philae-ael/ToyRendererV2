@@ -36,6 +36,7 @@ struct Swapchain {
 
   struct SwapchainConfig {
     VkPresentModeKHR prefered_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+    float internal_resolution_scale = 0.5;
   } config;
 
  private:

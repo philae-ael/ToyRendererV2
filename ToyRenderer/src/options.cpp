@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstddef>
 #include <cstdlib>
 #include <format>
@@ -14,6 +15,7 @@
 #include <map>
 #include <ranges>
 #include <span>
+#include <string>
 #include <string_view>
 
 struct CliParser;
@@ -38,7 +40,7 @@ struct Entry {
     std::string_view section;
   } info;
 
-  enum class Kind { Boolean, Count, Custom, Choice, String, None } kind = Kind::None;
+  enum class Kind { Boolean, Count, Custom, Choice, String, Float, None } kind = Kind::None;
   union {
     struct {
       bool *value;
@@ -58,6 +60,9 @@ struct Entry {
       int *value;
       std::span<const std::pair<std::string_view, int>> choices;
     } choice_entry;
+    struct {
+      float *value;
+    } float_entry;
     int d{};
   };
 };
@@ -107,6 +112,17 @@ auto CliParser::dispactch_action(const Entry &entry) -> ParseResult {
       }
       entry.custom_entry.action(*this, entry.custom_entry.userdata);
       break;
+    case Entry::Kind::Float: {
+      if (!has_next()) {
+        return ParseResult::MalFormedInput;
+      }
+      auto val = next();
+      const auto [_, ec] = std::from_chars(val.begin(), val.end(), *entry.float_entry.value);
+      if (ec != std::errc{}) {
+        return ParseResult::MalFormedInput;
+      }
+      break;
+    }
     case Entry::Kind::Choice: {
       if (!has_next()) {
         return ParseResult::MalFormedInput;
@@ -271,7 +287,7 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                            {.count_entry = {&verbose_count}},
                        },
                        {
-                           {'r', "renderdoc", "enable attach to renderdoc", "Debug"},
+                           {0, "renderdoc", "enable attach to renderdoc", "Debug"},
                            Entry::Kind::Boolean,
                            {.bool_entry = {&ret.debug.renderdoc, false}},
                        },
@@ -305,6 +321,11 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                                 }},
                        },
                        {
+                           {'r', "resolution", "choose internal resolution scale ", "Config"},
+                           Entry::Kind::Float,
+                           {.float_entry = {&ret.config.internal_resolution_scale}},
+                       },
+                       {
                            {'i', "imgui", "enable imgui", "Debug"},
                            Entry::Kind::Boolean,
                            {.bool_entry = {&ret.debug.imgui, false}},
@@ -315,7 +336,7 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                            {.bool_entry = {&ret.debug.imgui, true}},
                        },
                        {
-                           {'s', "scene", "load scene", "Scene"},
+                           {0, "scene", "load scene", "Scene"},
                            Entry::Kind::String,
                            {.string_entry = {&ret.scene}},
                        },
