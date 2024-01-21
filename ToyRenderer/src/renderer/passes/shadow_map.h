@@ -12,6 +12,7 @@
 
 namespace tr::renderer {
 struct DefaultRessources;
+struct VulkanContext;
 
 struct ShadowMap {
   std::array<VkDescriptorSetLayout, 1> descriptor_set_layouts{};
@@ -27,8 +28,8 @@ struct ShadowMap {
           .build(),
   });
 
-  static auto init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device, const RessourceManager &rm,
-                   const Swapchain &Swapchain) -> ShadowMap;
+  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
+      -> ShadowMap;
 
   void start_draw(Frame &frame) const;
   void end_draw(VkCommandBuffer cmd) const;

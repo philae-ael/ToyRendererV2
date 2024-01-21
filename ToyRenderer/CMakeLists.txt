@@ -27,19 +27,21 @@ target_compile_shader(Shaders
 target_include_directories(Shaders INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 add_executable(ToyRenderer
-    src/main.cpp
-    src/app.h
     src/app.cpp
-    src/camera.h
+    src/app.h
     src/camera.cpp
-    src/options.h
-    src/options.cpp
-    src/gltf.h
+    src/camera.h
     src/gltf.cpp
+    src/gltf.h
+    src/main.cpp
+    src/options.cpp
+    src/options.h
     src/renderer/buffer.h
     src/renderer/command_pool.cpp
     src/renderer/command_pool.h
     src/renderer/constants.h
+    src/renderer/context.cpp
+    src/renderer/context.h
     src/renderer/debug.cpp
     src/renderer/debug.h
     src/renderer/deletion_stack.cpp
@@ -50,8 +52,8 @@ add_executable(ToyRenderer
     src/renderer/device.h
     src/renderer/extensions.cpp
     src/renderer/extensions.h
-    src/renderer/frame.h
     src/renderer/frame.cpp
+    src/renderer/frame.h
     src/renderer/instance.cpp
     src/renderer/instance.h
     src/renderer/mesh.h
@@ -66,11 +68,11 @@ add_executable(ToyRenderer
     src/renderer/pipeline.cpp
     src/renderer/pipeline.h
     src/renderer/queue.h
+    src/renderer/render_graph.cpp
+    src/renderer/render_graph.h
+    src/renderer/ressource_definition.h
     src/renderer/ressources.cpp
     src/renderer/ressources.h
-    src/renderer/ressource_definition.h
-    src/renderer/render_graph.h
-    src/renderer/render_graph.cpp
     src/renderer/surface.cpp
     src/renderer/surface.h
     src/renderer/swapchain.cpp
@@ -83,18 +85,19 @@ add_executable(ToyRenderer
     src/renderer/vma.cpp
     src/renderer/vulkan_engine.cpp
     src/renderer/vulkan_engine.h
-    src/system/platform.h
-    src/system/platform.cpp
-    src/system/input.h
-    src/system/input.cpp
     src/system/imgui.h
+    src/system/imgui.cpp
+    src/system/input.cpp
+    src/system/input.h
+    src/system/platform.cpp
+    src/system/platform.h
 )
 
 target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator fastgltf::fastgltf)
 target_include_directories(ToyRenderer PRIVATE ${Stb_INCLUDE_DIR})
 
 # set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy" "--fix")
-set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")
+# set_property(TARGET ToyRenderer PROPERTY CXX_INCLUDE_WHAT_YOU_USE "iwyu-tool")
 
 if (MSVC)
     target_compile_options(ToyRenderer PRIVATE /W4)

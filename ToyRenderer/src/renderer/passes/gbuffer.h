@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include "../context.h"
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
@@ -36,8 +37,8 @@ struct GBuffer {
           .build(),
   });
 
-  static auto init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device, const RessourceManager &rm,
-                   const Swapchain &Swapchain) -> GBuffer;
+  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
+      -> GBuffer;
 
   void start_draw(Frame &frame, VkRect2D render_area) const;
   void end_draw(VkCommandBuffer cmd) const;

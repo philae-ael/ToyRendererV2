@@ -32,7 +32,7 @@ struct Shader {
 
 struct PipelineBuilder : VkBuilder<PipelineBuilder, VkGraphicsPipelineCreateInfo> {
   constexpr PipelineBuilder()
-      : VkBuilder({
+      : VkBuilder(VkGraphicsPipelineCreateInfo{
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,

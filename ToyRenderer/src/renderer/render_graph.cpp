@@ -51,14 +51,10 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
   {
     Lifetime setup_lifetime;
     passes = {
-        .gbuffer = GBuffer::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
-                                 engine.ctx.swapchain),
-        .shadow_map = ShadowMap::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
-                                      engine.ctx.swapchain),
-        .deferred = Deferred::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
-                                   engine.ctx.swapchain),
-        .present = Present::init(setup_lifetime, engine.lifetime.global, engine.ctx.device.vk_device, engine.rm,
-                                 engine.ctx.swapchain),
+        .gbuffer = GBuffer::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
+        .shadow_map = ShadowMap::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
+        .deferred = Deferred::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
+        .present = Present::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
     };
     setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
   }

@@ -20,10 +20,10 @@ const std::array gbuffer_frag_bin = std::to_array<uint32_t>({
 #include "shaders/gbuffer.frag.inc"
 });
 
-auto tr::renderer::GBuffer::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
-                                 const RessourceManager &rm, const Swapchain &swapchain) -> GBuffer {
-  const auto frag = Shader::init_from_src(setup_lifetime, device, gbuffer_frag_bin);
-  const auto vert = Shader::init_from_src(setup_lifetime, device, gbuffer_vert_bin);
+auto tr::renderer::GBuffer::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
+                                 Lifetime &setup_lifetime) -> GBuffer {
+  const auto frag = Shader::init_from_src(setup_lifetime, ctx.device.vk_device, gbuffer_frag_bin);
+  const auto vert = Shader::init_from_src(setup_lifetime, ctx.device.vk_device, gbuffer_vert_bin);
 
   const std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages{{
       frag.pipeline_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, "main"),
@@ -54,22 +54,22 @@ auto tr::renderer::GBuffer::init(Lifetime &setup_lifetime, Lifetime &lifetime, V
   });
 
   const std::array<VkFormat, 4> color_formats{
-      rm.image_definition(ImageRessourceId::GBuffer0).vk_format(swapchain),
-      rm.image_definition(ImageRessourceId::GBuffer1).vk_format(swapchain),
-      rm.image_definition(ImageRessourceId::GBuffer2).vk_format(swapchain),
-      rm.image_definition(ImageRessourceId::GBuffer3).vk_format(swapchain),
+      rm.image_definition(ImageRessourceId::GBuffer0).vk_format(ctx.swapchain),
+      rm.image_definition(ImageRessourceId::GBuffer1).vk_format(ctx.swapchain),
+      rm.image_definition(ImageRessourceId::GBuffer2).vk_format(ctx.swapchain),
+      rm.image_definition(ImageRessourceId::GBuffer3).vk_format(ctx.swapchain),
   };
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   auto pipeline_rendering_create_info =
       PipelineRenderingBuilder{}
           .color_attachment_formats(color_formats)
-          .depth_attachment(rm.image_definition(ImageRessourceId::Depth).vk_format(swapchain))
+          .depth_attachment(rm.image_definition(ImageRessourceId::Depth).vk_format(ctx.swapchain))
           .build();
 
   const auto descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_0).build(device),
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_1).build(device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_0).build(ctx.device.vk_device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_1).build(ctx.device.vk_device),
   });
   const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
       {
@@ -82,7 +82,7 @@ auto tr::renderer::GBuffer::init(Lifetime &setup_lifetime, Lifetime &lifetime, V
   const auto layout = PipelineLayoutBuilder{}
                           .set_layouts(descriptor_set_layouts)
                           .push_constant_ranges(push_constant_ranges)
-                          .build(device);
+                          .build(ctx.device.vk_device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
                             .layout_(layout)
@@ -95,7 +95,7 @@ auto tr::renderer::GBuffer::init(Lifetime &setup_lifetime, Lifetime &lifetime, V
                             .depth_stencil_state(&depth_state)
                             .color_blend_state(&color_blend_state)
                             .dynamic_state(&dynamic_state_state)
-                            .build(device);
+                            .build(ctx.device.vk_device);
 
   lifetime.tie(DeviceHandle::Pipeline, pipeline);
   lifetime.tie(DeviceHandle::PipelineLayout, layout);

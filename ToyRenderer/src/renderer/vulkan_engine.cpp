@@ -3,6 +3,8 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
+#include <utils/cast.h>
+#include <utils/misc.h>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
@@ -28,33 +30,6 @@
 #include "timestamp.h"
 #include "uploader.h"
 #include "utils.h"
-#include "utils/cast.h"
-#include "utils/misc.h"
-
-auto tr::renderer::VulkanContext::init(Lifetime& swapchain_lifetime, tr::Options& options,
-                                       std::span<const char*> required_instance_extensions, GLFWwindow* w)
-    -> VulkanContext {
-  const auto instance = Instance::init(options, required_instance_extensions);
-  const auto surface = Surface::init(instance.vk_instance, w);
-  const auto device = Device::init(instance.vk_instance, surface);
-  const auto swapchain = Swapchain::init_with_config(swapchain_lifetime,
-                                                     {
-                                                         options.config.prefered_present_mode,
-                                                         options.config.internal_resolution_scale,
-                                                     },
-                                                     device, surface, w);
-
-  return {
-      .instance = instance,
-      .surface = surface,
-      .device = device,
-      .swapchain = swapchain,
-  };
-}
-
-void tr::renderer::VulkanContext::rebuild_swapchain(Lifetime& swapchain_lifetime, GLFWwindow* w) {
-  swapchain.reinit(swapchain_lifetime, device, surface, w);
-}
 
 auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   if (swapchain_need_to_be_rebuilt) {
@@ -77,7 +52,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
 
   VK_UNWRAP(vkWaitForFences, ctx.device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
 
-  VkResult result =
+  VkResult const result =
       vkAcquireNextImageKHR(ctx.device.vk_device, ctx.swapchain.vk_swapchain, 1000000000,
                             frame.synchro.present_semaphore, VK_NULL_HANDLE, &frame.swapchain_image_index);
   switch (result) {

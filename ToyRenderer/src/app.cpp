@@ -12,6 +12,8 @@
 #include "camera.h"
 #include "gltf.h"
 #include "options.h"
+#include "renderer/frame.h"
+#include "renderer/uploader.h"
 #include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
@@ -26,7 +28,7 @@ tr::App::App(tr::Options options_) : options(options_) {
   auto win_size = subsystems.platform.init(this);
   state.camera_controller.camera.aspectRatio = win_size.aspect_ratio();
 
-  std::vector<const char*> required_vulkan_extensions;
+  std::vector<const char *> required_vulkan_extensions;
   subsystems.platform.required_vulkan_extensions(required_vulkan_extensions);
   subsystems.engine.init(options, required_vulkan_extensions, subsystems.platform.window);
 
@@ -34,8 +36,7 @@ tr::App::App(tr::Options options_) : options(options_) {
     subsystems.imgui.init(subsystems.platform.window, subsystems.engine);
   }
 
-  {
-    auto t = subsystems.engine.start_transfer();
+  subsystems.engine.transfer([&](renderer::Transferer &t) {
     auto bb = subsystems.engine.buffer_builder();
     auto ib = subsystems.engine.image_builder();
 
@@ -49,8 +50,7 @@ tr::App::App(tr::Options options_) : options(options_) {
     }
     const auto [_, scene] = Gltf::load_from_file(subsystems.engine.lifetime.global, ib, bb, t, scene_name);
     meshes.insert(meshes.end(), scene.begin(), scene.end());
-    subsystems.engine.end_transfer(std::move(t));
-  }
+  });
   subsystems.engine.sync();
 }
 
@@ -69,16 +69,14 @@ void tr::App::run() {
 
     update();
 
-    if (auto frame_opt = subsystems.engine.start_frame(); frame_opt.has_value()) {
-      auto& frame = frame_opt.value();
+    subsystems.engine.frame([&](renderer::Frame &frame) {
       rendergraph.draw(frame, meshes, state.camera_controller.camera);
 
       if (subsystems.imgui.start_frame()) {
-        subsystems.engine.debug_info.imgui(subsystems.engine);
+        subsystems.engine.imgui();
         subsystems.imgui.draw(frame);
       }
-      subsystems.engine.end_frame(std::move(frame));
-    }
+    });
 
     state.frame_timer.stop();
     state.timeline.push(state.frame_timer.elapsed_raw());

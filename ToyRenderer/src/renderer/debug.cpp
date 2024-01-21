@@ -232,7 +232,7 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
     }
   }
   {
-    std::array internal_resolutions = std::to_array<std::pair<const char*, float>>({
+    std::array const internal_resolutions = std::to_array<std::pair<const char*, float>>({
         {"0.5x", 0.5},
         {"0.8x", 0.8},
         {"1x", 1},

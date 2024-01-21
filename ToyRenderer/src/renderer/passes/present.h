@@ -4,13 +4,13 @@
 
 #include <array>
 
+#include "../context.h"
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../ressources.h"
 #include "utils/cast.h"
 
 namespace tr::renderer {
-
 struct Present {
   std::array<VkDescriptorSetLayout, 1> descriptor_set_layouts{};
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
@@ -28,8 +28,8 @@ struct Present {
 
   });
 
-  static auto init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device, const RessourceManager &rm,
-                   const Swapchain &swapchain) -> Present;
+  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
+      -> Present;
 
   void draw(Frame &frame, VkRect2D render_area) const;
 };

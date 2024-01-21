@@ -16,9 +16,9 @@ const std::array gbuffer_vert_bin = std::to_array<uint32_t>({
 #include "shaders/shadow_map.vert.inc"
 });
 
-auto tr::renderer::ShadowMap::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
-                                   const RessourceManager &rm, const Swapchain &swapchain) -> ShadowMap {
-  const auto vert = Shader::init_from_src(setup_lifetime, device, gbuffer_vert_bin);
+auto tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
+                                   Lifetime &setup_lifetime) -> ShadowMap {
+  const auto vert = Shader::init_from_src(setup_lifetime, ctx.device.vk_device, gbuffer_vert_bin);
 
   const std::array shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
       vert.pipeline_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, "main"),
@@ -42,11 +42,11 @@ auto tr::renderer::ShadowMap::init(Lifetime &setup_lifetime, Lifetime &lifetime,
 
   auto pipeline_rendering_create_info =
       PipelineRenderingBuilder{}
-          .depth_attachment(rm.image_definition(ImageRessourceId::ShadowMap).vk_format(swapchain))
+          .depth_attachment(rm.image_definition(ImageRessourceId::ShadowMap).vk_format(ctx.swapchain))
           .build();
 
   const auto descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::ShadowMap::set_0).build(device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::ShadowMap::set_0).build(ctx.device.vk_device),
   });
   const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
       {
@@ -59,7 +59,7 @@ auto tr::renderer::ShadowMap::init(Lifetime &setup_lifetime, Lifetime &lifetime,
   const auto layout = PipelineLayoutBuilder{}
                           .set_layouts(descriptor_set_layouts)
                           .push_constant_ranges(push_constant_ranges)
-                          .build(device);
+                          .build(ctx.device.vk_device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
                             .layout_(layout)
@@ -71,7 +71,7 @@ auto tr::renderer::ShadowMap::init(Lifetime &setup_lifetime, Lifetime &lifetime,
                             .multisample_state(&multisampling_state)
                             .depth_stencil_state(&depth_state)
                             .dynamic_state(&dynamic_state_state)
-                            .build(device);
+                            .build(ctx.device.vk_device);
 
   lifetime.tie(DeviceHandle::Pipeline, pipeline);
   lifetime.tie(DeviceHandle::PipelineLayout, layout);

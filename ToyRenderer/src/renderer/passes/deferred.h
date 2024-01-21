@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include "../context.h"
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
@@ -35,8 +36,8 @@ struct Deferred {
 
   });
 
-  static auto init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device, const RessourceManager &rm,
-                   const Swapchain &swapchain) -> Deferred;
+  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
+      -> Deferred;
 
   void draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const;
 };

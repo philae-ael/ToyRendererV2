@@ -29,6 +29,7 @@ struct VkBaseInOutStructure {
 
 template <class Child, class T>
 struct VkBuilder : T {
+  constexpr explicit VkBuilder(T&& t) : T(std::move(t)) {}
   [[nodiscard]] constexpr auto inner() const -> const T& { return *this; }
   [[nodiscard]] constexpr auto inner_ptr() const -> const T* { return this; }
   constexpr auto inner() -> T& { return *this; }

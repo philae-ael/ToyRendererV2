@@ -14,7 +14,7 @@ static auto read_file(const std::string& path) -> std::vector<T> {
 
   TR_ASSERT(f.is_open(), "failed to open file {}", path);
 
-  std::size_t file_size = f.tellg();
+  const auto file_size = static_cast<std::size_t>(f.tellg());
   std::vector<T> output(file_size);
   f.seekg(0);
   f.read(reinterpret_cast<char*>(output.data()), utils::narrow_cast<std::int64_t>(file_size));

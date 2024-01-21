@@ -8,17 +8,17 @@
 
 #include <array>
 #include <optional>
+#include <utility>
 
 #include "constants.h"
+#include "context.h"
 #include "debug.h"
 #include "deletion_stack.h"
 #include "descriptors.h"
 #include "device.h"
 #include "frame.h"
-#include "instance.h"
 #include "ressources.h"
 #include "surface.h"
-#include "swapchain.h"
 #include "uploader.h"
 #include "utils.h"
 #include "utils/data/static_stack.h"
@@ -28,19 +28,6 @@ class Imgui;
 }
 
 namespace tr::renderer {
-struct VulkanContext {
-  Instance instance;
-  VkSurfaceKHR surface = VK_NULL_HANDLE;
-  Device device;
-  Swapchain swapchain;
-
-  // TODO: window is not needed, an extent is enough
-  // For both
-  static auto init(Lifetime& swapchain_lifetime, tr::Options& options,
-                   std::span<const char*> required_instance_extensions, GLFWwindow* w) -> VulkanContext;
-  void rebuild_swapchain(Lifetime& swapchain_lifetime, GLFWwindow* w);
-};
-
 class VulkanEngine {
  public:
   VulkanEngine() = default;
@@ -51,10 +38,28 @@ class VulkanEngine {
   auto start_frame() -> std::optional<Frame>;
   void end_frame(Frame&&);
 
+  template <class Fn>
+  void frame(Fn&& f) {
+    auto f_ = std::forward<Fn>(f);
+    if (auto frame = start_frame(); frame) {
+      f_(*frame);
+      end_frame(std::move(*frame));
+    }
+  }
+
   auto start_transfer() -> Transferer;
   void end_transfer(Transferer&&);
 
+  template <class Fn>
+  void transfer(Fn&& f) {
+    auto f_ = std::forward<Fn>(f);
+    auto transferer = start_transfer();
+    f_(transferer);
+    end_transfer(std::move(transferer));
+  }
+
   void sync() const { VK_UNWRAP(vkDeviceWaitIdle, ctx.device.vk_device); }
+  void imgui() { debug_info.imgui(*this); }
 
   [[nodiscard]] auto image_builder() const -> ImageBuilder { return {ctx.device.vk_device, allocator, &ctx.swapchain}; }
   [[nodiscard]] auto buffer_builder() const -> BufferBuilder { return {ctx.device.vk_device, allocator}; }
@@ -73,16 +78,16 @@ class VulkanEngine {
   } lifetime;
 
   VulkanContext ctx;
+  VmaAllocator allocator = nullptr;
+  RessourceManager rm{};
+  VulkanEngineDebugInfo debug_info;
 
+ private:
   void rebuild_swapchain();
   void build_ressources();
 
   GLFWwindow* window{};
 
-  RessourceManager rm{};
-  VulkanEngineDebugInfo debug_info;
-
-  VmaAllocator allocator = nullptr;
   std::array<DescriptorAllocator, MAX_FRAMES_IN_FLIGHT> frame_descriptor_allocators{};
 
   // Swapchain related
@@ -97,6 +102,7 @@ class VulkanEngine {
   utils::data::static_stack<VkCommandBuffer, 2> graphic_command_buffers_for_next_frame{};
 
   VkCommandPool transfer_command_pool = VK_NULL_HANDLE;
+  friend VulkanEngineDebugInfo;
 };
 
 }  // namespace tr::renderer

@@ -16,10 +16,10 @@ const std::array triangle_frag_bin = std::to_array<uint32_t>({
 #include "shaders/present.frag.inc"
 });
 
-auto tr::renderer::Present::init(Lifetime &setup_lifetime, Lifetime &lifetime, VkDevice &device,
-                                 const RessourceManager &rm, const Swapchain &swapchain) -> Present {
-  const auto frag = Shader::init_from_src(setup_lifetime, device, triangle_frag_bin);
-  const auto vert = Shader::init_from_src(setup_lifetime, device, triangle_vert_bin);
+auto tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
+                                 Lifetime &setup_lifetime) -> Present {
+  const auto frag = Shader::init_from_src(setup_lifetime, ctx.device.vk_device, triangle_frag_bin);
+  const auto vert = Shader::init_from_src(setup_lifetime, ctx.device.vk_device, triangle_vert_bin);
 
   const auto shader_stages = std::to_array({
       frag.pipeline_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, "main"),
@@ -45,16 +45,16 @@ auto tr::renderer::Present::init(Lifetime &setup_lifetime, Lifetime &lifetime, V
   });
 
   const auto color_formats = std::to_array<VkFormat>({
-      rm.image_definition(ImageRessourceId::Swapchain).vk_format(swapchain),
+      rm.image_definition(ImageRessourceId::Swapchain).vk_format(ctx.swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
 
   const auto descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Present::bindings).build(device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Present::bindings).build(ctx.device.vk_device),
   });
-  const auto layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(device);
+  const auto layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(ctx.device.vk_device);
   VkPipeline pipeline = PipelineBuilder{}
                             .stages(shader_stages)
                             .layout_(layout)
@@ -67,7 +67,7 @@ auto tr::renderer::Present::init(Lifetime &setup_lifetime, Lifetime &lifetime, V
                             .depth_stencil_state(&depth_state)
                             .color_blend_state(&color_blend_state)
                             .dynamic_state(&dynamic_state_state)
-                            .build(device);
+                            .build(ctx.device.vk_device);
 
   VkSampler shadow_map_sampler = VK_NULL_HANDLE;
   const VkSamplerCreateInfo sampler_create_info{
@@ -90,7 +90,7 @@ auto tr::renderer::Present::init(Lifetime &setup_lifetime, Lifetime &lifetime, V
       .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
       .unnormalizedCoordinates = VK_FALSE,
   };
-  VK_UNWRAP(vkCreateSampler, device, &sampler_create_info, nullptr, &shadow_map_sampler);
+  VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &shadow_map_sampler);
 
   lifetime.tie(DeviceHandle::Pipeline, pipeline);
   lifetime.tie(DeviceHandle::PipelineLayout, layout);
