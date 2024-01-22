@@ -59,9 +59,9 @@ auto tr::renderer::Swapchain::init_with_config(Lifetime& lifetime, SwapchainConf
                                             s.available_present_modes.data());
 
   std::optional<VkSurfaceFormatKHR> chosen_format;
-  spdlog::debug("Available surface formats:");
+  spdlog::trace("Available surface formats:");
   for (const auto& available_format : s.available_formats) {
-    spdlog::debug("\tformat {} | colorSpace {}", available_format.format, available_format.colorSpace);
+    spdlog::trace("\tformat {} | colorSpace {}", available_format.format, available_format.colorSpace);
     if (available_format.format == VK_FORMAT_B8G8R8A8_UNORM &&
         available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
       chosen_format = available_format;
@@ -72,9 +72,9 @@ auto tr::renderer::Swapchain::init_with_config(Lifetime& lifetime, SwapchainConf
                 s.surface_format.colorSpace);
 
   std::optional<VkPresentModeKHR> chosen_present_mode;
-  spdlog::debug("Available present modes:");
+  spdlog::trace("Available present modes:");
   for (const auto& available_present_mode : s.available_present_modes) {
-    spdlog::debug("\t{}", available_present_mode);
+    spdlog::trace("\t{}", available_present_mode);
 
     if (available_present_mode == config.prefered_present_mode) {
       chosen_present_mode = available_present_mode;

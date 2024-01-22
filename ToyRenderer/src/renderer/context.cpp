@@ -9,7 +9,6 @@ auto tr::renderer::VulkanContext::init(Lifetime& swapchain_lifetime, tr::Options
   const auto swapchain = Swapchain::init_with_config(swapchain_lifetime,
                                                      {
                                                          options.config.prefered_present_mode,
-                                                         options.config.internal_resolution_scale,
                                                      },
                                                      device, surface, w);
 

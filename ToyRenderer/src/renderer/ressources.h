@@ -95,33 +95,10 @@ struct FramebufferFormat {};
 struct FramebufferExtent {};
 struct InternalResolution {};
 
-struct CVarExtent {
-  const char* name;
-  VkExtent2D default_;
-
-  [[nodiscard]] auto resolve() const -> VkExtent2D {
-    const auto vwidth = tr::Registry::global()["cvar"][name]["x"];
-    const auto vheight = tr::Registry::global()["cvar"][name]["y"];
-    if (!vheight.isUInt() || !vheight.isUInt()) {
-      save(default_);
-      return default_;
-    }
-
-    const auto width = vwidth.asUInt();
-    const auto height = vheight.asUInt();
-    return VkExtent2D{width, height};
-  }
-
-  void save(VkExtent2D extent) const {
-    tr::Registry::global()["cvar"][name]["x"] = extent.width;
-    tr::Registry::global()["cvar"][name]["y"] = extent.height;
-  }
-};
-
 struct ImageDefinition {
   ImageOptionsFlags flags;
   VkImageUsageFlags usage;
-  std::variant<FramebufferExtent, InternalResolution, VkExtent2D, CVarExtent> size;
+  std::variant<FramebufferExtent, InternalResolution, VkExtent2D, CVarExtent2D> size;
   std::variant<FramebufferFormat, VkFormat> format;
   std::string_view debug_name;
 
@@ -209,6 +186,7 @@ struct ImageRessourceStorage {
     for (size_t i = 0; i < ressources.size(); i++) {
       ressources[i] = ImageRessource::from_external_image(images[i], views[i], definition.usage, extent);
     }
+    invalidated = false;
   }
 };
 

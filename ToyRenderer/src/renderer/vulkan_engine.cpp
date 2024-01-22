@@ -31,6 +31,21 @@
 #include "uploader.h"
 #include "utils.h"
 
+void tr::renderer::VulkanEngine::rebuild_invalidated() {
+  sync();
+  Lifetime cleanup;
+  auto ib = image_builder();
+  for (auto& image_storage : rm.image_storages()) {
+    if (image_storage.invalidated) {
+      image_storage.tie(cleanup);
+      image_storage.init(ib);
+    }
+  }
+  cleanup.cleanup(ctx.device.vk_device, allocator);
+
+  rm.has_invalidated = true;
+}
+
 auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   if (swapchain_need_to_be_rebuilt) {
     rebuild_swapchain();
@@ -38,18 +53,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   }
 
   if (rm.has_invalidated) {
-    sync();
-    Lifetime cleanup;
-    auto ib = image_builder();
-    for (auto& image_storage : rm.image_storages()) {
-      if (image_storage.invalidated) {
-        image_storage.tie(cleanup);
-        image_storage.init(ib);
-      }
-    }
-    cleanup.cleanup(ctx.device.vk_device, allocator);
-
-    rm.has_invalidated = true;
+    rebuild_invalidated();
   }
 
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_TOP);
@@ -138,21 +142,20 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
 
 void tr::renderer::VulkanEngine::rebuild_swapchain() {
   spdlog::info("rebuilding swapchain");
-  sync();
 
+  sync();
+  lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
   ctx.rebuild_swapchain(lifetime.swapchain, window);
+
+  for (auto& image_storage : rm.image_storages()) {
+    if (image_storage.definition.depends_on_swapchain()) {
+      image_storage.invalidated = true;
+    }
+  }
+  rm.has_invalidated = true;
 
   rm.get_image_storage(ImageRessourceId::Swapchain)
       .from_external_images(ctx.swapchain.images, ctx.swapchain.image_views, ctx.swapchain.extent);
-
-  auto ib = image_builder();
-  for (auto& image_storage : rm.image_storages()) {
-    if (image_storage.definition.depends_on_swapchain()) {
-      image_storage.tie(lifetime.swapchain);
-      image_storage.init(ib);
-    }
-  }
-  lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
 }
 
 void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char*> required_instance_extensions,

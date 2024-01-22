@@ -40,16 +40,16 @@ auto tr::renderer::Instance::init(const tr::Options& options, std::span<const ch
       std::vector<VkLayerProperties> layers(layer_count);
       vkEnumerateInstanceLayerProperties(&layer_count, layers.data());
 
-      spdlog::debug("Available layers:");
+      spdlog::trace("Available layers:");
       std::set<std::string> layers_set;
       for (const auto& layer : layers) {
-        spdlog::debug("\t{}", layer.layerName);
+        spdlog::trace("\t{}", layer.layerName);
         layers_set.insert(layer.layerName);
       }
 
-      spdlog::debug("Wanted layers:");
+      spdlog::trace("Wanted layers:");
       for (const auto& wanted_layer : OPTIONAL_VALIDATION_LAYERS) {
-        spdlog::debug("\t{}", wanted_layer);
+        spdlog::trace("\t{}", wanted_layer);
       }
       const std::set<std::string> wanted_set{OPTIONAL_VALIDATION_LAYERS.begin(), OPTIONAL_VALIDATION_LAYERS.end()};
 

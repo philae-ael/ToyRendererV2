@@ -15,17 +15,17 @@ auto tr::renderer::check_extensions(const char* kind, std::span<const char* cons
                                     std::span<const char* const> optional, std::span<VkExtensionProperties> available)
     -> std::optional<std::set<std::string>> {
   std::set<std::string> available_set;
-  spdlog::debug("Available {} extensions", kind);
+  spdlog::trace("Available {} extensions", kind);
   for (const auto& extension : available) {
-    spdlog::debug("\t{}", extension.extensionName);
+    spdlog::trace("\t{}", extension.extensionName);
     available_set.insert(extension.extensionName);
   }
 
   // Required
   const std::set<std::string> required_set{required.begin(), required.end()};
-  spdlog::debug("Required {} extensions:", kind);
+  spdlog::trace("Required {} extensions:", kind);
   for (const auto& required_extension : required) {
-    spdlog::debug("\t{}", required_extension);
+    spdlog::trace("\t{}", required_extension);
   }
 
   std::vector<std::string> missing;
@@ -42,26 +42,26 @@ auto tr::renderer::check_extensions(const char* kind, std::span<const char* cons
 
   // Optional
   const std::set<std::string> optional_set{optional.begin(), optional.end()};
-  spdlog::debug("Optional {} extensions:", kind);
+  spdlog::trace("Optional {} extensions:", kind);
   for (const auto& optional_extension : optional) {
-    spdlog::debug("\t{}", optional_extension);
+    spdlog::trace("\t{}", optional_extension);
   }
   std::vector<std::string> optional_available;
   std::set_intersection(optional_set.begin(), optional_set.end(), available_set.begin(), available_set.end(),
                         std::back_inserter(optional_available));
 
   if (!optional_available.empty()) {
-    spdlog::debug("Got optional {} extensions:", kind);
+    spdlog::trace("Got optional {} extensions:", kind);
     for (const auto& extension : optional_available) {
-      spdlog::debug("\t{}:", extension);
+      spdlog::trace("\t{}:", extension);
     }
   }
 
   std::set<std::string> out = required_set;
   std::copy(optional_available.begin(), optional_available.end(), std::inserter(out, out.begin()));
-  spdlog::debug("extensions that will be activated:", kind);
+  spdlog::trace("extensions that will be activated:", kind);
   for (const auto& extension : out) {
-    spdlog::debug("\t{}:", extension);
+    spdlog::trace("\t{}:", extension);
   }
   return out;
 }

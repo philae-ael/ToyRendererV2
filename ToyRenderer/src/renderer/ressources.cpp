@@ -7,6 +7,7 @@
 
 #include "debug.h"
 #include "deletion_stack.h"
+#include "ressource_definition.h"
 #include "swapchain.h"
 #include "synchronisation.h"
 #include "utils/misc.h"
@@ -117,15 +118,14 @@ auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const 
             };
           },
           [&](InternalResolution) {
-            const auto w = static_cast<uint32_t>(static_cast<float>(swapchain.extent.width) *
-                                                 swapchain.config.internal_resolution_scale);
-            const auto h = static_cast<uint32_t>(static_cast<float>(swapchain.extent.height) *
-                                                 swapchain.config.internal_resolution_scale);
+            const float scale = internal_resolution_scale.resolve();
+            const auto w = static_cast<uint32_t>(static_cast<float>(swapchain.extent.width) * scale);
+            const auto h = static_cast<uint32_t>(static_cast<float>(swapchain.extent.height) * scale);
 
             return VkExtent3D{.width = w, .height = h, .depth = 1};
           },
           [](VkExtent2D extent) { return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1}; },
-          [](CVarExtent cvarextent) {
+          [](CVarExtent2D cvarextent) {
             VkExtent2D extent = cvarextent.resolve();
             return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1};
           },

@@ -84,6 +84,7 @@ class VulkanEngine {
 
  private:
   void rebuild_swapchain();
+  void rebuild_invalidated();
   void build_ressources();
 
   GLFWwindow* window{};

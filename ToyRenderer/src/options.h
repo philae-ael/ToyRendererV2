@@ -18,7 +18,6 @@ struct Options {
 
   struct {
     VkPresentModeKHR prefered_present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    float internal_resolution_scale = 0.5F;
   } config{};
 
   std::string_view scene;

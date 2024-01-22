@@ -321,11 +321,6 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
                                 }},
                        },
                        {
-                           {'r', "resolution", "choose internal resolution scale ", "Config"},
-                           Entry::Kind::Float,
-                           {.float_entry = {&ret.config.internal_resolution_scale}},
-                       },
-                       {
                            {'i', "imgui", "enable imgui", "Debug"},
                            Entry::Kind::Boolean,
                            {.bool_entry = {&ret.debug.imgui, false}},

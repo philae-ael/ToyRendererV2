@@ -13,6 +13,7 @@
 #include <optional>
 #include <utility>
 
+#include "ressource_definition.h"
 #include "swapchain.h"
 #include "timeline_info.h"
 #include "utils/cast.h"
@@ -74,7 +75,7 @@ void tr::renderer::VulkanEngineDebugInfo::write_gpu_timestamp(VkCommandBuffer cm
 void tr::renderer::VulkanEngineDebugInfo::timings_info() {
   if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::SeparatorText("GPU Timings:");
-    ImGui::Text("%s", std::format("{:.1f}FPS", 1000.F / avg_cpu_timelines[0].state).c_str());
+    ImGui::Text("%s", std::format("{:.1f}FPS", 1000.F / std::max(avg_cpu_timelines[0].state, avg_gpu_timelines[0].state)).c_str());
 
     if (ImGui::BeginTable("GPU Timings:", 2, ImGuiTableFlags_SizingStretchProp)) {
       for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
@@ -239,12 +240,12 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
         {"2x", 2},
         {"4x", 4},
     });
-    const auto current_internal_resolution = engine.ctx.swapchain.config.internal_resolution_scale;
+    const auto current_internal_resolution = internal_resolution_scale.resolve();
 
     if (ImGui::BeginCombo("Internal resolution scale", std::format("{:.1}x", current_internal_resolution).c_str())) {
       for (const auto& internal_resolution : internal_resolutions) {
         if (ImGui::Selectable(internal_resolution.first, current_internal_resolution == internal_resolution.second)) {
-          engine.ctx.swapchain.config.internal_resolution_scale = internal_resolution.second;
+          internal_resolution_scale.save(internal_resolution.second);
           engine.swapchain_need_to_be_rebuilt = true;
         }
       }

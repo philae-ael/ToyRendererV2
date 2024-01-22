@@ -10,7 +10,8 @@
 
 namespace tr::renderer {
 
-static constexpr tr::renderer::CVarExtent shadow_map_extent{"shadow_map_size", {1024, 1024}};
+CVAR_FLOAT(internal_resolution_scale, 1.0)
+CVAR_EXTENT2D(shadow_map_extent, 1024, 1024)
 
 static constexpr std::array image_definition = utils::to_array<tr::renderer::ImageRessourceDefinition>({
     {
