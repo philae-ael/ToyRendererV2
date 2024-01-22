@@ -33,16 +33,22 @@
 
 void tr::renderer::VulkanEngine::rebuild_invalidated() {
   sync();
-  Lifetime cleanup;
+  {
+    Lifetime cleanup;
+    for (auto& image_storage : rm.image_storages()) {
+      if (image_storage.invalidated) {
+        image_storage.tie(cleanup);
+      }
+    }
+    cleanup.cleanup(ctx.device.vk_device, allocator);
+  }
+
   auto ib = image_builder();
   for (auto& image_storage : rm.image_storages()) {
     if (image_storage.invalidated) {
-      image_storage.tie(cleanup);
       image_storage.init(ib);
     }
   }
-  cleanup.cleanup(ctx.device.vk_device, allocator);
-
   rm.has_invalidated = true;
 }
 
