@@ -12,7 +12,7 @@ namespace utils::data {
 template <types::trivial T, const std::size_t N>
 class static_stack {
  private:
-  std::array<T, N> inner;
+  std::array<T, N> inner{};
   std::size_t item_count{0};
 
  public:

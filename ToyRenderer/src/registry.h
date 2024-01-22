@@ -72,7 +72,7 @@ struct CVarExtent2D {
   [[nodiscard]] auto resolve() const -> VkExtent2D {
     const auto vwidth = tr::Registry::global()["cvar"][name]["x"];
     const auto vheight = tr::Registry::global()["cvar"][name]["y"];
-    if (!vheight.isUInt() || !vheight.isUInt()) {
+    if (!vwidth.isUInt() || !vheight.isUInt()) {
       save(default_);
       return default_;
     }

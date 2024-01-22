@@ -27,7 +27,7 @@ auto tr::renderer::Shader::compile(shaderc::Compiler& compiler, shaderc_shader_k
   TR_ASSERT(compiler.IsValid(), "compiler is invalid");
 
   const auto result =
-      compiler.CompileGlslToSpv(data->data(), data->size(), kind, path.filename().c_str(), "main", options);
+      compiler.CompileGlslToSpv(data->data(), data->size(), kind, path.filename().string().c_str(), "main", options);
 
   if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
     spdlog::error("Shader error:\n{}", result.GetErrorMessage());

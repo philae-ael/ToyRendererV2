@@ -99,26 +99,29 @@ static constexpr std::array image_definition = utils::to_array<tr::renderer::Ima
     },
 });
 
-static constexpr std::array buffer_definition = utils::to_array<tr::renderer::BufferRessourceDefinition>({
-    {
-        .definition =
+static constexpr std::array
+    buffer_definition =
+        utils::to_array<tr::renderer::BufferRessourceDefinition>(
             {
-                .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
-                .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-                .debug_name = "camera uniform",
-            },
-        .id = BufferRessourceId::Camera,
-    },
-    {
-        .definition =
-            {
-                .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                .size = utils::align(sizeof(CameraInfo), static_cast<size_t>(256)),
-                .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-                .debug_name = "shadow camera uniforms",
-            },
-        .id = BufferRessourceId::ShadowCamera,
-    },
-});
+                {
+                    .definition =
+                        {
+                            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(CameraInfo)), 256),
+                            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
+                            .debug_name = "camera uniform",
+                        },
+                    .id = BufferRessourceId::Camera,
+                },
+                {
+                    .definition =
+                        {
+                            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(CameraInfo)), 256),
+                            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
+                            .debug_name = "shadow camera uniforms",
+                        },
+                    .id = BufferRessourceId::ShadowCamera,
+                },
+            });
 }  // namespace tr::renderer

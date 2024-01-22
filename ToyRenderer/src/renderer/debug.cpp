@@ -20,6 +20,7 @@
 #include "vulkan_engine.h"
 
 #if defined(_WIN32)
+#define NOMINMAX
 #include <wtypes.h>
 #else
 #include <dlfcn.h>
@@ -76,9 +77,8 @@ void tr::renderer::VulkanEngineDebugInfo::write_gpu_timestamp(VkCommandBuffer cm
 void tr::renderer::VulkanEngineDebugInfo::timings_info() {
   if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::SeparatorText("GPU Timings:");
-    ImGui::Text(
-        "%s",
-        std::format("{:.1f}FPS", 1000.F / std::max(avg_cpu_timelines[0].state, avg_gpu_timelines[0].state)).c_str());
+    const float frame_time = std::max(avg_cpu_timelines[0].state, avg_gpu_timelines[0].state);
+    ImGui::Text("%s", std::format("{:.1f}FPS", 1000.F / frame_time).c_str());
 
     if (ImGui::BeginTable("GPU Timings:", 2, ImGuiTableFlags_SizingStretchProp)) {
       for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
@@ -246,11 +246,11 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
   }
   {
     std::array const internal_resolutions = std::to_array<std::pair<const char*, float>>({
-        {"0.5x", 0.5},
-        {"0.8x", 0.8},
-        {"1x", 1},
-        {"2x", 2},
-        {"4x", 4},
+        {"0.5x", 0.5F},
+        {"0.8x", 0.8F},
+        {"1x", 1.0F},
+        {"2x", 2.0F},
+        {"4x", 4.0F},
     });
     const auto current_internal_resolution = internal_resolution_scale.resolve();
 

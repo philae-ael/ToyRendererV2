@@ -33,8 +33,12 @@ overloaded(Ts...) -> overloaded<Ts...>;
 // TODO: put that in a memory.h file or smthg like that
 // There is std::align but it deal with pointers
 template <class T>
-constexpr auto align(T offset, T aligmement) -> T {
-  return (offset - 1 + aligmement) & (-aligmement);
+constexpr auto align(T offset, T alignement) -> T {
+  const auto alignement_ = static_cast<std::size_t>(alignement);
+#pragma warning(push)
+#pragma warning(disable : 4146)
+  return static_cast<T>((static_cast<std::size_t>(offset) - 1 + alignement_) & -alignement_);
+#pragma warning(pop)
 }
 
 template <class Fn>
