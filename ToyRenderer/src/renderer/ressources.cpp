@@ -124,11 +124,16 @@ auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const 
 
             return VkExtent3D{.width = w, .height = h, .depth = 1};
           },
-          [](VkExtent2D extent) { return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1}; }},
+          [](VkExtent2D extent) { return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1}; },
+          [](CVarExtent cvarextent) {
+            VkExtent2D extent = cvarextent.resolve();
+            return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1};
+          },
+      },
       size);
 }
 
-auto tr::renderer::ImageBuilder::build_image(Lifetime& lifetime, ImageDefinition definition) const -> ImageRessource {
+auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -> ImageRessource {
   const auto format = definition.vk_format(*swapchain);
   const auto aspect_mask = definition.vk_aspect_mask();
   const auto extent = definition.vk_extent(*swapchain);
@@ -193,10 +198,7 @@ auto tr::renderer::ImageBuilder::build_image(Lifetime& lifetime, ImageDefinition
   VK_UNWRAP(vkCreateImageView, device, &view_create_info, nullptr, &view);
   set_debug_object_name(device, VK_OBJECT_TYPE_IMAGE_VIEW, view, std::format("{} view", definition.debug_name));
 
-  lifetime.tie(VmaHandle::Image, image, alloc);
-  lifetime.tie(DeviceHandle::ImageView, view);
-
-  return ImageRessource{
+  const auto res = ImageRessource{
       .image = image,
       .view = view,
       .sync_info = SrcImageMemoryBarrierUndefined,
@@ -204,6 +206,8 @@ auto tr::renderer::ImageBuilder::build_image(Lifetime& lifetime, ImageDefinition
       .usage = definition.usage,
       .extent = {.width = extent.width, .height = extent.height},
   };
+
+  return res;
 }
 
 auto tr::renderer::BufferDefinition::vma_required_flags() const -> VkMemoryPropertyFlags {

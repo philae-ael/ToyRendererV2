@@ -87,23 +87,23 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
   }
 
   {
-    default_ressources.metallic_roughness = engine.image_builder().build_image(
-        engine.lifetime.global, {
-                                    .flags = 0,
-                                    .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                    .size = VkExtent2D{1, 1},
-                                    .format = VK_FORMAT_R8G8_UNORM,
-                                    .debug_name = "default metallic_roughness_texture",
-                                });
+    default_ressources.metallic_roughness = engine.image_builder().build_image({
+        .flags = 0,
+        .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .size = VkExtent2D{1, 1},
+        .format = VK_FORMAT_R8G8_UNORM,
+        .debug_name = "default metallic_roughness_texture",
+    });
+    default_ressources.metallic_roughness.tie(engine.lifetime.global);
 
-    default_ressources.normal_map = engine.image_builder().build_image(
-        engine.lifetime.global, {
-                                    .flags = 0,
-                                    .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                    .size = VkExtent2D{1, 1},
-                                    .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-                                    .debug_name = "default normal_texture",
-                                });
+    default_ressources.normal_map = engine.image_builder().build_image({
+        .flags = 0,
+        .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .size = VkExtent2D{1, 1},
+        .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+        .debug_name = "default normal_texture",
+    });
+    default_ressources.normal_map.tie(engine.lifetime.global);
 
     ImageMemoryBarrier::submit<2>(
         t.cmd.vk_cmd, {{
@@ -139,6 +139,8 @@ void tr::renderer::RenderGraph::imgui(VulkanEngine& engine) {
   if (ImGui::Button("Reload shaders")) {
     reinit_passes(engine);
   }
+
+  passes.shadow_map.imgui(engine.rm);
 
   ImGui::End();
 }

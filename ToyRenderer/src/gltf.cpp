@@ -65,21 +65,20 @@ auto load_texture(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& 
              },
              image.data);
 
-  auto image_ressource =
-      ib.build_image(lifetime, tr::renderer::ImageDefinition{
-                                   .flags = 0,
-                                   .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                   .size =
-                                       VkExtent2D{
-                                           .width = width,
-                                           .height = height,
-
-                                       },
-                                   // TODO: How to deal with RBG (non alpha images?)
-                                   // and more generally with unsupported formats
-                                   .format = VK_FORMAT_R8G8B8A8_UNORM,
-                                   .debug_name = debug_name,
-                               });
+  auto image_ressource = ib.build_image(tr::renderer::ImageDefinition{
+      .flags = 0,
+      .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+      .size =
+          VkExtent2D{
+              .width = width,
+              .height = height,
+          },
+      // TODO: How to deal with RBG (non alpha images?)
+      // and more generally with unsupported formats
+      .format = VK_FORMAT_R8G8B8A8_UNORM,
+      .debug_name = debug_name,
+  });
+  image_ressource.tie(lifetime);
 
   tr::renderer::ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
                                               {{

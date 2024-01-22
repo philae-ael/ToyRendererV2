@@ -37,6 +37,21 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
     swapchain_need_to_be_rebuilt = false;
   }
 
+  if (rm.has_invalidated) {
+    sync();
+    Lifetime cleanup;
+    auto ib = image_builder();
+    for (auto& image_storage : rm.image_storages()) {
+      if (image_storage.invalidated) {
+        image_storage.tie(cleanup);
+        image_storage.init(ib);
+      }
+    }
+    cleanup.cleanup(ctx.device.vk_device, allocator);
+
+    rm.has_invalidated = true;
+  }
+
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_TOP);
   frame_id += 1;
 
@@ -125,7 +140,6 @@ void tr::renderer::VulkanEngine::rebuild_swapchain() {
   spdlog::info("rebuilding swapchain");
   sync();
 
-  lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
   ctx.rebuild_swapchain(lifetime.swapchain, window);
 
   rm.get_image_storage(ImageRessourceId::Swapchain)
@@ -134,9 +148,11 @@ void tr::renderer::VulkanEngine::rebuild_swapchain() {
   auto ib = image_builder();
   for (auto& image_storage : rm.image_storages()) {
     if (image_storage.definition.depends_on_swapchain()) {
-      image_storage.init(lifetime.swapchain, ib);
+      image_storage.tie(lifetime.swapchain);
+      image_storage.init(ib);
     }
   }
+  lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
 }
 
 void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char*> required_instance_extensions,
@@ -200,11 +216,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
       continue;
     }
 
-    if (image_storage.definition.depends_on_swapchain()) {
-      image_storage.init(lifetime.swapchain, ib);
-    } else {
-      image_storage.init(lifetime.global, ib);
-    }
+    image_storage.init(ib);
   }
 
   auto bb = buffer_builder();
@@ -251,6 +263,10 @@ tr::renderer::VulkanEngine::~VulkanEngine() {
 
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkFreeCommandBuffers(ctx.device.vk_device, graphic_command_pools[i], 1, &graphics_command_buffers[i].vk_cmd);
+  }
+
+  for (const auto& image_storage : rm.image_storages()) {
+    image_storage.tie(lifetime.global);
   }
 
   lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);

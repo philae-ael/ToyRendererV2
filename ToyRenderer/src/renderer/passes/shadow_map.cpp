@@ -1,5 +1,6 @@
 #include "shadow_map.h"
 
+#include <utils/misc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
@@ -10,7 +11,6 @@
 #include "../pipeline.h"
 #include "../ressource_definition.h"
 #include "../vulkan_engine.h"
-#include "utils/misc.h"
 
 const std::array vert_spv_default = std::to_array<uint32_t>({
 #include "shaders/shadow_map.vert.inc"
@@ -99,17 +99,15 @@ void tr::renderer::ShadowMap::end_draw(VkCommandBuffer cmd) const {
 }
 
 void tr::renderer::ShadowMap::start_draw(Frame &frame) const {
-  ImageMemoryBarrier::submit<1>(
-      frame.cmd.vk_cmd,
-      {{
-          frame.frm.get_image(ImageRessourceId::ShadowMap).invalidate().prepare_barrier(SyncLateDepth),
-      }});
+  auto &shadow_map = frame.frm.get_image(ImageRessourceId::ShadowMap);
+  ImageMemoryBarrier::submit<1>(frame.cmd.vk_cmd, {{
+                                                      shadow_map.invalidate().prepare_barrier(SyncLateDepth),
+                                                  }});
 
   const VkRenderingAttachmentInfo depthAttachment =
-      frame.frm.get_image(ImageRessourceId::ShadowMap)
-          .as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
+      shadow_map.as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
 
-  const VkRect2D render_area{{0, 0}, {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE}};
+  const VkRect2D render_area{{0, 0}, shadow_map.extent};
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -191,4 +189,31 @@ void tr::renderer::ShadowMap::draw(Frame &frame, const DirectionalLight &light, 
     draw_mesh(frame, mesh);
   }
   end_draw(frame.cmd.vk_cmd);
+}
+
+void tr::renderer::ShadowMap::imgui(RessourceManager &rm) const {
+  utils::ignore_unused(this);
+
+  if (ImGui::CollapsingHeader("ShadowMap", ImGuiTreeNodeFlags_DefaultOpen)) {
+    std::array shadow_map_sizes = utils::to_array<std::pair<const char *, uint32_t>>({
+        {"512x512", 512},
+        {"1024x1024", 1024},
+        {"2048x2048", 2048},
+        {"4096x4096", 4096},
+    });
+
+    const auto current_shadow_map_size = shadow_map_extent.resolve();
+
+    if (ImGui::BeginCombo(
+            "Shadow Map Size",
+            std::format("{}x{}", current_shadow_map_size.width, current_shadow_map_size.height).c_str())) {
+      for (const auto &size : shadow_map_sizes) {
+        if (ImGui::Selectable(size.first, current_shadow_map_size.width == size.second)) {
+          shadow_map_extent.save({size.second, size.second});
+          rm.invalidate_image(ImageRessourceId::ShadowMap);
+        }
+      }
+      ImGui::EndCombo();
+    }
+  }
 }

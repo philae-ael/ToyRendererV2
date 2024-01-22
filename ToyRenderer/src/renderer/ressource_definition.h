@@ -3,7 +3,6 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <cstdint>
 
 #include "../camera.h"
 #include "ressources.h"
@@ -11,12 +10,12 @@
 
 namespace tr::renderer {
 
-static const uint32_t SHADOW_MAP_SIZE = 4096;
+static constexpr tr::renderer::CVarExtent shadow_map_extent{"shadow_map_size", {1024, 1024}};
 
 static constexpr std::array image_definition = utils::to_array<tr::renderer::ImageRessourceDefinition>({
     {
         {
-            .flags = 0,
+            .flags = IMAGE_OPTION_FLAG_EXTERNAL_BIT,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             .size = FramebufferExtent{},
             .format = FramebufferFormat{},
@@ -91,7 +90,7 @@ static constexpr std::array image_definition = utils::to_array<tr::renderer::Ima
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            .size = VkExtent2D{SHADOW_MAP_SIZE, SHADOW_MAP_SIZE},
+            .size = shadow_map_extent,
             .format = VK_FORMAT_D16_UNORM,
             .debug_name = "Shadow Map",
         },

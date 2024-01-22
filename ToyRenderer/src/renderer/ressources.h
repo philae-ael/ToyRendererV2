@@ -1,5 +1,7 @@
 #pragma once
+#include <spdlog/spdlog.h>
 #include <utils/assert.h>
+#include <utils/misc.h>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
@@ -10,10 +12,10 @@
 #include <string_view>
 #include <variant>
 
+#include "../registry.h"
 #include "constants.h"
 #include "deletion_stack.h"
 #include "synchronisation.h"
-#include "utils/misc.h"
 
 namespace tr::renderer {
 
@@ -75,6 +77,11 @@ struct ImageRessource {
 
   auto as_attachment(std::variant<VkClearValue, ImageClearOpLoad, ImageClearOpDontCare> clearOp)
       -> VkRenderingAttachmentInfo;
+
+  void tie(Lifetime& lifetime) const {
+    lifetime.tie(VmaHandle::Image, image, alloc);
+    lifetime.tie(DeviceHandle::ImageView, view);
+  }
 };
 
 enum ImageOptionsFlagBits {
@@ -88,10 +95,33 @@ struct FramebufferFormat {};
 struct FramebufferExtent {};
 struct InternalResolution {};
 
+struct CVarExtent {
+  const char* name;
+  VkExtent2D default_;
+
+  [[nodiscard]] auto resolve() const -> VkExtent2D {
+    const auto vwidth = tr::Registry::global()["cvar"][name]["x"];
+    const auto vheight = tr::Registry::global()["cvar"][name]["y"];
+    if (!vheight.isUInt() || !vheight.isUInt()) {
+      save(default_);
+      return default_;
+    }
+
+    const auto width = vwidth.asUInt();
+    const auto height = vheight.asUInt();
+    return VkExtent2D{width, height};
+  }
+
+  void save(VkExtent2D extent) const {
+    tr::Registry::global()["cvar"][name]["x"] = extent.width;
+    tr::Registry::global()["cvar"][name]["y"] = extent.height;
+  }
+};
+
 struct ImageDefinition {
   ImageOptionsFlags flags;
   VkImageUsageFlags usage;
-  std::variant<FramebufferExtent, InternalResolution, VkExtent2D> size;
+  std::variant<FramebufferExtent, InternalResolution, VkExtent2D, CVarExtent> size;
   std::variant<FramebufferFormat, VkFormat> format;
   std::string_view debug_name;
 
@@ -109,7 +139,7 @@ class ImageBuilder {
   ImageBuilder(VkDevice device_, VmaAllocator allocator_, const Swapchain* swapchain_)
       : device(device_), allocator(allocator_), swapchain(swapchain_) {}
 
-  [[nodiscard]] auto build_image(Lifetime& lifetime, ImageDefinition definition) const -> ImageRessource;
+  [[nodiscard]] auto build_image(ImageDefinition definition) const -> ImageRessource;
 
  private:
   VkDevice device;
@@ -143,16 +173,32 @@ struct BufferRessourceDefinition {
 struct ImageRessourceStorage {
   ImageDefinition definition;
   std::array<ImageRessource, MAX_FRAMES_IN_FLIGHT> ressources{};
+  bool invalidated = false;
 
   auto store(uint32_t frame_id, ImageRessource ressource) { ressources[frame_id % MAX_FRAMES_IN_FLIGHT] = ressource; }
-  auto get(uint32_t frame_id) -> ImageRessource { return ressources[frame_id % MAX_FRAMES_IN_FLIGHT]; }
+  auto get(uint32_t frame_id) -> ImageRessource& {
+    if (invalidated) {
+      spdlog::warn("invalidated image ressource is used!");
+    }
+    return ressources[frame_id % MAX_FRAMES_IN_FLIGHT];
+  }
 
-  void init(Lifetime& lifetime, ImageBuilder& rb) {
+  void init(ImageBuilder& rb) {
     if ((definition.flags & IMAGE_OPTION_FLAG_EXTERNAL_BIT) != 0) {
       return;
     }
     for (auto& res : ressources) {
-      res = rb.build_image(lifetime, definition);
+      res = rb.build_image(definition);
+    }
+    invalidated = false;
+  }
+
+  void tie(Lifetime& lifetime) const {
+    if ((definition.flags & IMAGE_OPTION_FLAG_EXTERNAL_BIT) != 0) {
+      return;
+    }
+    for (const auto& res : ressources) {
+      res.tie(lifetime);
     }
   }
 
@@ -171,7 +217,7 @@ struct BufferRessourceStorage {
   std::array<BufferRessource, MAX_FRAMES_IN_FLIGHT> ressources{};
 
   auto store(uint32_t frame_id, BufferRessource ressource) { ressources[frame_id % MAX_FRAMES_IN_FLIGHT] = ressource; }
-  auto get(uint32_t frame_id) -> BufferRessource { return ressources[frame_id % MAX_FRAMES_IN_FLIGHT]; }
+  auto get(uint32_t frame_id) -> BufferRessource& { return ressources[frame_id % MAX_FRAMES_IN_FLIGHT]; }
 
   void init(Lifetime& lifetime, BufferBuilder& bb) {
     for (auto& res : ressources) {
@@ -187,6 +233,8 @@ class RessourceManager {
   std::array<BufferRessourceStorage, static_cast<size_t>(BufferRessourceId::MAX)> buffer_storages_;
 
  public:
+  bool has_invalidated = false;
+
   void define_image(ImageRessourceDefinition def) {
     image_storages_[static_cast<size_t>(def.id)].definition = def.definition;
   }
@@ -207,6 +255,11 @@ class RessourceManager {
 
   auto image_storages() -> std::span<ImageRessourceStorage> { return image_storages_; }
   auto buffer_storages() -> std::span<BufferRessourceStorage> { return buffer_storages_; }
+
+  auto invalidate_image(ImageRessourceId id) {
+    get_image_storage(id).invalidated = true;
+    has_invalidated = true;
+  }
 };
 
 struct FrameRessourceManager {
@@ -214,13 +267,11 @@ struct FrameRessourceManager {
   uint32_t frame_index;
 
   [[nodiscard]] auto get_image(ImageRessourceId id) -> ImageRessource& {
-    utils::ignore_unused(this);
-    return rm->image_storages()[static_cast<size_t>(id)].ressources[frame_index];
+    return rm->image_storages()[static_cast<size_t>(id)].get(frame_index);
   }
 
   [[nodiscard]] auto get_buffer(BufferRessourceId id) -> BufferRessource& {
-    utils::ignore_unused(this);
-    return rm->buffer_storages()[static_cast<size_t>(id)].ressources[frame_index];
+    return rm->buffer_storages()[static_cast<size_t>(id)].get(frame_index);
   }
 
   template <class T, class Fn>

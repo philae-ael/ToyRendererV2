@@ -1,5 +1,6 @@
 #pragma once
 
+#include <imgui.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
@@ -37,6 +38,8 @@ struct ShadowMap {
   void draw(Frame &frame, const DirectionalLight &light, std::span<const Mesh> meshes);
 
   void draw_mesh(Frame &frame, const Mesh &mesh) const;
+
+  void imgui(RessourceManager &rm) const;
 };
 
 }  // namespace tr::renderer

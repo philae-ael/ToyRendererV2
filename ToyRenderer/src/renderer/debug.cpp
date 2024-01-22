@@ -210,17 +210,18 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
         {"FIFO Relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
     });
 
-    const auto current_present_mode = INLINE_LAMBDA->std::pair<const char*, VkPresentModeKHR> {
+    const auto current_present_mode = INLINE_LAMBDA->std::pair<std::string, VkPresentModeKHR> {
       const auto present_mode_it =
           std::ranges::find(internal_resolutions, engine.ctx.swapchain.config.prefered_present_mode,
                             &decltype(internal_resolutions)::value_type::second);
       if (present_mode_it != internal_resolutions.end()) {
         return *present_mode_it;
       }
-      return {"", engine.ctx.swapchain.config.prefered_present_mode};
+      return {std::format("{}", engine.ctx.swapchain.config.prefered_present_mode),
+              engine.ctx.swapchain.config.prefered_present_mode};
     };
 
-    if (ImGui::BeginCombo("Present mode", current_present_mode.first)) {
+    if (ImGui::BeginCombo("Present mode", current_present_mode.first.c_str())) {
       for (const auto& present_mode : internal_resolutions) {
         if (ImGui::Selectable(present_mode.first, current_present_mode.second == present_mode.second)) {
           engine.ctx.swapchain.config.prefered_present_mode = present_mode.second;
