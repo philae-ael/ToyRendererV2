@@ -12,17 +12,29 @@
 #include "../vulkan_engine.h"
 #include "utils/misc.h"
 
-const std::array gbuffer_vert_bin = std::to_array<uint32_t>({
+const std::array vert_spv_default = std::to_array<uint32_t>({
 #include "shaders/shadow_map.vert.inc"
 });
 
 auto tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
                                    Lifetime &setup_lifetime) -> ShadowMap {
-  const auto vert = Shader::init_from_src(setup_lifetime, ctx.device.vk_device, gbuffer_vert_bin);
+  shaderc::Compiler compiler;
+  shaderc::CompileOptions options;
+  options.SetGenerateDebugInfo();
+  options.SetSourceLanguage(shaderc_source_language_glsl);
+  options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-  const std::array shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
-      vert.pipeline_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, "main"),
-  });
+  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling deferred shader") {
+    const auto vert_spv =
+        Shader::compile(compiler, shaderc_glsl_vertex_shader, options, "./ToyRenderer/shaders/shadow_map.vert");
+
+    const auto vert = Shader::init_from_spv(setup_lifetime, ctx.device.vk_device,
+                                            vert_spv ? std::span{*vert_spv} : std::span{vert_spv_default});
+
+    return std::to_array({
+        vert.pipeline_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, "main"),
+    });
+  };
 
   const std::array<VkDynamicState, 2> dynamic_states = {
       VK_DYNAMIC_STATE_SCISSOR,

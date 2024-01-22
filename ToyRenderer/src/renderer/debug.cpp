@@ -183,9 +183,8 @@ void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine
     }
   }
 }
-
 void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine& engine) {
-  if (!ImGui::Begin("Vulkan Engine")) {
+  if (!ImGui::Begin("Stats")) {
     ImGui::End();
     return;
   }
@@ -198,7 +197,7 @@ void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine
 
 void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngine& engine) {
   utils::ignore_unused(this);
-  if (!ImGui::Begin("Options")) {
+  if (!ImGui::Begin("Engine Options")) {
     ImGui::End();
     return;
   }
@@ -241,7 +240,7 @@ void tr::renderer::VulkanEngineDebugInfo::option_window(tr::renderer::VulkanEngi
     });
     const auto current_internal_resolution = engine.ctx.swapchain.config.internal_resolution_scale;
 
-    if (ImGui::BeginCombo("internal resolution scale", std::format("{:.1}x", current_internal_resolution).c_str())) {
+    if (ImGui::BeginCombo("Internal resolution scale", std::format("{:.1}x", current_internal_resolution).c_str())) {
       for (const auto& internal_resolution : internal_resolutions) {
         if (ImGui::Selectable(internal_resolution.first, current_internal_resolution == internal_resolution.second)) {
           engine.ctx.swapchain.config.internal_resolution_scale = internal_resolution.second;

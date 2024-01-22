@@ -37,10 +37,7 @@ tr::App::App(tr::Options options_) : options(options_) {
   }
 
   subsystems.engine.transfer([&](renderer::Transferer &t) {
-    auto bb = subsystems.engine.buffer_builder();
-    auto ib = subsystems.engine.image_builder();
-
-    rendergraph.init(subsystems.engine, t, ib, bb);
+    rendergraph.init(subsystems.engine, t);
 
     std::string scene_name;
     if (options.scene.empty()) {
@@ -48,6 +45,8 @@ tr::App::App(tr::Options options_) : options(options_) {
     } else {
       scene_name = options.scene;
     }
+    auto bb = subsystems.engine.buffer_builder();
+    auto ib = subsystems.engine.image_builder();
     const auto [_, scene] = Gltf::load_from_file(subsystems.engine.lifetime.global, ib, bb, t, scene_name);
     meshes.insert(meshes.end(), scene.begin(), scene.end());
   });
@@ -74,6 +73,7 @@ void tr::App::run() {
 
       if (subsystems.imgui.start_frame()) {
         subsystems.engine.imgui();
+        rendergraph.imgui(subsystems.engine);
         subsystems.imgui.draw(frame);
       }
     });

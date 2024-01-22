@@ -1,11 +1,6 @@
 {
     "dependencies": [
-        "jsoncpp",
-        "vulkan",
-        {
-            "name": "spdlog",
-            "default-features": false
-        },
+        "fastgltf",
         "glfw3",
         "glm",
         {
@@ -16,8 +11,14 @@
                 "docking-experimental"
             ]
         },
-        "vulkan-memory-allocator",
-        "fastgltf",
-        "stb"
+        "jsoncpp",
+        "shaderc",
+        {
+            "name": "spdlog",
+            "default-features": false
+        },
+        "stb",
+        "vulkan",
+        "vulkan-memory-allocator"
     ]
 }

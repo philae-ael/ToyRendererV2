@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <set>
+#include <vector>
 
 #include "deletion_stack.h"
 #include "utils/assert.h"

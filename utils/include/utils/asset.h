@@ -1,18 +1,23 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <optional>
 #include <vector>
 
-#include "./assert.h"
 #include "utils/cast.h"
 
 template <class T>
-static auto read_file(const std::string& path) -> std::vector<T> {
+static auto read_file(const std::string& path) -> std::optional<std::vector<T>> {
   std::ifstream f(path, std::ios::ate | std::ios::binary);
 
-  TR_ASSERT(f.is_open(), "failed to open file {}", path);
+  if (!f.is_open()) {
+    spdlog::error("failed to open file {}", path);
+    return std::nullopt;
+  }
 
   const auto file_size = static_cast<std::size_t>(f.tellg());
   std::vector<T> output(file_size);

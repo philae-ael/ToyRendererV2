@@ -1,12 +1,13 @@
-﻿find_package(Vulkan REQUIRED)
-find_package(VulkanMemoryAllocator REQUIRED)
-find_package(jsoncpp REQUIRED)
+﻿find_package(fastgltf REQUIRED)
 find_package(glfw3 REQUIRED)
-find_package(spdlog REQUIRED)
-find_package(imgui REQUIRED)
 find_package(glm REQUIRED)
-find_package(fastgltf REQUIRED)
+find_package(imgui REQUIRED)
+find_package(jsoncpp REQUIRED)
+find_package(unofficial-shaderc REQUIRED)
+find_package(spdlog REQUIRED)
 find_package(Stb REQUIRED)
+find_package(Vulkan REQUIRED)
+find_package(VulkanMemoryAllocator REQUIRED)
 
 add_library(Shaders INTERFACE)
 target_compile_shader(Shaders
@@ -93,7 +94,7 @@ add_executable(ToyRenderer
     src/system/platform.h
 )
 
-target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator fastgltf::fastgltf)
+target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator fastgltf::fastgltf unofficial::shaderc::shaderc)
 target_include_directories(ToyRenderer PRIVATE ${Stb_INCLUDE_DIR})
 
 # set_property(TARGET ToyRenderer PROPERTY CXX_CLANG_TIDY "clang-tidy" "--fix")

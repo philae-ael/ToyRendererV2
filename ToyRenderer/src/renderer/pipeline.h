@@ -4,6 +4,8 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <shaderc/shaderc.hpp>
+#include <vector>
 
 #include "deletion_stack.h"
 #include "utils.h"
@@ -11,9 +13,9 @@
 namespace tr::renderer {
 
 struct Shader {
-  static auto init_from_src(Lifetime& lifetime, VkDevice, std::span<const uint32_t>) -> Shader;
-  static auto init_from_filename(Lifetime& lifetime, VkDevice, const std::filesystem::path&) -> Shader;
-
+  static auto init_from_spv(Lifetime& lifetime, VkDevice, std::span<const uint32_t>) -> Shader;
+  static auto compile(shaderc::Compiler& compiler, shaderc_shader_kind kind, const shaderc::CompileOptions& options,
+                      const std::filesystem::path& path) -> std::optional<std::vector<uint32_t>>;
   VkShaderModule module;
 
   auto pipeline_shader_stage(VkShaderStageFlagBits stage, const char* entry_point) const

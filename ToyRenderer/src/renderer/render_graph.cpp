@@ -1,5 +1,7 @@
 #include "render_graph.h"
 
+#include <imgui.h>
+
 #include <array>
 
 #include "../camera.h"
@@ -46,18 +48,18 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_BOTTOM);
 }
 
-void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transferer& t, ImageBuilder& ib,
-                                     BufferBuilder& /*bb*/) {
-  {
-    Lifetime setup_lifetime;
-    passes = {
-        .gbuffer = GBuffer::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-        .shadow_map = ShadowMap::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-        .deferred = Deferred::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-        .present = Present::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-    };
-    setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
-  }
+void tr::renderer::RenderGraph::reinit_passes(tr::renderer::VulkanEngine& engine) {
+  Lifetime setup_lifetime;
+  passes = {
+      .gbuffer = GBuffer::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
+      .shadow_map = ShadowMap::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
+      .deferred = Deferred::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
+      .present = Present::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
+  };
+  setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
+}
+void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transferer& t) {
+  reinit_passes(engine);
 
   {
     const VkSamplerCreateInfo sampler_create_info{
@@ -85,7 +87,7 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
   }
 
   {
-    default_ressources.metallic_roughness = ib.build_image(
+    default_ressources.metallic_roughness = engine.image_builder().build_image(
         engine.lifetime.global, {
                                     .flags = 0,
                                     .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -94,7 +96,7 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
                                     .debug_name = "default metallic_roughness_texture",
                                 });
 
-    default_ressources.normal_map = ib.build_image(
+    default_ressources.normal_map = engine.image_builder().build_image(
         engine.lifetime.global, {
                                     .flags = 0,
                                     .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -126,4 +128,17 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
             default_ressources.normal_map.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
         }});
   }
+}
+
+void tr::renderer::RenderGraph::imgui(VulkanEngine& engine) {
+  if (!ImGui::Begin("Shaders")) {
+    ImGui::End();
+    return;
+  }
+
+  if (ImGui::Button("Reload shaders")) {
+    reinit_passes(engine);
+  }
+
+  ImGui::End();
 }

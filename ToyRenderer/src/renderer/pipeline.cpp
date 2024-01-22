@@ -1,20 +1,42 @@
 #include "pipeline.h"
 
+#include <shaderc/shaderc.h>
+#include <shaderc/status.h>
+#include <spdlog/spdlog.h>
 #include <utils/asset.h>
 #include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
+#include <shaderc/shaderc.hpp>
+#include <vector>
 
 #include "utils.h"
+#include "utils/assert.h"
 
-auto tr::renderer::Shader::init_from_filename(Lifetime& lifetime, VkDevice device, const std::filesystem::path& path)
-    -> Shader {
-  const auto data = read_file<uint32_t>(path.string());
-  return init_from_src(lifetime, device, data);
+auto tr::renderer::Shader::compile(shaderc::Compiler& compiler, shaderc_shader_kind kind,
+                                   const shaderc::CompileOptions& options, const std::filesystem::path& path)
+    -> std::optional<std::vector<uint32_t>> {
+  const auto data = read_file<char>(path.string());
+  if (!data) {
+    return std::nullopt;
+  }
+
+  TR_ASSERT(compiler.IsValid(), "compiler is invalid");
+
+  const auto result =
+      compiler.CompileGlslToSpv(data->data(), data->size(), kind, path.filename().c_str(), "main", options);
+
+  if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
+    spdlog::error("Shader error:\n{}", result.GetErrorMessage());
+    return std::nullopt;
+  }
+  return std::vector<uint32_t>{result.begin(), result.end()};
 }
-auto tr::renderer::Shader::init_from_src(Lifetime& lifetime, VkDevice device, std::span<const uint32_t> module)
+
+auto tr::renderer::Shader::init_from_spv(Lifetime& lifetime, VkDevice device, std::span<const uint32_t> module)
     -> Shader {
   Shader shader{};
 

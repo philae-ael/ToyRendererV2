@@ -10,6 +10,7 @@
 #include "passes/shadow_map.h"
 #include "ressources.h"
 #include "uploader.h"
+#include "vulkan_engine.h"
 
 namespace tr::renderer {
 struct DefaultRessources {
@@ -18,8 +19,11 @@ struct DefaultRessources {
   ImageRessource normal_map{};
 };
 struct RenderGraph {
-  void init(VulkanEngine& engine, Transferer& t, ImageBuilder& ib, BufferBuilder& bb);
+  void reinit_passes(tr::renderer::VulkanEngine& engine);
+  void init(VulkanEngine& engine, Transferer& t);
   void draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera);
+
+  void imgui(VulkanEngine&);
 
   struct {
     GBuffer gbuffer;
