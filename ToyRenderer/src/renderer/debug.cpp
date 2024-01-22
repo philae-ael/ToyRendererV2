@@ -23,6 +23,7 @@
 #include <wtypes.h>
 #else
 #include <dlfcn.h>
+#include <sys/resource.h>
 #endif
 
 auto tr::renderer::Renderdoc::init() -> Renderdoc {
@@ -75,7 +76,9 @@ void tr::renderer::VulkanEngineDebugInfo::write_gpu_timestamp(VkCommandBuffer cm
 void tr::renderer::VulkanEngineDebugInfo::timings_info() {
   if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::SeparatorText("GPU Timings:");
-    ImGui::Text("%s", std::format("{:.1f}FPS", 1000.F / std::max(avg_cpu_timelines[0].state, avg_gpu_timelines[0].state)).c_str());
+    ImGui::Text(
+        "%s",
+        std::format("{:.1f}FPS", 1000.F / std::max(avg_cpu_timelines[0].state, avg_gpu_timelines[0].state)).c_str());
 
     if (ImGui::BeginTable("GPU Timings:", 2, ImGuiTableFlags_SizingStretchProp)) {
       for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
@@ -109,12 +112,21 @@ void tr::renderer::VulkanEngineDebugInfo::timings_info() {
 }
 
 void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine& engine) {
-  if (ImGui::CollapsingHeader("GPU memory usage", ImGuiTreeNodeFlags_DefaultOpen)) {
-    if (ImGui::BeginTable("Memory usage", 2, ImGuiTableFlags_SizingStretchProp)) {
-      ImGui::TableNextRow();
-      ImGui::TableNextColumn();
+  if (ImGui::CollapsingHeader("Memory usage", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::BeginTable("GPU Memory usage", 2, ImGuiTableFlags_SizingStretchProp)) {
+      {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        auto history = cpu_memory_usage.history();
+        ImGui::PlotLines("Global CPU memory usage (RSS)", history.data(), utils::narrow_cast<int>(history.size()));
+
+        ImGui::TableNextColumn();
+        ImGui::Text("%.1f MB", history[history.size() - 1] / 1024);
+      }
 
       {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
         auto history = gpu_memory_usage.history();
         ImGui::PlotLines("Global GPU memory usage", history.data(), utils::narrow_cast<int>(history.size()));
 
@@ -287,12 +299,26 @@ void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEn
                   period.name);
   }
 
-  std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
-  vmaGetHeapBudgets(engine.allocator, budgets.data());
-  float global_memory_usage{};
-  for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
-    gpu_heaps_usage[i].push(utils::narrow_cast<float>(budgets[i].usage));
-    global_memory_usage += utils::narrow_cast<float>(budgets[i].usage);
+  {
+    std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
+    vmaGetHeapBudgets(engine.allocator, budgets.data());
+    float global_memory_usage{};
+    for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
+      gpu_heaps_usage[i].push(utils::narrow_cast<float>(budgets[i].usage));
+      global_memory_usage += utils::narrow_cast<float>(budgets[i].usage);
+    }
+    gpu_memory_usage.push(global_memory_usage);
   }
-  gpu_memory_usage.push(global_memory_usage);
+
+  {
+    float memory_usage{};
+#if defined(_WIN32)
+#else
+    rusage r_usage{};
+    getrusage(RUSAGE_SELF, &r_usage);
+    memory_usage = static_cast<float>(r_usage.ru_maxrss);
+#endif
+
+    cpu_memory_usage.push(memory_usage);
+  }
 }

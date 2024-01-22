@@ -100,6 +100,7 @@ struct VulkanEngineDebugInfo {
 
   std::array<utils::Timeline<float, 500>, VK_MAX_MEMORY_HEAPS> gpu_heaps_usage{};
   utils::Timeline<float, 500> gpu_memory_usage{};
+  utils::Timeline<float, 500> cpu_memory_usage{};
 
   Renderdoc renderdoc;
 
