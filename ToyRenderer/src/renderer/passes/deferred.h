@@ -17,8 +17,11 @@ struct Deferred {
   std::array<VkDescriptorSetLayout, 1> descriptor_set_layouts{};
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
-
   VkSampler shadow_map_sampler = VK_NULL_HANDLE;
+
+  bool pcf_enable = true;
+  uint8_t pcf_iter_count = 3;
+  float shadow_bias = 0.0001F;
 
   static constexpr std::array bindings = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
@@ -36,10 +39,9 @@ struct Deferred {
 
   });
 
-  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
-      -> Deferred;
-
+  void init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime);
   void draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const;
+  auto imgui() -> bool;
 };
 
 }  // namespace tr::renderer

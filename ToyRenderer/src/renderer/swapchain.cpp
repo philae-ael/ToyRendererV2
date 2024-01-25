@@ -85,9 +85,9 @@ auto tr::renderer::Swapchain::init_with_config(Lifetime& lifetime, SwapchainConf
   spdlog::debug("Present Mode chosen: {}", s.present_mode);
 
   s.extent = s.compute_extent(window);
-  uint32_t image_count =
+  uint32_t const image_count =
       std::clamp<uint32_t>(MAX_FRAMES_IN_FLIGHT, s.capabilities.minImageCount,
-                 s.capabilities.maxImageCount == 0 ? MAX_FRAMES_IN_FLIGHT : s.capabilities.maxImageCount);
+                           s.capabilities.maxImageCount == 0 ? MAX_FRAMES_IN_FLIGHT : s.capabilities.maxImageCount);
 
   VkSharingMode image_sharing_mode{};
   std::vector<std::uint32_t> sharing_queue_families;

@@ -195,7 +195,7 @@ void tr::renderer::ShadowMap::imgui(RessourceManager &rm) const {
   utils::ignore_unused(this);
 
   if (ImGui::CollapsingHeader("ShadowMap", ImGuiTreeNodeFlags_DefaultOpen)) {
-    std::array shadow_map_sizes = utils::to_array<std::pair<const char *, uint32_t>>({
+    std::array const shadow_map_sizes = utils::to_array<std::pair<const char *, uint32_t>>({
         {"512x512", 512},
         {"1024x1024", 1024},
         {"2048x2048", 2048},

@@ -29,9 +29,10 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
     - [ ] SSAO
 - [ ] Shadows
     - [X] Basic Directionnal lights
+    - [X] Percentage closer filtering
+        - [ ] A better filtering pattern
     - [ ] Point lights
     - [ ] Shadow Cascade
-    - [ ] Shadow Antialising
 - [ ] Antialising
     - [ ] FXAA
     - [ ] TAA 

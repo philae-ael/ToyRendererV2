@@ -47,12 +47,11 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
 void tr::renderer::RenderGraph::reinit_passes(tr::renderer::VulkanEngine& engine) {
   Lifetime setup_lifetime;
-  passes = {
-      .gbuffer = GBuffer::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-      .shadow_map = ShadowMap::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-      .deferred = Deferred::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-      .present = Present::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime),
-  };
+  passes.gbuffer = GBuffer::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.shadow_map = ShadowMap::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.present = Present::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.deferred.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+
   setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
 }
 void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transferer& t) {
@@ -132,12 +131,17 @@ void tr::renderer::RenderGraph::imgui(VulkanEngine& engine) {
     ImGui::End();
     return;
   }
+  Lifetime setup_lifetime;
 
   if (ImGui::Button("Reload shaders")) {
     reinit_passes(engine);
   }
 
   passes.shadow_map.imgui(engine.rm);
+  if (passes.deferred.imgui()) {
+    passes.deferred.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  }
 
+  setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
   ImGui::End();
 }

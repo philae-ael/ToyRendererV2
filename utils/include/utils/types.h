@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <optional>
 #include <ranges>
 #include <type_traits>
@@ -58,4 +59,22 @@ auto make_non_null_pointer(T* t) -> std::optional<not_null_pointer<T>> {
 template <class T, class V>
 concept range_of = std::ranges::range<T> && std::is_convertible_v<V, std::ranges::range_reference_t<T>>;
 
+template <class T, class clock = std::chrono::steady_clock>
+struct debouncer {
+  clock::duration d = std::chrono::milliseconds(100);
+  std::optional<std::pair<typename clock::time_point, T>> last_val = std::nullopt;
+
+  template <class Fn1, class Fn2>
+  void debounce(Fn1 fn1, Fn2 fn2) {
+    std::optional<T> res = fn1();
+    if (res) {
+      last_val = std::pair{clock::now(), *res};
+    }
+
+    if (last_val && d <= (clock::now() - last_val->first)) {
+      fn2(last_val->second);
+      last_val.reset();
+    }
+  }
+};
 }  // namespace utils::types

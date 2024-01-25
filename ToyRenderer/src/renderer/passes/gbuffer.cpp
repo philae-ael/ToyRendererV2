@@ -203,7 +203,7 @@ void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Frustum &frustum, cons
   vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4),
                      &mesh.transform);
 
-  std::span<const GeoSurface> surfaces = mesh.surfaces;
+  std::span<const GeoSurface> const surfaces = mesh.surfaces;
   for (const auto &surface : FrustrumCulling::filter(frustum, surfaces)) {
     auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[1]);
 

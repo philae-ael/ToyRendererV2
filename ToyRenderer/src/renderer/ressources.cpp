@@ -126,7 +126,7 @@ auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const 
           },
           [](VkExtent2D extent) { return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1}; },
           [](CVarExtent2D cvarextent) {
-            VkExtent2D extent = cvarextent.resolve();
+            VkExtent2D const extent = cvarextent.resolve();
             return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1};
           },
       },

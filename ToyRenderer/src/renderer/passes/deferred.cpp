@@ -1,12 +1,15 @@
 #include "deferred.h"
 
+#include <imgui.h>
 #include <shaderc/env.h>
 #include <shaderc/shaderc.h>
+#include <spdlog/spdlog.h>
 #include <sys/types.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
 #include <glm/fwd.hpp>
+#include <optional>
 #include <shaderc/shaderc.hpp>
 
 #include "../debug.h"
@@ -15,6 +18,7 @@
 #include "../mesh.h"
 #include "../pipeline.h"
 #include "../vulkan_engine.h"
+#include "shadow_map.h"
 #include "utils/misc.h"
 
 const std::array vert_spv_default = std::to_array<uint32_t>({
@@ -30,13 +34,18 @@ struct PushConstant {
   glm::vec3 color;
   float padding = 0.0;
 };
-auto tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
-                                  Lifetime &setup_lifetime) -> Deferred {
+void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
+                                  Lifetime &setup_lifetime) {
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetGenerateDebugInfo();
   options.SetSourceLanguage(shaderc_source_language_glsl);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
+  if (pcf_enable) {
+    options.AddMacroDefinition("PERCENTAGE_CLOSER_FILTERING");
+    options.AddMacroDefinition("PERCENTAGE_CLOSER_FILTERING_ITER", std::format("{}", pcf_iter_count));
+  }
+  options.AddMacroDefinition("SHADOW_BIAS", std::format("{}", shadow_bias));
 
   const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling deferred shader") {
     const auto frag_spv =
@@ -80,7 +89,7 @@ auto tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
 
-  const auto descriptor_set_layouts = std::to_array({
+  descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Deferred::bindings).build(ctx.device.vk_device),
   });
   const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
@@ -90,25 +99,25 @@ auto tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
           .size = sizeof(PushConstant),
       },
   });
-  const auto layout = PipelineLayoutBuilder{}
-                          .set_layouts(descriptor_set_layouts)
-                          .push_constant_ranges(push_constant_ranges)
-                          .build(ctx.device.vk_device);
-  VkPipeline pipeline = PipelineBuilder{}
-                            .stages(shader_stages)
-                            .layout_(layout)
-                            .pipeline_rendering_create_info(&pipeline_rendering_create_info)
-                            .vertex_input_state(&vertex_input_state)
-                            .input_assembly_state(&input_assembly_state)
-                            .viewport_state(&viewport_state)
-                            .rasterization_state(&rasterizer_state)
-                            .multisample_state(&multisampling_state)
-                            .depth_stencil_state(&depth_state)
-                            .color_blend_state(&color_blend_state)
-                            .dynamic_state(&dynamic_state_state)
-                            .build(ctx.device.vk_device);
+  pipeline_layout = PipelineLayoutBuilder{}
+                        .set_layouts(descriptor_set_layouts)
+                        .push_constant_ranges(push_constant_ranges)
+                        .build(ctx.device.vk_device);
+  pipeline = PipelineBuilder{}
+                 .stages(shader_stages)
+                 .layout_(pipeline_layout)
+                 .pipeline_rendering_create_info(&pipeline_rendering_create_info)
+                 .vertex_input_state(&vertex_input_state)
+                 .input_assembly_state(&input_assembly_state)
+                 .viewport_state(&viewport_state)
+                 .rasterization_state(&rasterizer_state)
+                 .multisample_state(&multisampling_state)
+                 .depth_stencil_state(&depth_state)
+                 .color_blend_state(&color_blend_state)
+                 .dynamic_state(&dynamic_state_state)
+                 .build(ctx.device.vk_device);
 
-  VkSampler shadow_map_sampler = VK_NULL_HANDLE;
+  shadow_map_sampler = VK_NULL_HANDLE;
   const VkSamplerCreateInfo sampler_create_info{
       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
       .pNext = nullptr,
@@ -132,14 +141,13 @@ auto tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
   VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &shadow_map_sampler);
 
   lifetime.tie(DeviceHandle::Pipeline, pipeline);
-  lifetime.tie(DeviceHandle::PipelineLayout, layout);
+  lifetime.tie(DeviceHandle::PipelineLayout, pipeline_layout);
   lifetime.tie(DeviceHandle::Sampler, shadow_map_sampler);
   for (auto descriptor_set_layout : descriptor_set_layouts) {
     lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
   }
-
-  return {descriptor_set_layouts, layout, pipeline, shadow_map_sampler};
 }
+
 void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
 
@@ -235,4 +243,45 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
   }
 
   vkCmdEndRendering(frame.cmd.vk_cmd);
+}
+
+auto tr::renderer::Deferred::imgui() -> bool {
+  bool rebuild = false;
+
+  if (ImGui::CollapsingHeader("Deferred", ImGuiTreeNodeFlags_DefaultOpen)) {
+    rebuild |= ImGui::Button("Reload shader");
+
+    rebuild |= ImGui::Checkbox("Enable Percentage Closer filtering", &pcf_enable);
+    std::array const PCF_filter_sizes = utils::to_array<std::pair<const char *, uint8_t>>({
+        {"0 (no filtering)", 0},
+        {"1", 1},
+        {"2", 2},
+        {"3", 3},
+        {"4", 4},
+    });
+
+    const auto current_pcf_filter_size = pcf_iter_count;
+    if (pcf_enable && ImGui::BeginCombo("PCF Filter Size", std::format("{}", current_pcf_filter_size).c_str())) {
+      for (const auto &size : PCF_filter_sizes) {
+        if (ImGui::Selectable(size.first, current_pcf_filter_size == size.second)) {
+          pcf_iter_count = size.second;
+          rebuild = true;
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    static utils::types::debouncer<bool> shader_bias_debouncer;
+    shader_bias_debouncer.debounce(
+        [&]() -> std::optional<bool> {
+          if (ImGui::SliderFloat("Shadow bias", &shadow_bias, 1e-15F, 0.01F, "%.5f",
+                                 ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat)) {
+            return true;
+          }
+
+          return std::nullopt;
+        },
+        [&](bool debounced) { rebuild |= debounced; });
+  }
+  return rebuild;
 }

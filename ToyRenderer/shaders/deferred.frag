@@ -64,11 +64,36 @@ float saturate(float v) {
     return clamp(v, 0.0, 1.0);
 }
 
+#ifndef PERCENTAGE_CLOSER_FILTERING_ITER
+#define PERCENTAGE_CLOSER_FILTERING_ITER 3
+#endif
+
+#ifndef SHADOW_BIAS
+#define SHADOW_BIAS 0.001
+#endif
+
 float compute_shadow(vec3 pos) {
     vec4 f = LightProjMatrix * LightViewMatrix * vec4(pos, 1.0);
     vec3 d = f.xyz / f.w;
-    float v = texture(shadow_map, 0.5 * f.xy + vec2(0.5)).x;
-    return  v >= (d.z - 0.001) ? 1.0 : 0.0;
+
+#ifdef PERCENTAGE_CLOSER_FILTERING
+    vec2 width = 1.0 / textureSize(shadow_map, 0).xy;
+
+    float s = 0;
+    for(int i = -PERCENTAGE_CLOSER_FILTERING_ITER; i <= PERCENTAGE_CLOSER_FILTERING_ITER; i++){
+        for(int j = -PERCENTAGE_CLOSER_FILTERING_ITER; j <= PERCENTAGE_CLOSER_FILTERING_ITER; j++){
+            vec2 pos =  0.5 * d.xy + vec2(0.5) + vec2(i*width.x, j*width.y);
+            float v = texture(shadow_map, pos).x;
+            s += v >= (d.z - SHADOW_BIAS) ? 1.0 : 0.0;
+        }
+    }
+
+    float count = (2*PERCENTAGE_CLOSER_FILTERING_ITER + 1) * (2*PERCENTAGE_CLOSER_FILTERING_ITER+1);
+    return s / count;
+#else
+    float v = texture(shadow_map, 0.5 * d.xy + vec2(0.5)).x;
+    return  v >= (d.z - SHADOW_BIAS) ? 1.0 : 0.0;
+#endif
 }
 
 PixelData getPixelData(){
