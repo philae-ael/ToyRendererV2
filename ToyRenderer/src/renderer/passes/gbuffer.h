@@ -1,5 +1,6 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
@@ -8,11 +9,13 @@
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
+#include "../ressource_definition.h"
 #include "../ressources.h"
+#include "../vulkan_engine.h"
+#include "frustrum_culling.h"
 #include "utils/cast.h"
 
 namespace tr::renderer {
-struct DefaultRessources;
 
 struct GBuffer {
   std::array<VkDescriptorSetLayout, 2> descriptor_set_layouts{};
@@ -43,9 +46,29 @@ struct GBuffer {
   void start_draw(Frame &frame, VkRect2D render_area) const;
   void end_draw(VkCommandBuffer cmd) const;
 
-  void draw(Frame &frame, VkRect2D render_area, std::span<const Mesh> meshes, DefaultRessources default_ressources);
+  template <utils::types::range_of<const Mesh &> Range>
+  void draw(Frame &frame, VkRect2D render_area, const Camera &cam, Range meshes, DefaultRessources default_ressources) {
+    const DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
 
-  void draw_mesh(Frame &frame, const Mesh &mesh, const DefaultRessources &default_ressources);
+    start_draw(frame, render_area);
+
+    const auto camInfo = cam.cameraInfo();
+    frame.frm.update_buffer<CameraInfo>(frame.ctx->allocator, BufferRessourceId::Camera,
+                                        [&](CameraInfo *info) { *info = camInfo; });
+
+    // TODO: not needed every frame ! only when camera changes
+    auto fr = Frustum::from_camera(cam);
+
+    for (const auto &mesh : meshes) {
+      // TODO: find something smarter to not have to do so many mat mul
+      fr.transform = camInfo.viewMatrix * mesh.transform;
+      draw_mesh(frame, fr, mesh, default_ressources);
+    }
+    end_draw(frame.cmd.vk_cmd);
+  }
+
+  void draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
+                 const DefaultRessources &default_ressources) const;
 };
 
 }  // namespace tr::renderer

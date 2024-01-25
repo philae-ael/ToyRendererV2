@@ -13,6 +13,12 @@ namespace tr::renderer {
 CVAR_FLOAT(internal_resolution_scale, 1.0)
 CVAR_EXTENT2D(shadow_map_extent, 1024, 1024)
 
+struct DefaultRessources {
+  VkSampler sampler;
+  ImageRessource metallic_roughness;
+  ImageRessource normal_map;
+};
+
 static constexpr std::array image_definition = utils::to_array<tr::renderer::ImageRessourceDefinition>({
     {
         {

@@ -8,16 +8,11 @@
 #include "passes/gbuffer.h"
 #include "passes/present.h"
 #include "passes/shadow_map.h"
-#include "ressources.h"
 #include "uploader.h"
 #include "vulkan_engine.h"
 
 namespace tr::renderer {
-struct DefaultRessources {
-  VkSampler sampler = VK_NULL_HANDLE;
-  ImageRessource metallic_roughness{};
-  ImageRessource normal_map{};
-};
+
 struct RenderGraph {
   void reinit_passes(tr::renderer::VulkanEngine& engine);
   void init(VulkanEngine& engine, Transferer& t);
@@ -32,7 +27,7 @@ struct RenderGraph {
     Present present;
   } passes;
 
-  DefaultRessources default_ressources;
+  DefaultRessources default_ressources{};
 };
 
 }  // namespace tr::renderer

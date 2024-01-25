@@ -16,10 +16,13 @@
 #include <functional>
 #include <glm/detail/qualifier.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/fwd.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/vector_relational.hpp>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -197,32 +200,52 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
       std::vector<tr::renderer::Vertex> vertices;
       for (const auto& primitive : mesh.primitives) {
         const auto vertex_idx_offset = utils::narrow_cast<uint32_t>(vertices.size());
-        {
+        const auto index_idx_offset = utils::narrow_cast<uint32_t>(indices.size());
+        const auto count = INLINE_LAMBDA {
           TR_ASSERT(primitive.indicesAccessor, "index buffer");
           const auto& accessor = asset.accessors[*primitive.indicesAccessor];
-          const auto start_i_idx = indices.size();
 
-          TR_ASSERT(primitive.materialIndex, "material needed");
-          asset_mesh.surfaces.push_back({
-              .start = utils::narrow_cast<uint32_t>(start_i_idx),
-              .count = utils::narrow_cast<uint32_t>(accessor.count),
-              .material = materials[*primitive.materialIndex],
-          });
-
-          const auto index_idx_offset = utils::narrow_cast<uint32_t>(indices.size());
           indices.resize(index_idx_offset + accessor.count);
           auto primitive_indices = std::span(indices).subspan(index_idx_offset);
 
           fastgltf::iterateAccessorWithIndex<uint32_t>(asset, accessor, [&](uint32_t idx, std::size_t i_idx) {
             primitive_indices[i_idx] = vertex_idx_offset + idx;
           });
-        }
+
+          return primitive_indices.size();
+        };
 
         for (const auto& [attribute, accessor_index] : primitive.attributes) {
           const auto& accessor = asset.accessors[accessor_index];
           vertices.resize(std::max(vertices.size(), vertex_idx_offset + accessor.count));
           load_attribute(asset, accessor, std::span(vertices).subspan(vertex_idx_offset), std::string{attribute});
         }
+
+        const auto bounding_box = INLINE_LAMBDA->tr::renderer::AABB {
+          auto mmin = glm::vec3(std::numeric_limits<float>::infinity());
+          auto mmax = glm::vec3(-std::numeric_limits<float>::infinity());
+
+          for (const auto& vertex : std::span(vertices).subspan(vertex_idx_offset)) {
+            mmin.x = std::min(mmin.x, vertex.pos.x);
+            mmin.y = std::min(mmin.y, vertex.pos.y);
+            mmin.z = std::min(mmin.z, vertex.pos.z);
+
+            mmax.x = std::max(mmax.x, vertex.pos.x);
+            mmax.y = std::max(mmax.y, vertex.pos.y);
+            mmax.z = std::max(mmax.z, vertex.pos.z);
+          }
+
+          TR_ASSERT(glm::all(glm::lessThanEqual(mmin, mmax)), "bounding box is malformed: {} {}", mmin, mmax);
+          return {mmin, mmax};
+        };
+
+        TR_ASSERT(primitive.materialIndex, "material needed");
+        asset_mesh.surfaces.push_back({
+            .start = utils::narrow_cast<uint32_t>(index_idx_offset),
+            .count = utils::narrow_cast<uint32_t>(count),
+            .material = materials[*primitive.materialIndex],
+            .bounding_box = bounding_box,
+        });
       }
 
       auto vertices_bytes = std::as_bytes(std::span(vertices));
@@ -305,3 +328,10 @@ auto tr::Gltf::load_from_file(tr::renderer::Lifetime& lifetime, tr::renderer::Im
   }
   return load(lifetime, ib, bb, t, asset);
 }
+
+template <>
+struct std::formatter<glm::vec4> : formatter<std::string_view> {
+  auto format(glm::vec4 val, format_context& ctx) const -> format_context::iterator {  // NOLINT
+    return std::format_to(ctx.out(), "{{{}, {}, {}, {}}}", val.x, val.y, val.z, val.w);
+  }
+};

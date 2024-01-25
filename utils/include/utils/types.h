@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <ranges>
 #include <type_traits>
 namespace utils::types {
 
@@ -53,5 +54,8 @@ auto make_non_null_pointer(T* t) -> std::optional<not_null_pointer<T>> {
 
   return {*t};
 }
+
+template <class T, class V>
+concept range_of = std::ranges::range<T> && std::is_convertible_v<V, std::ranges::range_reference_t<T>>;
 
 }  // namespace utils::types

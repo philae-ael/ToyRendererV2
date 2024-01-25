@@ -53,6 +53,7 @@ void tr::renderer::VulkanEngine::rebuild_invalidated() {
 }
 
 auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
+  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_TOP);
   if (swapchain_need_to_be_rebuilt) {
     rebuild_swapchain();
     swapchain_need_to_be_rebuilt = false;
@@ -62,7 +63,6 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
     rebuild_invalidated();
   }
 
-  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_TOP);
   frame_id += 1;
 
   // Try to get frame or bail early

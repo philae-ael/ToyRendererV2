@@ -35,10 +35,7 @@ overloaded(Ts...) -> overloaded<Ts...>;
 template <class T>
 constexpr auto align(T offset, T alignement) -> T {
   const auto alignement_ = static_cast<std::size_t>(alignement);
-#pragma warning(push)
-#pragma warning(disable : 4146)
   return static_cast<T>((static_cast<std::size_t>(offset) - 1 + alignement_) & -alignement_);
-#pragma warning(pop)
 }
 
 template <class Fn>

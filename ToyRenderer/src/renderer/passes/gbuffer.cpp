@@ -1,5 +1,6 @@
 #include "gbuffer.h"
 
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
@@ -8,8 +9,8 @@
 
 #include "../mesh.h"
 #include "../pipeline.h"
-#include "../render_graph.h"
 #include "../vulkan_engine.h"
+#include "frustrum_culling.h"
 #include "utils/misc.h"
 
 const std::array vert_spv_default = std::to_array<uint32_t>({
@@ -191,7 +192,8 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
                           0, nullptr);
 }
 
-void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const DefaultRessources &default_ressources) {
+void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
+                                      const DefaultRessources &default_ressources) const {
   const VkDeviceSize offset = 0;
   vkCmdBindVertexBuffers(frame.cmd.vk_cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
   if (mesh.buffers.indices) {
@@ -201,7 +203,8 @@ void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const Defa
   vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4),
                      &mesh.transform);
 
-  for (const auto &surface : mesh.surfaces) {
+  std::span<const GeoSurface> surfaces = mesh.surfaces;
+  for (const auto &surface : FrustrumCulling::filter(frustum, surfaces)) {
     auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[1]);
 
     DescriptorUpdater{descriptor, 0}
@@ -234,14 +237,4 @@ void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Mesh &mesh, const Defa
       vkCmdDraw(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0);
     }
   }
-}
-void tr::renderer::GBuffer::draw(Frame &frame, VkRect2D render_area, std::span<const Mesh> meshes,
-                                 DefaultRessources default_ressources) {
-  const DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
-
-  start_draw(frame, render_area);
-  for (const auto &mesh : meshes) {
-    draw_mesh(frame, mesh, default_ressources);
-  }
-  end_draw(frame.cmd.vk_cmd);
 }

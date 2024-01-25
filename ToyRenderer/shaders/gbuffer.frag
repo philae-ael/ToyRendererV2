@@ -16,7 +16,7 @@ layout(set = 1, binding = 0) uniform sampler2D[3] texs;
 void main() {
     vec4 albedo = texture(texs[0], fragUV1);
     vec4 roughness_metallic = texture(texs[1], fragUV1);
-    vec3 normal = TBN * (texture(texs[2], fragUV1) * 2.0 - 1.0).rgb;
+    vec3 normal = TBN[2];// * (texture(texs[2], fragUV1) * 2.0 - 1.0).rgb;
 
     g1.xyz = albedo.xyz;
     // roughness

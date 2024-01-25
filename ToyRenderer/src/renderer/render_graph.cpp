@@ -19,10 +19,7 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
 
-  frame.frm.update_buffer<CameraInfo>(frame.ctx->allocator, BufferRessourceId::Camera,
-                                      [&](CameraInfo* info) { *info = camera.cameraInfo(); });
-
-  passes.gbuffer.draw(frame, {{0, 0}, internal_extent}, meshes, default_ressources);
+  passes.gbuffer.draw(frame, {{0, 0}, internal_extent}, camera, meshes, default_ressources);
 
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);

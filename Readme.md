@@ -1,13 +1,24 @@
 # Toy Renderer (V2)
 
+## Build and Run
+
+```
+cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg.cmake
+./build/ToyRenderer/ToyRenderer
+```
+
 ## Plan 
 
 ### Rendering
 - [ ] GPU-Driven
 - [ ] Mesh shaders
 - [ ] Occlusion CPU & GPU
-- [ ] Frustrum culling
-    - [ ] 
+- [X] Frustrum culling
+    - [X] AABB bounding box 
+        - [ ] works but still buggy at the extremities of Sponza for big objects, the 8 rather than only 2 extremities should be tested, or something else idk
+        - [ ] Rather than radar approch use hiearchical test? -> GPU maybe?
+    - [ ] Maybe some more clever techniques like OOB / Convex Hull
+- [ ] Allow to display wireframe / Bounding Box conditionnally
 - [ ] Deferred Pipeline 
     - [X] PBR (buggy)
     - [ ] IBL

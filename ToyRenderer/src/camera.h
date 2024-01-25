@@ -1,6 +1,12 @@
 #pragma once
 
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/matrix_operation.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/matrix.hpp>
+#include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
 #include "utils/math.h"
@@ -23,7 +29,7 @@ struct CameraInput {
 struct Camera {
   glm::vec3 position{0.0};
   glm::vec3 eulerAngles{0.0};
-  float fov;
+  float fovy;
   float aspectRatio;
   float zNear;
   float zFar;
@@ -36,7 +42,7 @@ struct CameraController {
       : camera{
             .position = glm::vec3(0.0F, 1.0F, 0.0F),
             .eulerAngles = {0.0, utils::math::PI_2, 0.0},
-            .fov = utils::math::PI_4,
+            .fovy = utils::math::PI_4,
             .aspectRatio = 1.0F,
             .zNear = 0.1F,
             .zFar = 100.0F,

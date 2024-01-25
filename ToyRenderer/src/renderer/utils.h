@@ -4,6 +4,9 @@
 
 #include <cstdint>
 #include <format>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <optional>
 #include <set>
 #include <span>
@@ -506,5 +509,19 @@ struct std::formatter<VkPresentModeKHR> : formatter<std::string_view> {
     }
 #undef CASE
     return std::format_to(ctx.out(), "{}", value);
+  }
+};
+
+template <>
+struct std::formatter<glm::vec3> : formatter<std::string_view> {
+  auto format(glm::vec3 val, format_context& ctx) const -> format_context::iterator {  // NOLINT
+    return std::format_to(ctx.out(), "{{{}, {}, {}}}", val.x, val.y, val.z);
+  }
+};
+
+template <>
+struct std::formatter<glm::vec2> : formatter<std::string_view> {
+  auto format(glm::vec2 val, format_context& ctx) const -> format_context::iterator {  // NOLINT
+    return std::format_to(ctx.out(), "{{{}, {}}}", val.x, val.y);
   }
 };

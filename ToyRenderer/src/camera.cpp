@@ -6,7 +6,7 @@
 namespace tr {
 
 auto Camera::cameraInfo() const -> CameraInfo {
-  auto projMatrix = glm::perspective(fov, aspectRatio, zNear, zFar);
+  auto projMatrix = glm::perspective(fovy, aspectRatio, zNear, zFar);
 
   // opengl / gtlf style
   projMatrix[1][1] *= -1;

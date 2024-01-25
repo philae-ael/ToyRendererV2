@@ -60,6 +60,8 @@ add_executable(ToyRenderer
     src/renderer/mesh.h
     src/renderer/passes/deferred.cpp
     src/renderer/passes/deferred.h
+    src/renderer/passes/frustrum_culling.cpp
+    src/renderer/passes/frustrum_culling.h
     src/renderer/passes/gbuffer.cpp
     src/renderer/passes/gbuffer.h
     src/renderer/passes/present.cpp

@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
 #include <glm/fwd.hpp>
 #include <glm/mat4x4.hpp>
 #include <memory>
@@ -52,6 +54,27 @@ struct Material {
   std::optional<tr::renderer::ImageRessource> normal_texture;
 };
 
+struct AABB {
+  glm::vec3 min;
+  glm::vec3 max;
+
+  [[nodiscard]] auto transform(glm::mat4 transform_) const -> AABB {
+    const auto a = glm::vec3(transform_ * glm::vec4(min, 1.0));
+    const auto b = glm::vec3(transform_ * glm::vec4(max, 1.0));
+    return {
+        {glm::min(a.x, b.x), glm::min(a.y, b.y), glm::min(a.z, b.z)},
+        {glm::max(a.x, b.x), glm::max(a.y, b.y), glm::max(a.z, b.z)},
+    };
+  }
+};
+
+struct GeoSurface {
+  uint32_t start;
+  uint32_t count;
+  std::shared_ptr<Material> material;
+  AABB bounding_box;
+};
+
 struct Mesh {
   std::string name;
 
@@ -60,12 +83,7 @@ struct Mesh {
     std::optional<BufferRessource> indices;
   } buffers;
 
-  struct Surface {
-    uint32_t start;
-    uint32_t count;
-    std::shared_ptr<Material> material;
-  };
-  std::vector<Surface> surfaces;
+  std::vector<GeoSurface> surfaces;
   glm::mat4x4 transform = glm::identity<glm::mat4x4>();
 };
 

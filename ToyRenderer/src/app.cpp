@@ -5,6 +5,7 @@
 #include <utils/misc.h>
 #include <vulkan/vulkan_core.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -53,6 +54,12 @@ tr::App::App(tr::Options options_) : options(options_) {
       auto ib = subsystems.engine.image_builder();
       const auto [_, scene] = Gltf::load_from_file(subsystems.engine.lifetime.global, ib, bb, t, scene_name);
       meshes.insert(meshes.end(), scene.begin(), scene.end());
+
+      std::size_t surface_count = 0;
+      for (const auto &mesh : meshes) {
+        surface_count += mesh.surfaces.size();
+      }
+      spdlog::info("There are {} meshes and {} surfaces ", meshes.size(), surface_count);
     };
   });
   subsystems.engine.sync();
