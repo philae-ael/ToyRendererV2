@@ -13,7 +13,7 @@ class Imgui {
  public:
   void init(GLFWwindow *window, renderer::VulkanEngine &engine);
 
-  [[nodiscard]] auto start_frame() const -> bool;
+  [[nodiscard]] auto start_frame(renderer::Frame &frame) const -> bool;
 
   void draw(renderer::Frame &frame) const;
 

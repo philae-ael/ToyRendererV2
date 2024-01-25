@@ -76,6 +76,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   };
 
   VK_UNWRAP(vkWaitForFences, ctx.device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
+  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_WAIT_FENCE);
 
   VkResult const result =
       vkAcquireNextImageKHR(ctx.device.vk_device, ctx.swapchain.vk_swapchain, 1000000000,

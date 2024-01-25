@@ -51,7 +51,8 @@ void tr::system::Imgui::init(GLFWwindow *window, renderer::VulkanEngine &engine)
   valid = true;
 }
 
-auto tr::system::Imgui::start_frame() const -> bool {
+auto tr::system::Imgui::start_frame(renderer::Frame &frame) const -> bool {
+  frame.write_cpu_timestamp(renderer::CPU_TIMESTAMP_INDEX_IMGUI_TOP);
   if (!valid) {
     return false;
   }
@@ -99,12 +100,14 @@ void tr::system::Imgui::draw(renderer::Frame &frame) const {
   vkCmdBeginRendering(frame.cmd.vk_cmd, &render_info);
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), frame.cmd.vk_cmd);
   vkCmdEndRendering(frame.cmd.vk_cmd);
-  frame.write_gpu_timestamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, renderer::GPU_TIMESTAMP_INDEX_IMGUI_BOTTOM);
 
   if ((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0) {
     ImGui::UpdatePlatformWindows();
     ImGui::RenderPlatformWindowsDefault();
   }
+
+  frame.write_gpu_timestamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, renderer::GPU_TIMESTAMP_INDEX_IMGUI_BOTTOM);
+  frame.write_cpu_timestamp(renderer::CPU_TIMESTAMP_INDEX_IMGUI_BOTTOM);
 }
 
 tr::system::Imgui::~Imgui() {

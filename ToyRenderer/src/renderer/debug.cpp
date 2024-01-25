@@ -76,16 +76,20 @@ void tr::renderer::VulkanEngineDebugInfo::write_gpu_timestamp(VkCommandBuffer cm
 
 void tr::renderer::VulkanEngineDebugInfo::timings_info() {
   if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::SeparatorText("GPU Timings:");
     const float frame_time = std::max(avg_cpu_timelines[0].state, avg_gpu_timelines[0].state);
     ImGui::Text("%s", std::format("{:.1f}FPS", 1000.F / frame_time).c_str());
 
+    ImGui::SeparatorText("GPU Timings:");
     if (ImGui::BeginTable("GPU Timings:", 2, ImGuiTableFlags_SizingStretchProp)) {
       for (std::size_t i = 0; i < GPU_TIME_PERIODS.size(); i++) {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        auto history = gpu_timelines[i].history();
-        ImGui::PlotLines(GPU_TIME_PERIODS[i].name, history.data(), utils::narrow_cast<int>(history.size()));
+        if (draw_stat_graphs) {
+          auto history = gpu_timelines[i].history();
+          ImGui::PlotLines(GPU_TIME_PERIODS[i].name, history.data(), utils::narrow_cast<int>(history.size()));
+        } else {
+          ImGui::Text("%s", GPU_TIME_PERIODS[i].name);
+        }
 
         ImGui::TableNextColumn();
         auto text = std::format("{:7.1f}us", 1000.F * avg_gpu_timelines[i].state);
@@ -99,8 +103,12 @@ void tr::renderer::VulkanEngineDebugInfo::timings_info() {
       for (std::size_t i = 0; i < CPU_TIME_PERIODS.size(); i++) {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        auto history = cpu_timelines[i].history();
-        ImGui::PlotLines(CPU_TIME_PERIODS[i].name, history.data(), utils::narrow_cast<int>(history.size()));
+        if (draw_stat_graphs) {
+          auto history = cpu_timelines[i].history();
+          ImGui::PlotLines(CPU_TIME_PERIODS[i].name, history.data(), utils::narrow_cast<int>(history.size()));
+        } else {
+          ImGui::Text("%s", CPU_TIME_PERIODS[i].name);
+        }
 
         ImGui::TableNextColumn();
         auto text = std::format("{:7.1f}us", 1000.F * avg_cpu_timelines[i].state);
@@ -117,91 +125,102 @@ void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine
       {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        auto history = cpu_memory_usage.history();
-        ImGui::PlotLines("Global CPU memory usage (RSS)", history.data(), utils::narrow_cast<int>(history.size()));
-
-        ImGui::TableNextColumn();
-        ImGui::Text("%.1f MB", history[history.size() - 1] / 1024);
-      }
-
-      {
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        auto history = gpu_memory_usage.history();
-        ImGui::PlotLines("Global GPU memory usage", history.data(), utils::narrow_cast<int>(history.size()));
-
-        ImGui::TableNextColumn();
-        ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
-      }
-
-      for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-
-        const auto history = gpu_heaps_usage[i].history();
-        const auto label = std::format("Heap number {}", i);
-        ImGui::PlotLines(label.c_str(), history.data(), utils::narrow_cast<int>(history.size()));
-
-        ImGui::TableNextColumn();
-        ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
-      }
-      ImGui::EndTable();
-    }
-
-    if (ImGui::BeginTable("details", 7, ImGuiTableFlags_SizingStretchProp)) {
-      std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
-      vmaGetHeapBudgets(engine.allocator, budgets.data());
-
-      ImGui::TableSetupColumn("Heap Number");
-      ImGui::TableSetupColumn("Usage");
-      ImGui::TableSetupColumn("Budget");
-      ImGui::TableSetupColumn("Allocation Bytes");
-      ImGui::TableSetupColumn("Allocation Count");
-      ImGui::TableSetupColumn("Block Bytes");
-      ImGui::TableSetupColumn("Block Count");
-      ImGui::TableHeadersRow();
-      for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
-        auto& budget = budgets[i];
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::Text("%zu", i);
-        ImGui::TableNextColumn();
-        ImGui::Text("%zu", budget.usage);
-        ImGui::TableNextColumn();
-        ImGui::Text("%zu", budget.budget);
-        ImGui::TableNextColumn();
-        ImGui::Text("%lu", budget.statistics.allocationBytes);
-        ImGui::TableNextColumn();
-        ImGui::Text("%u", budget.statistics.allocationCount);
-        ImGui::TableNextColumn();
-        ImGui::Text("%lu", budget.statistics.blockBytes);
-        ImGui::TableNextColumn();
-        ImGui::Text("%u", budget.statistics.blockCount);
-      }
-      ImGui::EndTable();
-    }
-    if (ImGui::Button("Dump allocation map as json")) {
-      char* stats_string = nullptr;
-      vmaBuildStatsString(engine.allocator, &stats_string, VK_TRUE);
-      {
-        std::ofstream f("gpu_memory_dump.json");
-        if (!f.is_open()) {
-          spdlog::error("Can't open file to dump gpu memory map");
+        if (draw_stat_graphs) {
+          auto history = cpu_memory_usage.history();
+          ImGui::PlotLines("Global CPU memory usage (RSS)", history.data(), utils::narrow_cast<int>(history.size()));
         } else {
-          f << stats_string;
+          ImGui::Text("Global CPU memory usage (RSS)");
         }
+
+        ImGui::TableNextRow();
+        {
+          auto history = gpu_memory_usage.history();
+
+          ImGui::TableNextColumn();
+          if (draw_stat_graphs) {
+            ImGui::PlotLines("Global GPU memory usage", history.data(), utils::narrow_cast<int>(history.size()));
+          } else {
+            ImGui::Text("Global GPU memory usage");
+          }
+
+          ImGui::TableNextColumn();
+          ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
+        }
+
+        for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          const auto history = gpu_heaps_usage[i].history();
+          const auto label = std::format("Heap number {}", i);
+          if (draw_stat_graphs) {
+            ImGui::PlotLines(label.c_str(), history.data(), utils::narrow_cast<int>(history.size()));
+          } else {
+            ImGui::Text("%s", label.c_str());
+          }
+
+          ImGui::TableNextColumn();
+          ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
+        }
+        ImGui::EndTable();
       }
 
-      vmaFreeStatsString(engine.allocator, stats_string);
+      if (ImGui::BeginTable("details", 7, ImGuiTableFlags_SizingStretchProp)) {
+        std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
+        vmaGetHeapBudgets(engine.allocator, budgets.data());
+
+        ImGui::TableSetupColumn("Heap Number");
+        ImGui::TableSetupColumn("Usage");
+        ImGui::TableSetupColumn("Budget");
+        ImGui::TableSetupColumn("Allocation Bytes");
+        ImGui::TableSetupColumn("Allocation Count");
+        ImGui::TableSetupColumn("Block Bytes");
+        ImGui::TableSetupColumn("Block Count");
+        ImGui::TableHeadersRow();
+        for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
+          auto& budget = budgets[i];
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          ImGui::Text("%zu", i);
+          ImGui::TableNextColumn();
+          ImGui::Text("%zu", budget.usage);
+          ImGui::TableNextColumn();
+          ImGui::Text("%zu", budget.budget);
+          ImGui::TableNextColumn();
+          ImGui::Text("%lu", budget.statistics.allocationBytes);
+          ImGui::TableNextColumn();
+          ImGui::Text("%u", budget.statistics.allocationCount);
+          ImGui::TableNextColumn();
+          ImGui::Text("%lu", budget.statistics.blockBytes);
+          ImGui::TableNextColumn();
+          ImGui::Text("%u", budget.statistics.blockCount);
+        }
+        ImGui::EndTable();
+      }
+      if (ImGui::Button("Dump allocation map as json")) {
+        char* stats_string = nullptr;
+        vmaBuildStatsString(engine.allocator, &stats_string, VK_TRUE);
+        {
+          std::ofstream f("gpu_memory_dump.json");
+          if (!f.is_open()) {
+            spdlog::error("Can't open file to dump gpu memory map");
+          } else {
+            f << stats_string;
+          }
+        }
+
+        vmaFreeStatsString(engine.allocator, stats_string);
+      }
     }
   }
 }
+
 void tr::renderer::VulkanEngineDebugInfo::stat_window(tr::renderer::VulkanEngine& engine) {
   if (!ImGui::Begin("Stats")) {
     ImGui::End();
     return;
   }
 
+  ImGui::Checkbox("Draw Graphs", &draw_stat_graphs);
   timings_info();
   memory_info(engine);
 

@@ -109,6 +109,8 @@ struct VulkanEngineDebugInfo {
   void timings_info();
   void memory_info(VulkanEngine &);
   void option_window(VulkanEngine &);
+
+  bool draw_stat_graphs = false;
 };
 
 }  // namespace tr::renderer

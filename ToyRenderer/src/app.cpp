@@ -83,7 +83,7 @@ void tr::App::run() {
     subsystems.engine.frame([&](renderer::Frame &frame) {
       rendergraph.draw(frame, meshes, state.camera_controller.camera);
 
-      if (subsystems.imgui.start_frame()) {
+      if (subsystems.imgui.start_frame(frame)) {
         subsystems.engine.imgui();
         rendergraph.imgui(subsystems.engine);
         subsystems.imgui.draw(frame);
