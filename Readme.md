@@ -18,6 +18,7 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
         - [ ] works but still buggy at the extremities of Sponza for big objects, the 8 rather than only 2 extremities should be tested, or something else idk
         - [ ] Rather than radar approch use hiearchical test? -> GPU maybe?
     - [ ] Maybe some more clever techniques like OOB / Convex Hull
+- [ ] Debug Pass (to draw / cubes / lines / on top of the frame)
 - [ ] Allow to display wireframe / Bounding Box conditionnally
 - [ ] Deferred Pipeline 
     - [X] PBR (buggy)
@@ -58,6 +59,7 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
 ### Rendering
 - [RealTime Rendering](https://www.realtimerendering.com/)
 - [Physically Based Rendering](https://pbrt.org/)
+- [Mathematics for 3D Game Programming and Computer Graphics](http://mathfor3dgameprogramming.com/)
 
 ### Vulkan
 - [Vulkan Guide](https://vkguide.dev/)

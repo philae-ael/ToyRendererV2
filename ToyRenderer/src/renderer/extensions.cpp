@@ -62,9 +62,7 @@ EVAL(EXTENSIONS)
     if ((flags & (ExtensionFlags::section)) == (ExtensionFlags::section)) {                       \
       auto tmp_pfn_##name = reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name)); \
       if (tmp_pfn_##name == nullptr) {                                                            \
-        spdlog::debug("could not load function" #name                                             \
-                      " extension may be missing"                                                 \
-                      " function will be a nop");                                                 \
+        spdlog::debug("could not load function " #name);                                          \
         pfn_##name = (PFN_##name)nop;                                                             \
       } else {                                                                                    \
         pfn_##name = tmp_pfn_##name;                                                              \

@@ -15,12 +15,15 @@
 #include <fastgltf/types.hpp>
 #include <functional>
 #include <glm/detail/qualifier.hpp>
+#include <glm/ext/matrix_float2x2.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/quaternion_geometric.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/fwd.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/matrix.hpp>
 #include <glm/vector_relational.hpp>
 #include <limits>
 #include <memory>
@@ -170,6 +173,98 @@ void load_attribute(const fastgltf::Asset& asset, const fastgltf::Accessor& acce
   std::call_once(warn_once_flags[attribute], [&] { spdlog::warn("Unknown attribute {}", attribute); });
 }
 
+auto load_primitive(const fastgltf::Primitive& primitive, const fastgltf::Asset& asset, std::vector<uint32_t>& indices,
+                    std::vector<tr::renderer::Vertex>& vertices, std::shared_ptr<tr::renderer::Material> material)
+    -> tr::renderer::GeoSurface {
+  const auto vertex_idx_offset = utils::narrow_cast<uint32_t>(vertices.size());
+  const auto index_idx_offset = utils::narrow_cast<uint32_t>(indices.size());
+
+  const auto primitive_indices = INLINE_LAMBDA {
+    TR_ASSERT(primitive.indicesAccessor, "index buffer");
+    const auto& accessor = asset.accessors[*primitive.indicesAccessor];
+
+    indices.resize(index_idx_offset + accessor.count);
+    auto primitive_indices_ = std::span(indices).subspan(index_idx_offset);
+
+    fastgltf::iterateAccessorWithIndex<uint32_t>(
+        asset, accessor, [&](uint32_t idx, std::size_t i_idx) { primitive_indices_[i_idx] = vertex_idx_offset + idx; });
+    return primitive_indices_;
+  };
+  const auto count = primitive_indices.size();
+
+  bool has_tangent_attribute = false;
+  for (const auto& [attribute, accessor_index] : primitive.attributes) {
+    const auto& accessor = asset.accessors[accessor_index];
+    vertices.resize(std::max(vertices.size(), vertex_idx_offset + accessor.count));
+    load_attribute(asset, accessor, std::span(vertices).subspan(vertex_idx_offset), std::string{attribute});
+
+    spdlog::debug("Loading attribute {}", attribute);
+    if (attribute == "TANGENT") {
+      has_tangent_attribute = true;
+    }
+  }
+  auto primitive_vertices = std::span(vertices).subspan(vertex_idx_offset);
+
+  if (!has_tangent_attribute) {
+    TR_ASSERT(primitive_indices.size() % 3 == 0, "HUHU,  number of indices is not divisible by 3");
+
+    auto it = primitive_indices.begin();
+    auto end = primitive_indices.end();
+    while (it != end) {
+      const auto i0 = *(it++);
+      const auto i1 = *(it++);
+      const auto i2 = *(it++);
+
+      auto& v0 = vertices[i0];
+      auto& v1 = vertices[i1];
+      auto& v2 = vertices[i2];
+
+      // p182
+      // https://canvas.projekti.info/ebooks/Mathematics%20for%203D%20Game%20Programming%20and%20Computer%20Graphics,%20Third%20Edition.pdf
+      // Notes: what is a vertex is reused? The tangent is dependant on the order of iteration, this is bad?
+      const auto Q1 = v1.pos - v0.pos;
+      const auto S1 = v1.uv1 - v0.uv1;
+
+      const auto Q2 = v2.pos - v0.pos;
+      const auto S2 = v2.uv1 - v0.uv1;
+
+      const auto Q = glm::mat2{Q1, Q2};
+      const auto S_inv = glm::inverse(glm::mat2{S1, S2});
+      const glm::mat2x3 TB = S_inv * Q;
+
+      // gram-schmidt
+      v0.tangent = glm::normalize(TB[0] - glm::dot(TB[0], v0.normal) * v0.normal);
+      v1.tangent = glm::normalize(TB[0] - glm::dot(TB[0], v1.normal) * v1.normal);
+      v2.tangent = glm::normalize(TB[0] - glm::dot(TB[0], v2.normal) * v2.normal);
+    }
+  }
+
+  const auto bounding_box = INLINE_LAMBDA->tr::renderer::AABB {
+    auto mmin = glm::vec3(std::numeric_limits<float>::infinity());
+    auto mmax = glm::vec3(-std::numeric_limits<float>::infinity());
+
+    for (const auto& vertex : primitive_vertices) {
+      mmin.x = std::min(mmin.x, vertex.pos.x);
+      mmin.y = std::min(mmin.y, vertex.pos.y);
+      mmin.z = std::min(mmin.z, vertex.pos.z);
+
+      mmax.x = std::max(mmax.x, vertex.pos.x);
+      mmax.y = std::max(mmax.y, vertex.pos.y);
+      mmax.z = std::max(mmax.z, vertex.pos.z);
+    }
+
+    TR_ASSERT(glm::all(glm::lessThanEqual(mmin, mmax)), "bounding box is malformed: {} {}", mmin, mmax);
+    return {mmin, mmax};
+  };
+
+  return {
+      .start = utils::narrow_cast<uint32_t>(index_idx_offset),
+      .count = utils::narrow_cast<uint32_t>(count),
+      .material = std::move(material),
+      .bounding_box = bounding_box,
+  };
+}
+
 auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
                  const fastgltf::Asset& asset, std::span<std::shared_ptr<tr::renderer::Material>> materials)
     -> std::vector<tr::renderer::Mesh> {
@@ -196,56 +291,13 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
       TR_ASSERT(node.meshIndex, "Child not supported");
       const auto& mesh = asset.meshes[*node.meshIndex];
 
-      std::vector<uint32_t> indices{};
+      std::vector<uint32_t> indices;
       std::vector<tr::renderer::Vertex> vertices;
       for (const auto& primitive : mesh.primitives) {
-        const auto vertex_idx_offset = utils::narrow_cast<uint32_t>(vertices.size());
-        const auto index_idx_offset = utils::narrow_cast<uint32_t>(indices.size());
-        const auto count = INLINE_LAMBDA {
-          TR_ASSERT(primitive.indicesAccessor, "index buffer");
-          const auto& accessor = asset.accessors[*primitive.indicesAccessor];
-
-          indices.resize(index_idx_offset + accessor.count);
-          auto primitive_indices = std::span(indices).subspan(index_idx_offset);
-
-          fastgltf::iterateAccessorWithIndex<uint32_t>(asset, accessor, [&](uint32_t idx, std::size_t i_idx) {
-            primitive_indices[i_idx] = vertex_idx_offset + idx;
-          });
-
-          return primitive_indices.size();
-        };
-
-        for (const auto& [attribute, accessor_index] : primitive.attributes) {
-          const auto& accessor = asset.accessors[accessor_index];
-          vertices.resize(std::max(vertices.size(), vertex_idx_offset + accessor.count));
-          load_attribute(asset, accessor, std::span(vertices).subspan(vertex_idx_offset), std::string{attribute});
-        }
-
-        const auto bounding_box = INLINE_LAMBDA->tr::renderer::AABB {
-          auto mmin = glm::vec3(std::numeric_limits<float>::infinity());
-          auto mmax = glm::vec3(-std::numeric_limits<float>::infinity());
-
-          for (const auto& vertex : std::span(vertices).subspan(vertex_idx_offset)) {
-            mmin.x = std::min(mmin.x, vertex.pos.x);
-            mmin.y = std::min(mmin.y, vertex.pos.y);
-            mmin.z = std::min(mmin.z, vertex.pos.z);
-
-            mmax.x = std::max(mmax.x, vertex.pos.x);
-            mmax.y = std::max(mmax.y, vertex.pos.y);
-            mmax.z = std::max(mmax.z, vertex.pos.z);
-          }
-
-          TR_ASSERT(glm::all(glm::lessThanEqual(mmin, mmax)), "bounding box is malformed: {} {}", mmin, mmax);
-          return {mmin, mmax};
-        };
-
         TR_ASSERT(primitive.materialIndex, "material needed");
-        asset_mesh.surfaces.push_back({
-            .start = utils::narrow_cast<uint32_t>(index_idx_offset),
-            .count = utils::narrow_cast<uint32_t>(count),
-            .material = materials[*primitive.materialIndex],
-            .bounding_box = bounding_box,
-        });
+
+        asset_mesh.surfaces.push_back(
+            load_primitive(primitive, asset, indices, vertices, materials[*primitive.materialIndex]));
       }
 
       auto vertices_bytes = std::as_bytes(std::span(vertices));
