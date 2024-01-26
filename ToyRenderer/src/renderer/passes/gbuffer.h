@@ -5,13 +5,13 @@
 
 #include <array>
 
+#include "../../camera.h"
 #include "../context.h"
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
 #include "../ressource_definition.h"
 #include "../ressources.h"
-#include "../vulkan_engine.h"
 #include "frustrum_culling.h"
 #include "utils/cast.h"
 
@@ -52,12 +52,9 @@ struct GBuffer {
 
     start_draw(frame, render_area);
 
-    const auto camInfo = cam.cameraInfo();
-    frame.frm.update_buffer<CameraInfo>(frame.ctx->allocator, BufferRessourceId::Camera,
-                                        [&](CameraInfo *info) { *info = camInfo; });
-
     // TODO: not needed every frame ! only when camera changes
     auto fr = Frustum::from_camera(cam);
+    const auto camInfo = cam.cameraInfo();
 
     for (const auto &mesh : meshes) {
       // TODO: find something smarter to not have to do so many mat mul

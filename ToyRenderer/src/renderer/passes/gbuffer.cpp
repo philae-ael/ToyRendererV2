@@ -138,7 +138,7 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
           frame.frm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
       }});
 
-  const std::array attachments = utils::to_array<VkRenderingAttachmentInfo, 4>({
+  const std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
       frame.frm.get_image(ImageRessourceId::GBuffer0)
           .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
       frame.frm.get_image(ImageRessourceId::GBuffer1)

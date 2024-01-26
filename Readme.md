@@ -16,9 +16,12 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
 - [X] Frustrum culling
     - [X] AABB bounding box 
         - [ ] works but still buggy at the extremities of Sponza for big objects, the 8 rather than only 2 extremities should be tested, or something else idk
-        - [ ] Rather than radar approch use hiearchical test? -> GPU maybe?
     - [ ] Maybe some more clever techniques like OOB / Convex Hull
-- [ ] Debug Pass (to draw / cubes / lines / on top of the frame)
+    - [ ] Use hiearchical test?
+- [ ] Debug Pass 
+    - [X] draw triangle wireframe
+    - [ ] draw square 
+    - [ ] draw boxes
 - [ ] Allow to display wireframe / Bounding Box conditionnally
 - [ ] Deferred Pipeline 
     - [X] PBR (buggy)

@@ -222,6 +222,9 @@ struct PipelineDepthStencilStateBuilder
   [[nodiscard]] constexpr auto build() const -> VkPipelineDepthStencilStateCreateInfo { return inner(); }
 };
 
+constexpr PipelineDepthStencilStateBuilder DepthStateTestReadOnlyOpLess =
+    PipelineDepthStencilStateBuilder{}.depth_test(true).depth_write(false).depth_compare_op(VK_COMPARE_OP_LESS);
+
 constexpr PipelineDepthStencilStateBuilder DepthStateTestAndWriteOpLess =
     PipelineDepthStencilStateBuilder{}.depth_test(true).depth_write(true).depth_compare_op(VK_COMPARE_OP_LESS);
 
@@ -295,6 +298,14 @@ struct PipelineColorBlendAttachmentStateBuilder
 constexpr PipelineColorBlendAttachmentStateBuilder PipelineColorBlendStateAllColorNoBlend =
     PipelineColorBlendAttachmentStateBuilder{}.color_write_mask(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                                                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT);
+
+constexpr PipelineColorBlendAttachmentStateBuilder PipelineColorBlendStateAllColorBlend =
+    PipelineColorBlendAttachmentStateBuilder{}
+        .color_write_mask(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                          VK_COLOR_COMPONENT_A_BIT)
+        .color_blend(VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
+        .alpha_blend(VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO)
+        .blend(true);
 
 struct PipelineMultisampleStateBuilder
     : VkBuilder<PipelineMultisampleStateBuilder, VkPipelineMultisampleStateCreateInfo> {

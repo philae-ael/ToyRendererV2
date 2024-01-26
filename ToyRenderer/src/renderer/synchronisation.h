@@ -37,7 +37,7 @@ struct ImageMemoryBarrier {
       }
     }
 
-    if (barriers_.size() > 0) {
+    if (!barriers_.empty()) {
       submit(cmd, barriers_);
     }
   }
@@ -104,6 +104,13 @@ static constexpr SyncInfo SyncFragmentStorageRead{
 
 static constexpr SyncInfo SyncLateDepth{
     .accessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    .stageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+    .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+};
+
+static constexpr SyncInfo SyncLateDepthReadOnly{
+    .accessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT_KHR,
     .stageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
     .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
     .queueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,

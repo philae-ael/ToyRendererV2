@@ -1,5 +1,6 @@
 #include "ressources.h"
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
@@ -232,10 +233,14 @@ auto tr::renderer::BufferDefinition::vma_usage() const -> VmaMemoryUsage {
 }
 
 auto tr::renderer::BufferDefinition::vma_flags() const -> VmaAllocationCreateFlags {
+  VmaAllocationCreateFlags flags_ = 0;
   if ((flags & BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT) != 0) {
-    return VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    flags_ |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
   }
-  return 0;
+  if ((flags & BUFFER_OPTION_FLAG_CREATE_MAPPED_BIT) != 0) {
+    flags_ |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+  }
+  return flags_;
 }
 
 auto tr::renderer::BufferBuilder::build_buffer(Lifetime& lifetime, BufferDefinition definition) const
@@ -266,8 +271,10 @@ auto tr::renderer::BufferBuilder::build_buffer(Lifetime& lifetime, BufferDefinit
       .pUserData = nullptr,
       .priority = 1.0F,
   };
-  VK_UNWRAP(vmaCreateBuffer, allocator, &buffer_create_info, &allocation_create_info, &res.buffer, &res.alloc, nullptr);
+  VmaAllocationInfo info;
+  VK_UNWRAP(vmaCreateBuffer, allocator, &buffer_create_info, &allocation_create_info, &res.buffer, &res.alloc, &info);
   set_debug_object_name(device, VK_OBJECT_TYPE_BUFFER, res.buffer, std::format("{} buffer", definition.debug_name));
+  res.mapped_data = info.pMappedData;
 
   lifetime.tie(VmaHandle::Buffer, res.buffer, res.alloc);
   return res;

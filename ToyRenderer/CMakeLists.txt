@@ -16,10 +16,12 @@ target_compile_shader(Shaders
     FORMAT num
     ARGS -g
     SOURCES
-    shaders/gbuffer.frag
-    shaders/gbuffer.vert
     shaders/deferred.frag
     shaders/deferred.vert
+    shaders/debug.frag
+    shaders/debug.vert
+    shaders/gbuffer.frag
+    shaders/gbuffer.vert
     shaders/present.frag
     shaders/present.vert
     shaders/shadow_map.vert
@@ -60,6 +62,8 @@ add_executable(ToyRenderer
     src/renderer/mesh.h
     src/renderer/passes/deferred.cpp
     src/renderer/passes/deferred.h
+    src/renderer/passes/debug.cpp
+    src/renderer/passes/debug.h
     src/renderer/passes/frustrum_culling.cpp
     src/renderer/passes/frustrum_culling.h
     src/renderer/passes/gbuffer.cpp

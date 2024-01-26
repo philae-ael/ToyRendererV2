@@ -24,6 +24,7 @@ struct Swapchain;
 struct BufferRessource {
   VkBuffer buffer = VK_NULL_HANDLE;
   VmaAllocation alloc = nullptr;
+  void* mapped_data = nullptr;
 
   VkBufferUsageFlags usage = 0;
   uint32_t size = 0;
@@ -31,11 +32,12 @@ struct BufferRessource {
 
 enum BufferOptionFlagsBits {
   BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT = 1 << 0,
+  BUFFER_OPTION_FLAG_CREATE_MAPPED_BIT = 1 << 1,
 };
 
 using BufferOptionFlags = std::uint32_t;
 
-enum class BufferRessourceId { Camera, ShadowCamera, MAX };
+enum class BufferRessourceId { Camera, ShadowCamera, DebugVertices, MAX };
 
 struct BufferDefinition {
   VkBufferUsageFlags usage;

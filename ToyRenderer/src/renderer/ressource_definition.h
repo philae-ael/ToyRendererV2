@@ -5,6 +5,7 @@
 #include <array>
 
 #include "../camera.h"
+#include "mesh.h"
 #include "ressources.h"
 #include "utils/cast.h"
 
@@ -129,5 +130,16 @@ static constexpr std::array
                         },
                     .id = BufferRessourceId::ShadowCamera,
                 },
+                {
+                    .definition =
+                        {
+                            .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(Vertex)) * 3 * 1024, 256),
+                            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT | BUFFER_OPTION_FLAG_CREATE_MAPPED_BIT,
+                            .debug_name = "debug vertices",
+                        },
+                    .id = BufferRessourceId::DebugVertices,
+                },
+
             });
 }  // namespace tr::renderer
