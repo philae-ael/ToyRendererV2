@@ -100,6 +100,7 @@ add_executable(ToyRenderer
     src/system/platform.h
 )
 
+target_compile_definitions(ToyRenderer PRIVATE -DGLM_ENABLE_EXPERIMENTAL)
 target_link_libraries(ToyRenderer PRIVATE Shaders glfw Vulkan::Vulkan imgui::imgui spdlog::spdlog glm::glm utils renderdoc JsonCpp::JsonCpp GPUOpen::VulkanMemoryAllocator fastgltf::fastgltf unofficial::shaderc::shaderc)
 target_include_directories(ToyRenderer PRIVATE ${Stb_INCLUDE_DIR})
 

@@ -112,6 +112,7 @@ struct std::formatter<VkResult> : formatter<std::string_view> {
       CASE(VK_ERROR_COMPRESSION_EXHAUSTED_EXT)
       CASE(VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT)
       CASE(VK_RESULT_MAX_ENUM)
+      CASE(VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR)
     }
 #undef CASE
     return std::format_to(ctx.out(), "{}", value);
@@ -481,6 +482,8 @@ struct std::formatter<VkObjectType> : formatter<std::string_view> {
       CASE(VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV)
       CASE(VK_OBJECT_TYPE_SHADER_EXT)
       CASE(VK_OBJECT_TYPE_MAX_ENUM)
+      CASE(VK_OBJECT_TYPE_CUDA_MODULE_NV)
+      CASE(VK_OBJECT_TYPE_CUDA_FUNCTION_NV)
     }
 #undef CASE
     return std::format_to(ctx.out(), "{}", value);
