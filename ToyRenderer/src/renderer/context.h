@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include "device.h"
 #include "instance.h"
 #include "swapchain.h"
 
@@ -9,6 +10,7 @@ namespace tr::renderer {
 struct VulkanContext {
   Instance instance;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
+  PhysicalDevice physical_device;
   Device device;
   Swapchain swapchain;
 

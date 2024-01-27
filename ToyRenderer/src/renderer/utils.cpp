@@ -12,7 +12,8 @@
 #include <vector>
 
 auto tr::renderer::check_extensions(const char* kind, std::span<const char* const> required,
-                                    std::span<const char* const> optional, std::span<VkExtensionProperties> available)
+                                    std::span<const char* const> optional,
+                                    std::span<const VkExtensionProperties> available)
     -> std::optional<std::set<std::string>> {
   std::set<std::string> available_set;
   spdlog::trace("Available {} extensions", kind);

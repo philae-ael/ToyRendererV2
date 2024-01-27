@@ -2,60 +2,47 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <cstddef>
 #include <set>
 #include <vector>
 
 #include "deletion_stack.h"
-#include "utils/assert.h"
-#include "utils/cast.h"
-#include "utils/types.h"
 
 struct GLFWwindow;
 
 namespace tr::renderer {
+struct QueuesInfo {
+  std::uint32_t graphics_family;
+  std::uint32_t present_family;
+  std::uint32_t transfer_family;
 
-struct Device : utils::types::threadsafe {
-  static auto init(VkInstance instance, VkSurfaceKHR surface) -> Device;
-  void defer_deletion(InstanceDeletionStack& instance_deletion_stack) const {
-    instance_deletion_stack.defer_deletion(InstanceHandle::Device, vk_device);
-  }
+  VkQueueFamilyProperties graphics_family_properties;
+  VkQueueFamilyProperties present_family_properties;
+  VkQueueFamilyProperties transfer_family_properties;
+};
 
-  VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-  VkDevice vk_device = VK_NULL_HANDLE;
-
+struct PhysicalDevice {
+  VkPhysicalDevice vk_physical_device = VK_NULL_HANDLE;
   std::set<std::string> extensions;
 
   VkPhysicalDeviceProperties device_properties{};
   VkPhysicalDeviceMemoryProperties memory_properties{};
+  QueuesInfo queues;
+
+  static auto init(VkInstance instance, VkSurfaceKHR surface) -> PhysicalDevice;
+};
+
+struct Device {
+  static auto init(const PhysicalDevice& infos) -> Device;
+  void defer_deletion(InstanceDeletionStack& instance_deletion_stack) const {
+    instance_deletion_stack.defer_deletion(InstanceHandle::Device, vk_device);
+  }
+
+  VkDevice vk_device = VK_NULL_HANDLE;
+
+  VkQueue graphics_queue;
+  VkQueue present_queue;
+  VkQueue transfer_queue;
 
   std::vector<VkFormat> format_supported;
-
-  struct Queues {
-    std::uint32_t graphics_family;
-    std::uint32_t present_family;
-    std::uint32_t transfer_family;
-
-    VkQueue graphics_queue;
-    VkQueue present_queue;
-    VkQueue transfer_queue;
-
-    VkQueueFamilyProperties graphics_family_properties;
-    VkQueueFamilyProperties present_family_properties;
-    VkQueueFamilyProperties transfer_family_properties;
-  } queues{};
-
-  auto find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) -> uint32_t {
-    for (std::size_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-      const auto& memory_type = memory_properties.memoryTypes[i];
-
-      bool suitable_memory = ((type_filter & (1 << i)) != 0) && (memory_type.propertyFlags & properties) == properties;
-      if (suitable_memory) {
-        return utils::narrow_cast<uint32_t>(i);
-      }
-    }
-
-    TR_ASSERT(false, "could not find any memory");
-  }
 };
 }  // namespace tr::renderer

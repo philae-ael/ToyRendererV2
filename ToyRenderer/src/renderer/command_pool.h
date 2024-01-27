@@ -10,6 +10,7 @@ namespace tr::renderer {
 struct CommandPool {
   enum class TargetQueue { Graphics, Present, Transfer };
 
-  static auto init(Lifetime& lifetime, Device& device, CommandPool::TargetQueue target_queue) -> VkCommandPool;
+  static auto init(Lifetime& lifetime, Device& device, PhysicalDevice& physical_device,
+                   CommandPool::TargetQueue target_queue) -> VkCommandPool;
 };
 }  // namespace tr::renderer

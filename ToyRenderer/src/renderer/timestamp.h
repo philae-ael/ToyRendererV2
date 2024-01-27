@@ -9,11 +9,12 @@
 #include "deletion_stack.h"
 #include "device.h"
 #include "utils.h"
+#include "utils/cast.h"
 namespace tr::renderer {
 
 template <const size_t FRAMES, const size_t QUERY_COUNT>
 struct GPUTimestamp {
-  static auto init(Lifetime &lifetime, Device &device) -> GPUTimestamp {
+  static auto init(Lifetime &lifetime, Device &device, const PhysicalDevice &physical_device) -> GPUTimestamp {
     GPUTimestamp t{};
     VkQueryPoolCreateInfo create_info{
         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
@@ -26,7 +27,7 @@ struct GPUTimestamp {
 
     VK_UNWRAP(vkCreateQueryPool, device.vk_device, &create_info, nullptr, &t.query_pool);
     vkResetQueryPool(device.vk_device, t.query_pool, 0, FRAMES * QUERY_COUNT);
-    t.to_ms = device.device_properties.limits.timestampPeriod / 1000000.0F;
+    t.to_ms = physical_device.device_properties.limits.timestampPeriod / 1000000.0F;
 
     lifetime.tie(DeviceHandle::QueryPool, t.query_pool);
     return t;

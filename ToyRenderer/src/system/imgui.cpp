@@ -33,9 +33,9 @@ void tr::system::Imgui::init(GLFWwindow *window, renderer::VulkanEngine &engine)
 
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = engine.ctx.instance.vk_instance;
-  init_info.PhysicalDevice = engine.ctx.device.physical_device;
+  init_info.PhysicalDevice = engine.ctx.physical_device.vk_physical_device;
   init_info.Device = engine.ctx.device.vk_device;
-  init_info.Queue = engine.ctx.device.queues.graphics_queue;
+  init_info.Queue = engine.ctx.device.graphics_queue;
   init_info.DescriptorPool = imgui_pool;
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;

@@ -50,7 +50,7 @@ struct VkBuilder : T {
 };
 
 auto check_extensions(const char* kind, std::span<const char* const> required, std::span<const char* const> optional,
-                      std::span<VkExtensionProperties> available) -> std::optional<std::set<std::string>>;
+                      std::span<const VkExtensionProperties> available) -> std::optional<std::set<std::string>>;
 
 }  // namespace tr::renderer
 

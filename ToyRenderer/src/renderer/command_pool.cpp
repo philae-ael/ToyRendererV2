@@ -6,20 +6,20 @@
 #include "device.h"
 #include "utils.h"
 
-auto tr::renderer::CommandPool::init(Lifetime& lifetime, Device& device, CommandPool::TargetQueue target_queue)
-    -> VkCommandPool {
+auto tr::renderer::CommandPool::init(Lifetime& lifetime, Device& device, PhysicalDevice& physical_device,
+                                     CommandPool::TargetQueue target_queue) -> VkCommandPool {
   VkCommandPool command_pool = VK_NULL_HANDLE;
 
   std::uint32_t queue_family_index{};
   switch (target_queue) {
     case TargetQueue::Graphics:
-      queue_family_index = device.queues.graphics_family;
+      queue_family_index = physical_device.queues.graphics_family;
       break;
     case TargetQueue::Present:
-      queue_family_index = device.queues.present_family;
+      queue_family_index = physical_device.queues.present_family;
       break;
     case TargetQueue::Transfer:
-      queue_family_index = device.queues.transfer_family;
+      queue_family_index = physical_device.queues.transfer_family;
       break;
   }
   const VkCommandPoolCreateInfo command_pool_create_info{

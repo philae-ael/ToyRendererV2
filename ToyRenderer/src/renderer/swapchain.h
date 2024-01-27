@@ -15,11 +15,13 @@ namespace tr::renderer {
 
 struct Swapchain {
   struct SwapchainConfig;
-  void reinit(Lifetime &lifetime, Device &device, VkSurfaceKHR surface, GLFWwindow *window) {
-    *this = init_with_config(lifetime, config, device, surface, window);
+  void reinit(Lifetime& lifetime, const Device& device, const PhysicalDevice& physical_device, VkSurfaceKHR surface,
+              GLFWwindow* window) {
+    *this = init_with_config(lifetime, config, device, physical_device, surface, window);
   }
-  static auto init_with_config(Lifetime &lifetime, SwapchainConfig config, const Device &device, VkSurfaceKHR surface,
-                               GLFWwindow *window) -> Swapchain;
+  static auto init_with_config(Lifetime& lifetime, SwapchainConfig config, const tr::renderer::Device& device,
+                               const tr::renderer::PhysicalDevice& physical_device, VkSurfaceKHR surface,
+                               GLFWwindow* window) -> Swapchain;
 
   VkSwapchainKHR vk_swapchain = VK_NULL_HANDLE;
 
@@ -39,6 +41,6 @@ struct Swapchain {
   } config;
 
  private:
-  auto compute_extent(GLFWwindow *window) const -> VkExtent2D;
+  auto compute_extent(GLFWwindow* window) const -> VkExtent2D;
 };
 }  // namespace tr::renderer

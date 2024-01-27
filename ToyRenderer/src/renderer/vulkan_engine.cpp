@@ -128,7 +128,7 @@ void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
                                 }});
 
   VK_UNWRAP(frame.cmd.end);
-  VK_UNWRAP(frame.submitCmds, ctx.device.queues.graphics_queue);
+  VK_UNWRAP(frame.submitCmds, ctx.device.graphics_queue);
 
   // Present
   // TODO: there should be a queue ownership transfer if graphics queue != present queue
@@ -176,7 +176,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
 
   VmaAllocatorCreateInfo allocator_create_info{
       .flags = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT,
-      .physicalDevice = ctx.device.physical_device,
+      .physicalDevice = ctx.physical_device.vk_physical_device,
       .device = ctx.device.vk_device,
       .preferredLargeHeapBlockSize = 0,
       .pAllocationCallbacks = nullptr,
@@ -187,7 +187,7 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
       .vulkanApiVersion = VK_API_VERSION_1_3,
       .pTypeExternalMemoryHandleTypes = nullptr,
   };
-  if (ctx.device.extensions.contains(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME)) {
+  if (ctx.physical_device.extensions.contains(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME)) {
     allocator_create_info.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
     spdlog::debug("VMA flag VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT is set");
   }
@@ -195,13 +195,15 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
   VK_UNWRAP(vmaCreateAllocator, &allocator_create_info, &allocator);
 
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    graphic_command_pools[i] = CommandPool::init(lifetime.global, ctx.device, CommandPool::TargetQueue::Graphics);
+    graphic_command_pools[i] =
+        CommandPool::init(lifetime.global, ctx.device, ctx.physical_device, CommandPool::TargetQueue::Graphics);
     graphics_command_buffers[i] = OneTimeCommandBuffer::allocate(ctx.device.vk_device, graphic_command_pools[i]);
   }
   graphic_command_pool_for_next_frame =
-      CommandPool::init(lifetime.global, ctx.device, CommandPool::TargetQueue::Graphics);
+      CommandPool::init(lifetime.global, ctx.device, ctx.physical_device, CommandPool::TargetQueue::Graphics);
 
-  transfer_command_pool = CommandPool::init(lifetime.global, ctx.device, CommandPool::TargetQueue::Transfer);
+  transfer_command_pool =
+      CommandPool::init(lifetime.global, ctx.device, ctx.physical_device, CommandPool::TargetQueue::Transfer);
 
   for (auto& frame_descriptor_allocator : frame_descriptor_allocators) {
     frame_descriptor_allocator = DescriptorAllocator::init(lifetime.global, ctx.device.vk_device, 8192,
@@ -234,7 +236,8 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
     buffer_storage.init(lifetime.global, bb);
   }
 
-  debug_info.gpu_timestamps = decltype(debug_info.gpu_timestamps)::init(lifetime.global, ctx.device);
+  debug_info.gpu_timestamps =
+      decltype(debug_info.gpu_timestamps)::init(lifetime.global, ctx.device, ctx.physical_device);
 
   for (auto& synchro : frame_synchronisation_pool) {
     synchro = FrameSynchro::init(lifetime.global, ctx.device.vk_device);
@@ -260,7 +263,7 @@ void tr::renderer::VulkanEngine::end_transfer(Transferer&& t_in) {
   VK_UNWRAP(t.graphics_cmd.end);
   graphic_command_buffers_for_next_frame.push_back(t.graphics_cmd.vk_cmd);
 
-  QueueSubmit{}.command_buffers({{t.cmd.vk_cmd}}).submit(ctx.device.queues.transfer_queue, VK_NULL_HANDLE);
+  QueueSubmit{}.command_buffers({{t.cmd.vk_cmd}}).submit(ctx.device.transfer_queue, VK_NULL_HANDLE);
 
   // WARN: THIS IS BAD: we should keep the uploader until all the uploads are done
   // Maybe within a deletion queue with a fence ? Or smthg like that

@@ -35,7 +35,7 @@ struct ShadowMap {
   void start_draw(Frame &frame) const;
   void end_draw(VkCommandBuffer cmd) const;
 
-  void draw(Frame &frame, const DirectionalLight &light, std::span<const Mesh> meshes);
+  void draw(Frame &frame, const DirectionalLight &light, std::span<const Mesh> meshes) const;
 
   void draw_mesh(Frame &frame, const Mesh &mesh) const;
 

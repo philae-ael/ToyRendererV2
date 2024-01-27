@@ -166,7 +166,7 @@ void tr::renderer::ShadowMap::draw_mesh(Frame &frame, const Mesh &mesh) const {
     }
   }
 }
-void tr::renderer::ShadowMap::draw(Frame &frame, const DirectionalLight &light, std::span<const Mesh> meshes) {
+void tr::renderer::ShadowMap::draw(Frame &frame, const DirectionalLight &light, std::span<const Mesh> meshes) const {
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Shadow map");
 
   start_draw(frame);

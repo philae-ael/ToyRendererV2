@@ -18,9 +18,6 @@ struct Extent2d {
   auto aspect_ratio() -> float { return static_cast<float>(width) / static_cast<float>(height); }
 };
 
-struct threadsafe {};
-struct threadunsafe {};
-
 template <class T>
 class not_null_pointer {
  public:

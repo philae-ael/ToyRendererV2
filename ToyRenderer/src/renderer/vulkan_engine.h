@@ -80,7 +80,7 @@ class VulkanEngine {
   VulkanContext ctx;
   VmaAllocator allocator = nullptr;
   RessourceManager rm{};
-  VulkanEngineDebugInfo debug_info;
+  mutable VulkanEngineDebugInfo debug_info;
 
  private:
   void rebuild_swapchain();

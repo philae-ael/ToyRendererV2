@@ -105,6 +105,9 @@ void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, const Res
 }
 
 void tr::renderer::Debug::draw(Frame &frame, VkRect2D render_area) {
+  if (vertices.empty()) {
+    return;
+  }
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Debug");
   ImageMemoryBarrier::submit<2>(
       frame.cmd.vk_cmd, {{

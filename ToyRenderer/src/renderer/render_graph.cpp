@@ -14,7 +14,7 @@
 #include "timeline_info.h"
 #include "vulkan_engine.h"
 
-void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera) {
+void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera) const {
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_TOP);
   auto internal_extent = frame.frm.get_image(ImageRessourceId::Rendered).extent;
   auto swapchain_extent = frame.frm.get_image(ImageRessourceId::Swapchain).extent;
@@ -43,40 +43,8 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
   passes.deferred.draw(frame, {{0, 0}, internal_extent}, lights);
 
-  /* for (const auto& mesh : meshes) { */
-  /*   const auto transform = mesh.transform; */
-  /*   for (const auto& surface : mesh.surfaces) { */
-  /*     const auto bb = surface.bounding_box.transform(transform); */
-  /**/
-  /*     const auto v = bb.max - bb.min; */
-  /**/
-  /*     const auto tri = [&](glm::vec3 offset0, glm::vec3 offset1, glm::vec3 offset2) { */
-  /*       const auto tris = std::to_array({ */
-  /*           DebugVertex{bb.min + offset0 * v, {1, 1, 1}}, */
-  /*           DebugVertex{bb.min + offset1 * v, {1, 1, 1}}, */
-  /*           DebugVertex{bb.min + offset2 * v, {1, 1, 1}}, */
-  /*       }); */
-  /*       Debug::global().push_triangle(tris); */
-  /*     }; */
-  /**/
-  /*     tri({0, 0, 0}, {1, 0, 0}, {1, 1, 0}); */
-  /*     tri({1, 1, 0}, {0, 1, 0}, {0, 0, 0}); */
-  /*     tri({1, 0, 0}, {1, 0, 1}, {1, 1, 1}); */
-  /*     tri({1, 1, 1}, {1, 1, 0}, {1, 0, 0}); */
-  /**/
-  /*     tri({0, 0, 0}, {0, 0, 1}, {0, 1, 1}); */
-  /*     tri({0, 1, 1}, {0, 1, 0}, {0, 0, 0}); */
-  /*     tri({0, 0, 1}, {1, 0, 1}, {1, 1, 1}); */
-  /*     tri({1, 1, 1}, {0, 1, 1}, {0, 0, 1}); */
-  /**/
-  /*     tri({1, 1, 1}, {0, 1, 1}, {0, 1, 0}); */
-  /*     tri({0, 1, 0}, {1, 1, 0}, {1, 1, 1}); */
-  /*     tri({1, 0, 1}, {0, 0, 1}, {0, 0, 0}); */
-  /*     tri({0, 0, 0}, {1, 0, 0}, {1, 0, 1}); */
-  /*   } */
-  /* } */
-  /* Debug::global().draw(frame, {{0, 0}, internal_extent}); */
-  /**/
+  Debug::global().draw(frame, {{0, 0}, internal_extent});
+
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_DEFERRED_BOTTOM);
 
   passes.present.draw(frame, {{0, 0}, swapchain_extent});

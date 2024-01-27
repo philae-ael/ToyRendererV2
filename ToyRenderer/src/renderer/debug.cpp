@@ -147,7 +147,7 @@ void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine
           ImGui::Text("%.1f MB", history[history.size() - 1] / 1024 / 1024);
         }
 
-        for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
+        for (std::size_t i = 0; i < engine.ctx.physical_device.memory_properties.memoryHeapCount; i++) {
           ImGui::TableNextRow();
           ImGui::TableNextColumn();
           const auto history = gpu_heaps_usage[i].history();
@@ -176,7 +176,7 @@ void tr::renderer::VulkanEngineDebugInfo::memory_info(tr::renderer::VulkanEngine
         ImGui::TableSetupColumn("Block Bytes");
         ImGui::TableSetupColumn("Block Count");
         ImGui::TableHeadersRow();
-        for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
+        for (std::size_t i = 0; i < engine.ctx.physical_device.memory_properties.memoryHeapCount; i++) {
           auto& budget = budgets[i];
           ImGui::TableNextRow();
           ImGui::TableNextColumn();
@@ -322,7 +322,7 @@ void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEn
     std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
     vmaGetHeapBudgets(engine.allocator, budgets.data());
     float global_memory_usage{};
-    for (std::size_t i = 0; i < engine.ctx.device.memory_properties.memoryHeapCount; i++) {
+    for (std::size_t i = 0; i < engine.ctx.physical_device.memory_properties.memoryHeapCount; i++) {
       gpu_heaps_usage[i].push(utils::narrow_cast<float>(budgets[i].usage));
       global_memory_usage += utils::narrow_cast<float>(budgets[i].usage);
     }

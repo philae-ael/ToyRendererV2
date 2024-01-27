@@ -49,7 +49,7 @@ struct Frame {
         .pImageIndices = &swapchain_image_index,
         .pResults = nullptr,
     };
-    return vkQueuePresentKHR(device.queues.present_queue, &present_info);
+    return vkQueuePresentKHR(device.present_queue, &present_info);
   }
 
   void write_gpu_timestamp(VkPipelineStageFlagBits pipelineStage, GPUTimestampIndex index) const;

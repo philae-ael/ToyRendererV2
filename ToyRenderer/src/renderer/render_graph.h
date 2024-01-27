@@ -16,7 +16,7 @@ namespace tr::renderer {
 struct RenderGraph {
   void reinit_passes(tr::renderer::VulkanEngine& engine);
   void init(VulkanEngine& engine, Transferer& t);
-  void draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera);
+  void draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera) const;
 
   void imgui(VulkanEngine&);
 

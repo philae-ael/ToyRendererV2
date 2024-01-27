@@ -47,7 +47,7 @@ struct GBuffer {
   void end_draw(VkCommandBuffer cmd) const;
 
   template <utils::types::range_of<const Mesh &> Range>
-  void draw(Frame &frame, VkRect2D render_area, const Camera &cam, Range meshes, DefaultRessources default_ressources) {
+  void draw(Frame &frame, VkRect2D render_area, const Camera &cam, Range meshes, DefaultRessources default_ressources) const {
     const DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
 
     start_draw(frame, render_area);
