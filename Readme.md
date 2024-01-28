@@ -26,7 +26,7 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
 - [ ] Deferred Pipeline 
     - [X] PBR (buggy)
     - [ ] IBL
-- [X]  Forward 
+- [X]  Forward (not used)
     - [ ] for transparent objects only
 - [ ] Bindless textures
 - [ ] Ambient Occlusion

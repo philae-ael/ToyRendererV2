@@ -61,7 +61,7 @@ PixelData getPixelData(){
     // TODO: more complex packing
     pixel.albedo =  t0.xyz;
     pixel.perceptualRoughness = t0.a;
-    pixel.normal =  t1.xyz;
+    pixel.normal = t1.xyz;
     pixel.metallic = t1.a;
     pixel.view = t2.xyz;
     pixel.pos = t3.xyz;

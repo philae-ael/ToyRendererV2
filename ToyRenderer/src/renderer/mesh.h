@@ -73,6 +73,7 @@ struct GeoSurface {
   uint32_t count;
   std::shared_ptr<Material> material;
   AABB bounding_box;
+  bool is_transparent;
 };
 
 struct Mesh {

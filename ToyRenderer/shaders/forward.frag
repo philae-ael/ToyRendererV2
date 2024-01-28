@@ -54,7 +54,7 @@ float compute_shadow(vec3 pos) {
 
 PixelData getPixelData() {
     PixelData pixel;
-    pixel.normal = TBN * (texture(texs[2], fragUV1) * 2.0 - 1.0).rgb; 
+    pixel.normal = normalize(TBN * (texture(texs[2], fragUV1) * 2.0 - 1.0).rgb); 
     pixel.albedo = texture(texs[0], fragUV1).rgb;
 
     vec4 roughness_metallic = texture(texs[1], fragUV1);

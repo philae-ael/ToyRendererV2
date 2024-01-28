@@ -25,8 +25,7 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
 
-  std::span<const Mesh> m{};
-  passes.gbuffer.draw(frame, {{0, 0}, internal_extent}, camera, m, default_ressources);
+  passes.gbuffer.draw(frame, {{0, 0}, internal_extent}, camera, meshes, default_ressources);
 
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
@@ -44,7 +43,7 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
   passes.deferred.draw(frame, {{0, 0}, internal_extent}, lights);
 
-  passes.forward.draw(frame, {{0, 0}, internal_extent}, camera, meshes, lights, default_ressources);
+  /* passes.forward.draw(frame, {{0, 0}, internal_extent}, camera, meshes, lights, default_ressources); */
 
   Debug::global().draw(frame, {{0, 0}, internal_extent});
 
