@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <shaderc/shaderc.hpp>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "deletion_stack.h"
@@ -30,6 +32,25 @@ struct Shader {
         .pSpecializationInfo = nullptr,
     };
   }
+};
+
+class FileIncluder : public shaderc::CompileOptions::IncluderInterface {
+ public:
+  explicit FileIncluder(std::filesystem::path base_path_) : base_path(std::move(base_path_)) {}
+  auto GetInclude(const char* requested_source, shaderc_include_type include_type, const char* requesting_source,
+                  size_t include_depth) -> shaderc_include_result* override;
+  void ReleaseInclude(shaderc_include_result* include_result) override;
+
+ private:
+  [[nodiscard]] auto FindReadableFilepath(const std::string& filename) const -> std::string;
+  auto FindRelativeReadableFilepath(const std::string& requesting_file, const std::string& filename) const
+      -> std::string;
+
+  std::filesystem::path base_path;
+  struct FileInfo {
+    std::string full_path;
+    std::vector<char> contents;
+  };
 };
 
 struct PipelineBuilder : VkBuilder<PipelineBuilder, VkGraphicsPipelineCreateInfo> {

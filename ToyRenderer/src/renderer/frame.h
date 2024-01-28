@@ -28,7 +28,7 @@ struct Frame {
   DescriptorAllocator descriptor_allocator;
   FrameRessourceManager frm;
 
-  VulkanEngine *ctx;
+  const VulkanEngine *ctx;
 
   auto submitCmds(VkQueue queue) const -> VkResult {
     return QueueSubmit{}

@@ -1,5 +1,6 @@
 #include "deferred.h"
 
+#include <bits/getopt_core.h>
 #include <imgui.h>
 #include <shaderc/env.h>
 #include <shaderc/shaderc.h>
@@ -8,9 +9,12 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
+#include <filesystem>
 #include <glm/fwd.hpp>
+#include <memory>
 #include <optional>
 #include <shaderc/shaderc.hpp>
+#include <string>
 
 #include "../debug.h"
 #include "../descriptors.h"
@@ -34,10 +38,12 @@ struct PushConstant {
   glm::vec3 color;
   float padding = 0.0;
 };
+
 void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
                                   Lifetime &setup_lifetime) {
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
+  options.SetIncluder(std::make_unique<FileIncluder>("./ToyRenderer/shaders"));
   options.SetGenerateDebugInfo();
   options.SetSourceLanguage(shaderc_source_language_glsl);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);

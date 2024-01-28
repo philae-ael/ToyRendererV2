@@ -8,6 +8,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <optional>
 #include <shaderc/shaderc.hpp>
@@ -52,3 +53,61 @@ auto tr::renderer::Shader::init_from_spv(Lifetime& lifetime, VkDevice device, st
   lifetime.tie(DeviceHandle::ShaderModule, shader.module);
   return shader;
 }
+
+// NOLINTBEGIN
+auto MakeErrorIncludeResult(const char* message) -> shaderc_include_result* {
+  return new shaderc_include_result{"", 0, message, strlen(message), nullptr};
+}
+
+auto tr::renderer::FileIncluder::GetInclude(const char* requested_source, shaderc_include_type include_type,
+                                            const char* requesting_source, size_t /*include_depth*/)
+    -> shaderc_include_result* {
+  const std::string full_path = (include_type == shaderc_include_type_relative)
+                                    ? FindRelativeReadableFilepath(requesting_source, requested_source)
+                                    : FindReadableFilepath(requested_source);
+
+  if (full_path.empty()) {
+    return MakeErrorIncludeResult("Cannot find or open include file.");
+  }
+
+  auto* new_file_info = new FileInfo{full_path, {}};
+  auto contents = read_file<char>(full_path);
+  if (!contents) {
+    return MakeErrorIncludeResult("Cannot read file");
+  }
+
+  new_file_info->contents = std::move(*contents);
+  return new shaderc_include_result{new_file_info->full_path.data(), new_file_info->full_path.length(),
+                                    new_file_info->contents.data(), new_file_info->contents.size(), new_file_info};
+}
+
+void tr::renderer::FileIncluder::ReleaseInclude(shaderc_include_result* include_result) {
+  auto* info = static_cast<FileInfo*>(include_result->user_data);
+  delete info;
+  delete include_result;
+}
+
+auto tr::renderer::FileIncluder::FindRelativeReadableFilepath(const std::string& requesting_file,
+                                                              const std::string& filename) const -> std::string {
+  assert(!filename.empty());
+
+  std::string relative_filename = std::filesystem::path(requesting_file).parent_path() / filename;
+  if (std::filebuf{}.open(relative_filename, std::ios_base::in) != nullptr) {
+    return relative_filename;
+  }
+
+  return FindReadableFilepath(filename);
+}
+
+auto tr::renderer::FileIncluder::FindReadableFilepath(const std::string& filename) const -> std::string {
+  assert(!filename.empty());
+  static const auto for_reading = std::ios_base::in;
+  std::filebuf opener;
+
+  std::string prefixed_filename = base_path / filename;
+  if (std::filebuf{}.open(prefixed_filename, for_reading) != nullptr) {
+    return prefixed_filename;
+  }
+  return "";
+}
+// NOLINTEND
