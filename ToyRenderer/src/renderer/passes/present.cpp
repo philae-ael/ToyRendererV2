@@ -24,7 +24,7 @@ auto tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, const R
   options.SetSourceLanguage(shaderc_source_language_glsl);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling deferred shader") {
+  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling present shader") {
     const auto vert_spv =
         Shader::compile(compiler, shaderc_glsl_vertex_shader, options, "./ToyRenderer/shaders/present.vert");
     const auto frag_spv =

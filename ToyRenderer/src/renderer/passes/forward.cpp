@@ -1,4 +1,4 @@
-#include "deferred.h"
+#include "forward.h"
 
 #include <bits/getopt_core.h>
 #include <imgui.h>
@@ -19,18 +19,17 @@
 #include "../debug.h"
 #include "../descriptors.h"
 #include "../frame.h"
-#include "../mesh.h"
 #include "../pipeline.h"
 #include "../vulkan_engine.h"
 #include "shadow_map.h"
 #include "utils/misc.h"
 
 const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/deferred.vert.inc"
+#include "shaders/forward.vert.inc"
 });
 
 const std::array frag_spv_default = std::to_array<uint32_t>({
-#include "shaders/deferred.frag.inc"
+#include "shaders/forward.frag.inc"
 });
 
 struct PushConstant {
@@ -39,8 +38,8 @@ struct PushConstant {
   float padding = 0.0;
 };
 
-void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
-                                  Lifetime &setup_lifetime) {
+void tr::renderer::Forward::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
+                                 Lifetime &setup_lifetime) {
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetIncluder(std::make_unique<FileIncluder>("./ToyRenderer/shaders"));
@@ -53,11 +52,11 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
   }
   options.AddMacroDefinition("SHADOW_BIAS", std::format("{}", shadow_bias));
 
-  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling deferred shader") {
+  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling forward shader") {
     const auto frag_spv =
-        Shader::compile(compiler, shaderc_glsl_fragment_shader, options, "./ToyRenderer/shaders/deferred.frag");
+        Shader::compile(compiler, shaderc_glsl_fragment_shader, options, "./ToyRenderer/shaders/forward.frag");
     const auto vert_spv =
-        Shader::compile(compiler, shaderc_glsl_vertex_shader, options, "./ToyRenderer/shaders/deferred.vert");
+        Shader::compile(compiler, shaderc_glsl_vertex_shader, options, "./ToyRenderer/shaders/forward.vert");
 
     const auto frag = Shader::init_from_spv(setup_lifetime, ctx.device.vk_device,
                                             frag_spv ? std::span{*frag_spv} : std::span{frag_spv_default});
@@ -76,16 +75,17 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
   };
   const auto dynamic_state_state = PipelineDynamicStateBuilder{}.dynamic_state(dynamic_states).build();
 
-  const auto vertex_input_state = PipelineVertexInputStateBuilder{}.build();
+  const auto vertex_input_state =
+      PipelineVertexInputStateBuilder{}.vertex_attributes(Vertex::attributes).vertex_bindings(Vertex::bindings).build();
   const auto input_assembly_state =
       PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
   const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
-  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.build();
+  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.cull_mode(VK_CULL_MODE_BACK_BIT).build();
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
   const auto color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState>({
-      PipelineColorBlendStateAllColorNoBlend.build(),
+      PipelineColorBlendStateAllColorBlend.build(),
   });
 
   const auto color_formats = std::to_array<VkFormat>({
@@ -93,15 +93,25 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
+  auto pipeline_rendering_create_info =
+      PipelineRenderingBuilder{}
+          .color_attachment_formats(color_formats)
+          .depth_attachment(rm.image_definition(ImageRessourceId::Depth).vk_format(ctx.swapchain))
+          .build();
 
   descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Deferred::bindings).build(ctx.device.vk_device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Forward::set_0).build(ctx.device.vk_device),
+      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Forward::set_1).build(ctx.device.vk_device),
   });
   const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
       {
-          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
           .offset = 0,
+          .size = sizeof(glm::mat4x4),
+      },
+      {
+          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .offset = sizeof(glm::mat4x4),
           .size = sizeof(PushConstant),
       },
   });
@@ -154,62 +164,84 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
   }
 }
 
-void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
-  const DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
+void tr::renderer::Forward::draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
+                                      const DefaultRessources &default_ressources) const {
+  const VkDeviceSize offset = 0;
+  vkCmdBindVertexBuffers(frame.cmd.vk_cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
+  if (mesh.buffers.indices) {
+    vkCmdBindIndexBuffer(frame.cmd.vk_cmd, mesh.buffers.indices->buffer, 0, VK_INDEX_TYPE_UINT32);
+  }
 
-  ImageMemoryBarrier::submit<6>(
-      frame.cmd.vk_cmd,
-      {{
-          frame.frm.get_image(ImageRessourceId::Rendered).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer3).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::ShadowMap).prepare_barrier(SyncFragmentStorageRead),
-      }});
-  std::array<VkRenderingAttachmentInfo, 1> attachments{
-      frame.frm.get_image(ImageRessourceId::Rendered).as_attachment(ImageClearOpDontCare{}),
+  vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4),
+                     &mesh.transform);
+
+  std::span<const GeoSurface> const surfaces = mesh.surfaces;
+  for (const auto &surface : FrustrumCulling::filter(frustum, surfaces)) {
+    auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[1]);
+
+    DescriptorUpdater{descriptor, 0}
+        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .image_info({{
+            {
+                .sampler = default_ressources.sampler,
+                .imageView = surface.material->base_color_texture.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+            {
+                .sampler = default_ressources.sampler,
+                .imageView =
+                    surface.material->metallic_roughness_texture.value_or(default_ressources.metallic_roughness).view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+            {
+                .sampler = default_ressources.sampler,
+                .imageView = surface.material->normal_texture.value_or(default_ressources.normal_map).view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+        }})
+        .write(frame.ctx->ctx.device.vk_device);
+    DescriptorUpdater{descriptor, 1}
+        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .image_info({{
+            {
+                .sampler = shadow_map_sampler,
+                .imageView = frame.frm.get_image(ImageRessourceId::ShadowMap).view,
+                .imageLayout = SyncFragmentStorageRead.layout,
+            },
+        }})
+        .write(frame.ctx->ctx.device.vk_device);
+
+    vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &descriptor, 0,
+                            nullptr);
+
+    if (mesh.buffers.indices) {
+      vkCmdDrawIndexed(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0, 0);
+    } else {
+      vkCmdDraw(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0);
+    }
+  }
+}
+
+void tr::renderer::Forward::end_draw(VkCommandBuffer cmd) const {
+  utils::ignore_unused(this);
+  vkCmdEndRendering(cmd);
+}
+
+void tr::renderer::Forward::start_draw(Frame &frame, VkRect2D render_area) const {
+  const DebugCmdScope scope(frame.cmd.vk_cmd, "Forward");
+
+  ImageMemoryBarrier::submit<3>(
+      frame.cmd.vk_cmd, {{
+                            frame.frm.get_image(ImageRessourceId::Rendered).prepare_barrier(SyncColorAttachmentOutput),
+                            frame.frm.get_image(ImageRessourceId::ShadowMap).prepare_barrier(SyncFragmentStorageRead),
+                            frame.frm.get_image(ImageRessourceId::Depth).prepare_barrier(SyncLateDepth),
+                        }});
+  const std::array<VkRenderingAttachmentInfo, 1> attachments{
+      frame.frm.get_image(ImageRessourceId::Rendered).as_attachment(ImageClearOpLoad{}),
   };
 
-  const auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
-  DescriptorUpdater{descriptor, 0}
-      .type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-      .image_info({{
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer0).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer1).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer2).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-          {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer3).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-      }})
-      .write(frame.ctx->ctx.device.vk_device);
-  DescriptorUpdater{descriptor, 1}
-      .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-      .image_info({{
-          {
-              .sampler = shadow_map_sampler,
-              .imageView = frame.frm.get_image(ImageRessourceId::ShadowMap).view,
-              .imageLayout = SyncFragmentStorageRead.layout,
-          },
-      }})
-      .write(frame.ctx->ctx.device.vk_device);
-
-  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor, 0,
-                          nullptr);
+  const VkRenderingAttachmentInfo depthAttachment =
+      frame.frm.get_image(ImageRessourceId::Depth).as_attachment(ImageClearOpLoad{});
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -220,7 +252,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
       .viewMask = 0,
       .colorAttachmentCount = utils::narrow_cast<uint32_t>(attachments.size()),
       .pColorAttachments = attachments.data(),
-      .pDepthAttachment = nullptr,
+      .pDepthAttachment = &depthAttachment,
       .pStencilAttachment = nullptr,
   };
   vkCmdBeginRendering(frame.cmd.vk_cmd, &render_info);
@@ -237,27 +269,26 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
   vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
   vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-  // TODO: use a vertex buffer
-  for (const auto light : lights) {
-    PushConstant data{
-        light.camera_info(),
-        light.color,
-    };
+  const auto &b = frame.frm.get_buffer(BufferRessourceId::Camera);
+  const VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
 
-    vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(data), &data);
-    vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
-  }
+  const auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
+  DescriptorUpdater{camera_descriptor, 0}
+      .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+      .buffer_info({&buffer_info, 1})
+      .write(frame.ctx->ctx.device.vk_device);
 
-  vkCmdEndRendering(frame.cmd.vk_cmd);
+  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &camera_descriptor,
+                          0, nullptr);
 }
 
-auto tr::renderer::Deferred::imgui() -> bool {
+auto tr::renderer::Forward::imgui() -> bool {
   bool rebuild = false;
 
-  if (ImGui::CollapsingHeader("Deferred", ImGuiTreeNodeFlags_DefaultOpen)) {
-    rebuild |= ImGui::Button("Reload shader");
+  if (ImGui::CollapsingHeader("Forward", ImGuiTreeNodeFlags_DefaultOpen)) {
+    rebuild |= ImGui::Button("Reload shader (Forward)");
 
-    rebuild |= ImGui::Checkbox("Enable Percentage Closer filtering", &pcf_enable);
+    rebuild |= ImGui::Checkbox("Enable Percentage Closer filtering (Forward)", &pcf_enable);
     std::array const PCF_filter_sizes = utils::to_array<std::pair<const char *, uint8_t>>({
         {"0 (no filtering)", 0},
         {"1", 1},
@@ -267,7 +298,8 @@ auto tr::renderer::Deferred::imgui() -> bool {
     });
 
     const auto current_pcf_filter_size = pcf_iter_count;
-    if (pcf_enable && ImGui::BeginCombo("PCF Filter Size", std::format("{}", current_pcf_filter_size).c_str())) {
+    if (pcf_enable &&
+        ImGui::BeginCombo("PCF Filter Size (Forward)", std::format("{}", current_pcf_filter_size).c_str())) {
       for (const auto &size : PCF_filter_sizes) {
         if (ImGui::Selectable(size.first, current_pcf_filter_size == size.second)) {
           pcf_iter_count = size.second;
@@ -280,7 +312,7 @@ auto tr::renderer::Deferred::imgui() -> bool {
     static utils::types::debouncer<bool> shader_bias_debouncer;
     shader_bias_debouncer.debounce(
         [&]() -> std::optional<bool> {
-          if (ImGui::SliderFloat("Shadow bias", &shadow_bias, 1e-15F, 0.01F, "%.5f",
+          if (ImGui::SliderFloat("Shadow bias (Forward)", &shadow_bias, 1e-15F, 0.01F, "%.5f",
                                  ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat)) {
             return true;
           }

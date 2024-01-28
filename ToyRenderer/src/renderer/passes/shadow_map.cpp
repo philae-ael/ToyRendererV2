@@ -24,7 +24,7 @@ auto tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, const
   options.SetSourceLanguage(shaderc_source_language_glsl);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling deferred shader") {
+  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling shadow map shader") {
     const auto vert_spv =
         Shader::compile(compiler, shaderc_glsl_vertex_shader, options, "./ToyRenderer/shaders/shadow_map.vert");
 

@@ -5,6 +5,7 @@
 #include "../camera.h"
 #include "mesh.h"
 #include "passes/deferred.h"
+#include "passes/forward.h"
 #include "passes/gbuffer.h"
 #include "passes/present.h"
 #include "passes/shadow_map.h"
@@ -24,6 +25,7 @@ struct RenderGraph {
     GBuffer gbuffer;
     ShadowMap shadow_map;
     Deferred deferred;
+    Forward forward;
     Present present;
   } passes;
 

@@ -20,6 +20,8 @@ target_compile_shader(Shaders
     shaders/deferred.vert
     shaders/debug.frag
     shaders/debug.vert
+    shaders/forward.frag
+    shaders/forward.vert
     shaders/gbuffer.frag
     shaders/gbuffer.vert
     shaders/present.frag
@@ -64,6 +66,8 @@ add_executable(ToyRenderer
     src/renderer/passes/deferred.h
     src/renderer/passes/debug.cpp
     src/renderer/passes/debug.h
+    src/renderer/passes/forward.cpp
+    src/renderer/passes/forward.h
     src/renderer/passes/frustrum_culling.cpp
     src/renderer/passes/frustrum_culling.h
     src/renderer/passes/gbuffer.cpp

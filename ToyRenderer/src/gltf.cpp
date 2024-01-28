@@ -198,7 +198,6 @@ auto load_primitive(const fastgltf::Primitive& primitive, const fastgltf::Asset&
     vertices.resize(std::max(vertices.size(), vertex_idx_offset + accessor.count));
     load_attribute(asset, accessor, std::span(vertices).subspan(vertex_idx_offset), std::string{attribute});
 
-    spdlog::debug("Loading attribute {}", attribute);
     if (attribute == "TANGENT") {
       has_tangent_attribute = true;
     }
@@ -206,6 +205,7 @@ auto load_primitive(const fastgltf::Primitive& primitive, const fastgltf::Asset&
   auto primitive_vertices = std::span(vertices).subspan(vertex_idx_offset);
 
   if (!has_tangent_attribute) {
+    spdlog::debug("model does not contain tangents, computing them! (at least trying)");
     TR_ASSERT(primitive_indices.size() % 3 == 0, "HUHU,  number of indices is not divisible by 3");
 
     auto it = primitive_indices.begin();

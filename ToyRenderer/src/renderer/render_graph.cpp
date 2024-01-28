@@ -25,7 +25,8 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
 
-  passes.gbuffer.draw(frame, {{0, 0}, internal_extent}, camera, meshes, default_ressources);
+  std::span<const Mesh> m{};
+  passes.gbuffer.draw(frame, {{0, 0}, internal_extent}, camera, m, default_ressources);
 
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_GBUFFER_BOTTOM);
@@ -42,6 +43,8 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_SHADOW_BOTTOM);
 
   passes.deferred.draw(frame, {{0, 0}, internal_extent}, lights);
+
+  passes.forward.draw(frame, {{0, 0}, internal_extent}, camera, meshes, lights, default_ressources);
 
   Debug::global().draw(frame, {{0, 0}, internal_extent});
 
@@ -60,6 +63,7 @@ void tr::renderer::RenderGraph::reinit_passes(tr::renderer::VulkanEngine& engine
   passes.shadow_map = ShadowMap::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.present = Present::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.deferred.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.forward.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
 
   setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
 }
@@ -149,6 +153,10 @@ void tr::renderer::RenderGraph::imgui(VulkanEngine& engine) {
   passes.shadow_map.imgui(engine.rm);
   if (passes.deferred.imgui()) {
     passes.deferred.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  }
+
+  if (passes.forward.imgui()) {
+    passes.forward.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   }
 
   setup_lifetime.cleanup(engine.ctx.device.vk_device, engine.allocator);
