@@ -74,14 +74,10 @@ auto load_texture(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& 
   auto image_ressource = ib.build_image(tr::renderer::ImageDefinition{
       .flags = 0,
       .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-      .size =
-          VkExtent2D{
-              .width = width,
-              .height = height,
-          },
+      .size = {tr::renderer::StaticExtent{width, height}},
       // TODO: How to deal with RBG (non alpha images?)
       // and more generally with unsupported formats
-      .format = VK_FORMAT_R8G8B8A8_UNORM,
+      .format = {tr::renderer::StaticFormat{VK_FORMAT_R8G8B8A8_UNORM}},
       .debug_name = debug_name,
   });
   image_ressource.tie(lifetime);
@@ -301,23 +297,23 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
       }
 
       auto vertices_bytes = std::as_bytes(std::span(vertices));
-      asset_mesh.buffers.vertices =
-          bb.build_buffer(lifetime, {
-                                        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                        .size = utils::narrow_cast<uint32_t>(vertices_bytes.size_bytes()),
-                                        .flags = 0,
-                                        .debug_name = std::format("vertex buffer for {}", mesh.name),
-                                    });
+      asset_mesh.buffers.vertices = bb.build_buffer({
+          .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          .size = utils::narrow_cast<uint32_t>(vertices_bytes.size_bytes()),
+          .flags = 0,
+          .debug_name = std::format("vertex buffer for {}", mesh.name),
+      });
+      asset_mesh.buffers.vertices.tie(lifetime);
       t.upload_buffer(asset_mesh.buffers.vertices.buffer, 0, vertices_bytes);
 
       auto indices_bytes = std::as_bytes(std::span(indices));
-      asset_mesh.buffers.indices =
-          bb.build_buffer(lifetime, {
-                                        .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                        .size = utils::narrow_cast<uint32_t>(indices_bytes.size_bytes()),
-                                        .flags = 0,
-                                        .debug_name = std::format("index buffer for {}", mesh.name),
-                                    });
+      asset_mesh.buffers.indices = bb.build_buffer({
+          .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          .size = utils::narrow_cast<uint32_t>(indices_bytes.size_bytes()),
+          .flags = 0,
+          .debug_name = std::format("index buffer for {}", mesh.name),
+      });
+      asset_mesh.buffers.indices->tie(lifetime);
       t.upload_buffer(asset_mesh.buffers.indices->buffer, 0, indices_bytes);
 
       meshes.push_back(asset_mesh);

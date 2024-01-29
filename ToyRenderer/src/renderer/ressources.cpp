@@ -7,12 +7,10 @@
 #include <variant>
 
 #include "debug.h"
-#include "deletion_stack.h"
 #include "ressource_definition.h"
 #include "swapchain.h"
 #include "synchronisation.h"
 #include "utils/misc.h"
-#include "utils/types.h"
 
 auto tr::renderer::ImageRessource::as_attachment(
     std::variant<VkClearValue, ImageClearOpLoad, ImageClearOpDontCare> clearOp) -> VkRenderingAttachmentInfo {
@@ -85,11 +83,7 @@ auto tr::renderer::ImageRessource::from_external_image(VkImage image, VkImageVie
   return {image, view, sync_info, nullptr, usage, extent};
 }
 auto tr::renderer::ImageDefinition::vk_format(const Swapchain& swapchain) const -> VkFormat {
-  return std::visit(utils::overloaded{
-                        [&](FramebufferFormat) { return swapchain.surface_format.format; },
-                        [](VkFormat format_) { return format_; },
-                    },
-                    format);
+  return format.resolve(swapchain);
 }
 
 auto tr::renderer::ImageDefinition::vk_aspect_mask() const -> VkImageAspectFlags {
@@ -109,29 +103,7 @@ auto tr::renderer::ImageDefinition::vk_aspect_mask() const -> VkImageAspectFlags
 }
 
 auto tr::renderer::ImageDefinition::vk_extent(const Swapchain& swapchain) const -> VkExtent3D {
-  return std::visit(
-      utils::overloaded{
-          [&](FramebufferExtent) {
-            return VkExtent3D{
-                .width = swapchain.extent.width,
-                .height = swapchain.extent.height,
-                .depth = 1,
-            };
-          },
-          [&](InternalResolution) {
-            const float scale = internal_resolution_scale.resolve();
-            const auto w = static_cast<uint32_t>(static_cast<float>(swapchain.extent.width) * scale);
-            const auto h = static_cast<uint32_t>(static_cast<float>(swapchain.extent.height) * scale);
-
-            return VkExtent3D{.width = w, .height = h, .depth = 1};
-          },
-          [](VkExtent2D extent) { return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1}; },
-          [](CVarExtent2D cvarextent) {
-            VkExtent2D const extent = cvarextent.resolve();
-            return VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1};
-          },
-      },
-      size);
+  return size.resolve(swapchain);
 }
 
 auto tr::renderer::ImageBuilder::build_image(ImageDefinition definition) const -> ImageRessource {
@@ -243,8 +215,7 @@ auto tr::renderer::BufferDefinition::vma_flags() const -> VmaAllocationCreateFla
   return flags_;
 }
 
-auto tr::renderer::BufferBuilder::build_buffer(Lifetime& lifetime, BufferDefinition definition) const
-    -> BufferRessource {
+auto tr::renderer::BufferBuilder::build_buffer(BufferDefinition definition) const -> BufferRessource {
   BufferRessource res{
       .usage = definition.usage,
       .size = definition.size,
@@ -276,13 +247,36 @@ auto tr::renderer::BufferBuilder::build_buffer(Lifetime& lifetime, BufferDefinit
   set_debug_object_name(device, VK_OBJECT_TYPE_BUFFER, res.buffer, std::format("{} buffer", definition.debug_name));
   res.mapped_data = info.pMappedData;
 
-  lifetime.tie(VmaHandle::Buffer, res.buffer, res.alloc);
   return res;
 }
 
-auto tr::renderer::RessourceManager::frame(uint32_t frame_index) -> FrameRessourceManager {
-  return {
-      utils::types::not_null_pointer(*this),
-      frame_index,
-  };
+auto tr::renderer::InternalResolutionExtent::resolve(const Swapchain& swapchain) -> VkExtent3D {
+  const float scale = internal_resolution_scale.resolve();
+  const auto w = static_cast<uint32_t>(static_cast<float>(swapchain.extent.width) * scale);
+  const auto h = static_cast<uint32_t>(static_cast<float>(swapchain.extent.height) * scale);
+
+  return VkExtent3D{.width = w, .height = h, .depth = 1};
+}
+auto tr::renderer::SwapchainExtent::resolve(const Swapchain& swapchain) -> VkExtent3D {
+  const auto w = swapchain.extent.width;
+  const auto h = swapchain.extent.height;
+
+  return VkExtent3D{.width = w, .height = h, .depth = 1};
+}
+auto tr::renderer::ImageExtent::resolve(const Swapchain& swapchain) const -> VkExtent3D {
+  return std::visit([swapchain](const auto& s) { return s.resolve(swapchain); }, *this);
+}
+auto tr::renderer::ImageExtent::depends_on(ImageDependency dep) const -> bool {
+  return std::visit([dep](const auto& s) { return s.depends_on(dep); }, *this);
+}
+
+auto tr::renderer::SwapchainFormat::resolve(const Swapchain& swapchain) -> VkFormat {
+  return swapchain.surface_format.format;
+}
+
+auto tr::renderer::ImageFormat::depends_on(ImageDependency dep) const -> bool {
+  return std::visit([dep](const auto& s) { return s.depends_on(dep); }, *this);
+}
+auto tr::renderer::ImageFormat::resolve(const Swapchain& swapchain) const -> VkFormat {
+  return std::visit([swapchain](const auto& s) { return s.resolve(swapchain); }, *this);
 }

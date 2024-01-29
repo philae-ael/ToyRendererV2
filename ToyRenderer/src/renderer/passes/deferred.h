@@ -8,7 +8,6 @@
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
-#include "../ressources.h"
 #include "utils/cast.h"
 
 namespace tr::renderer {
@@ -18,6 +17,10 @@ struct Deferred {
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
   VkSampler shadow_map_sampler = VK_NULL_HANDLE;
+
+  std::array<image_ressource_handle, 4> gbuffer_handles{};
+  image_ressource_handle rendered_handle{};
+  image_ressource_handle shadow_map_handle{};
 
   bool pcf_enable = true;
   uint8_t pcf_iter_count = 3;
@@ -39,7 +42,7 @@ struct Deferred {
 
   });
 
-  void init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime);
+  void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
   void draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const;
   auto imgui() -> bool;
 };

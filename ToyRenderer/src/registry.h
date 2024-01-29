@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 #define CVAR_FLOAT(name, default_) static constexpr tr::CVarFloat name{#name, (default_)};
 #define CVAR_EXTENT2D(name, default_w, default_h) \
@@ -66,12 +67,13 @@ struct CVarFloat {
 };
 
 struct CVarExtent2D {
-  const char* name;
+  std::string_view name;
   VkExtent2D default_;
 
   [[nodiscard]] auto resolve() const -> VkExtent2D {
-    const auto vwidth = tr::Registry::global()["cvar"][name]["x"];
-    const auto vheight = tr::Registry::global()["cvar"][name]["y"];
+    std::string n{name};
+    const auto vwidth = tr::Registry::global()["cvar"][n]["x"];
+    const auto vheight = tr::Registry::global()["cvar"][n]["y"];
     if (!vwidth.isUInt() || !vheight.isUInt()) {
       save(default_);
       return default_;
@@ -83,8 +85,11 @@ struct CVarExtent2D {
   }
 
   void save(VkExtent2D extent) const {
-    tr::Registry::global()["cvar"][name]["x"] = extent.width;
-    tr::Registry::global()["cvar"][name]["y"] = extent.height;
+    std::string n{name};
+    tr::Registry::global()["cvar"][n]["x"] = extent.width;
+    tr::Registry::global()["cvar"][n]["y"] = extent.height;
   }
+  constexpr friend auto operator<=>(const CVarExtent2D& a, const CVarExtent2D& b) { return a.name <=> b.name; };
+  constexpr friend auto operator==(const CVarExtent2D& a, const CVarExtent2D& b) -> bool { return a.name == b.name; }
 };
 }  // namespace tr

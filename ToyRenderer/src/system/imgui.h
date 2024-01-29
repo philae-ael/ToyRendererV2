@@ -11,6 +11,7 @@ namespace tr::system {
 
 class Imgui {
  public:
+  renderer::image_ressource_handle swapchain_handle{};
   void init(GLFWwindow *window, renderer::VulkanEngine &engine);
 
   [[nodiscard]] auto start_frame(renderer::Frame &frame) const -> bool;

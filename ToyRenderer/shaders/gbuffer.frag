@@ -11,12 +11,14 @@ layout(location = 1) out vec4 g2;
 layout(location = 2) out vec4 g3;
 layout(location = 3) out vec4 g4;
 
-layout(set = 1, binding = 0) uniform sampler2D[3] texs;
+layout(set = 1, binding = 0) uniform sampler2D[] color_tex;
+layout(set = 1, binding = 1) uniform sampler2D[] roughness_metallic_tex;
+layout(set = 1, binding = 2) uniform sampler2D[] normal_tex;
 
 void main() {
-    vec4 albedo = texture(texs[0], fragUV1);
-    vec4 roughness_metallic = texture(texs[1], fragUV1);
-    vec3 normal = normalize(TBN * (texture(texs[2], fragUV1) * 2.0 - 1.0).rgb);
+    vec4 albedo = texture(color_tex[0], fragUV1);
+    vec4 roughness_metallic = texture(roughness_metallic_tex[0], fragUV1);
+    vec3 normal = normalize(TBN * (texture(normal_tex[0], fragUV1) * 2.0 - 1.0).rgb);
 
     if (albedo.a < 0.9) {
             discard;

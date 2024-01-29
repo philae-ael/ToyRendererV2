@@ -9,7 +9,6 @@
 #include "../context.h"
 #include "../descriptors.h"
 #include "../frame.h"
-#include "../ressources.h"
 #include "../vertex.h"
 #include "utils/cast.h"
 
@@ -46,6 +45,11 @@ struct Debug {
 
   std::vector<DebugVertex> vertices;
 
+  image_ressource_handle rendered_handle{};
+  image_ressource_handle depth_handle{};
+  buffer_ressource_handle camera_handle{};
+  buffer_ressource_handle debug_vertices_handle{};
+
   static constexpr std::array set_0 = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
@@ -71,7 +75,7 @@ struct Debug {
 
   });
 
-  void init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime);
+  void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
   void draw(Frame &frame, VkRect2D render_area);
   auto imgui() -> bool;
 

@@ -8,6 +8,7 @@
 #include <shaderc/shaderc.hpp>
 
 #include "../pipeline.h"
+#include "../ressource_definition.h"
 #include "../vulkan_engine.h"
 #include "utils/assert.h"
 #include "utils/cast.h"
@@ -20,8 +21,12 @@ const std::array frag_spv_default = std::to_array<uint32_t>({
 #include "shaders/debug.frag.inc"
 });
 
-void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
-                               Lifetime &setup_lifetime) {
+void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime) {
+  rendered_handle = rm.register_transient_image(RENDERED);
+  depth_handle = rm.register_transient_image(DEPTH);
+  camera_handle = rm.register_transient_buffer(CAMERA);
+  debug_vertices_handle = rm.register_transient_buffer(DEBUG_VERTICES);
+
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetGenerateDebugInfo();
@@ -68,15 +73,14 @@ void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, const Res
   });
 
   const std::array<VkFormat, 1> color_formats{
-      rm.image_definition(ImageRessourceId::Rendered).vk_format(ctx.swapchain),
+      RENDERED.definition.vk_format(ctx.swapchain),
   };
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  auto pipeline_rendering_create_info =
-      PipelineRenderingBuilder{}
-          .color_attachment_formats(color_formats)
-          .depth_attachment(rm.image_definition(ImageRessourceId::Depth).vk_format(ctx.swapchain))
-          .build();
+  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
+                                            .color_attachment_formats(color_formats)
+                                            .depth_attachment(DEPTH.definition.vk_format(ctx.swapchain))
+                                            .build();
 
   descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Debug::set_0).build(ctx.device.vk_device),
@@ -109,18 +113,18 @@ void tr::renderer::Debug::draw(Frame &frame, VkRect2D render_area) {
     return;
   }
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Debug");
-  ImageMemoryBarrier::submit<2>(
-      frame.cmd.vk_cmd, {{
-                            frame.frm.get_image(ImageRessourceId::Depth).prepare_barrier(SyncLateDepthReadOnly),
-                            frame.frm.get_image(ImageRessourceId::Rendered).prepare_barrier(SyncColorAttachmentOutput),
-                        }});
+  auto &depth_ressource = frame.frm->get_image_ressource(depth_handle);
+  auto &rendered_ressource = frame.frm->get_image_ressource(rendered_handle);
+  ImageMemoryBarrier::submit<2>(frame.cmd.vk_cmd, {{
+                                                      depth_ressource.prepare_barrier(SyncLateDepthReadOnly),
+                                                      rendered_ressource.prepare_barrier(SyncColorAttachmentOutput),
+                                                  }});
 
   const std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
-      frame.frm.get_image(ImageRessourceId::Rendered).as_attachment(ImageClearOpLoad{}),
+      rendered_ressource.as_attachment(ImageClearOpLoad{}),
   });
 
-  const VkRenderingAttachmentInfo depthAttachment =
-      frame.frm.get_image(ImageRessourceId::Depth).as_attachment(ImageClearOpLoad{});
+  const VkRenderingAttachmentInfo depthAttachment = depth_ressource.as_attachment(ImageClearOpLoad{});
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -148,7 +152,7 @@ void tr::renderer::Debug::draw(Frame &frame, VkRect2D render_area) {
   vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
   vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-  const auto &b = frame.frm.get_buffer(BufferRessourceId::Camera);
+  const auto &b = frame.frm->get_buffer_ressource(camera_handle);
   const VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
 
   const auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
@@ -161,7 +165,7 @@ void tr::renderer::Debug::draw(Frame &frame, VkRect2D render_area) {
                           0, nullptr);
 
   const VkDeviceSize offset = 0;
-  const auto buf = frame.frm.get_buffer(BufferRessourceId::DebugVertices);
+  const auto buf = frame.frm->get_buffer_ressource(debug_vertices_handle);
 
   TR_ASSERT(buf.mapped_data != nullptr, "debug vertices are not mapped");
   std::memcpy(buf.mapped_data, vertices.data(),

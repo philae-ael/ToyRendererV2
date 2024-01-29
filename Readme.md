@@ -13,6 +13,7 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
 - [ ] GPU-Driven
 - [ ] Mesh shaders
 - [ ] Occlusion CPU & GPU
+- [ ] MIPMAPS
 - [X] Frustrum culling
     - [X] AABB bounding box 
         - [ ] works but still buggy at the extremities of Sponza for big objects, the 8 rather than only 2 extremities should be tested, or something else idk

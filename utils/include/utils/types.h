@@ -24,7 +24,8 @@ class not_null_pointer {
   auto get() const -> const T* { return ptr_; }
   auto get() -> T* { return ptr_; }
 
-  constexpr explicit not_null_pointer(T& t) : ptr_(&t) {}
+  // NOLINTNEXTLINE
+  constexpr not_null_pointer(T& t) : ptr_(&t) {}
   not_null_pointer(const not_null_pointer&) = default;
   not_null_pointer(not_null_pointer&&) = default;
   auto operator=(const not_null_pointer&) -> not_null_pointer& = default;

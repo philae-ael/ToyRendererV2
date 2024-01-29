@@ -10,7 +10,6 @@
 #include "../frame.h"
 #include "../mesh.h"
 #include "../ressource_definition.h"
-#include "../ressources.h"
 #include "frustrum_culling.h"
 #include "utils/cast.h"
 
@@ -25,6 +24,11 @@ struct Forward {
   bool pcf_enable = true;
   uint8_t pcf_iter_count = 3;
   float shadow_bias = 0.0001F;
+
+  image_ressource_handle shadow_map_handle{};
+  image_ressource_handle rendered_handle{};
+  image_ressource_handle depth_handle{};
+  buffer_ressource_handle camera_handle{};
 
   static constexpr std::array set_0 = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}  // camera
@@ -51,7 +55,7 @@ struct Forward {
 
   });
 
-  void init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime);
+  void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
 
   void start_draw(Frame &frame, VkRect2D render_area) const;
   void end_draw(VkCommandBuffer cmd) const;

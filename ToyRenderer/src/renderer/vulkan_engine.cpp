@@ -24,33 +24,14 @@
 #include "descriptors.h"
 #include "queue.h"
 #include "ressource_definition.h"
+#include "ressource_manager.h"
 #include "ressources.h"
 #include "swapchain.h"
 #include "timeline_info.h"
 #include "timestamp.h"
 #include "uploader.h"
 #include "utils.h"
-
-void tr::renderer::VulkanEngine::rebuild_invalidated() {
-  sync();
-  {
-    Lifetime cleanup;
-    for (auto& image_storage : rm.image_storages()) {
-      if (image_storage.invalidated) {
-        image_storage.tie(cleanup);
-      }
-    }
-    cleanup.cleanup(ctx.device.vk_device, allocator);
-  }
-
-  auto ib = image_builder();
-  for (auto& image_storage : rm.image_storages()) {
-    if (image_storage.invalidated) {
-      image_storage.init(ib);
-    }
-  }
-  rm.has_invalidated = true;
-}
+#include "utils/types.h"
 
 auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_TOP);
@@ -59,31 +40,35 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
     swapchain_need_to_be_rebuilt = false;
   }
 
-  if (rm.has_invalidated) {
-    rebuild_invalidated();
-  }
-
   frame_id += 1;
+  std::uint32_t frame_id_mod = frame_id % MAX_FRAMES_IN_FLIGHT;
 
-  // Try to get frame or bail early
+  VK_UNWRAP(vkWaitForFences, ctx.device.vk_device, 1, &frame_synchronisation_pool[frame_id_mod].render_fence, VK_TRUE,
+            1000000000);
+  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_WAIT_FENCE);
+  auto& frm_opt = frame_ressource_data[frame_id_mod];
+  if (frm_opt) {
+    rm.release_frame_data(std::move(frm_opt.value()));
+    frame_ressource_data[frame_id_mod].reset();
+  }
+  auto ib = image_builder();
+  auto bb = buffer_builder();
+  frm_opt = rm.acquire_frame_data(ib, bb);
   Frame frame{
       .swapchain_image_index = static_cast<uint32_t>(-1),
-      .synchro = frame_synchronisation_pool[frame_id % MAX_FRAMES_IN_FLIGHT],
-      .cmd = graphics_command_buffers[frame_id % MAX_FRAMES_IN_FLIGHT],
-      .descriptor_allocator = frame_descriptor_allocators[frame_id % MAX_FRAMES_IN_FLIGHT],
-      .frm = rm.frame(frame_id % MAX_FRAMES_IN_FLIGHT),
+      .synchro = frame_synchronisation_pool[frame_id_mod],
+      .cmd = graphics_command_buffers[frame_id_mod],
+      .descriptor_allocator = frame_descriptor_allocators[frame_id_mod],
+      .frm = *frm_opt,
       .ctx = this,
   };
-
-  VK_UNWRAP(vkWaitForFences, ctx.device.vk_device, 1, &frame.synchro.render_fence, VK_TRUE, 1000000000);
-  debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_ACQUIRE_FRAME_WAIT_FENCE);
 
   VkResult const result =
       vkAcquireNextImageKHR(ctx.device.vk_device, ctx.swapchain.vk_swapchain, 1000000000,
                             frame.synchro.present_semaphore, VK_NULL_HANDLE, &frame.swapchain_image_index);
   switch (result) {
     case VK_ERROR_OUT_OF_DATE_KHR:
-      rebuild_swapchain();
+      swapchain_need_to_be_rebuilt = true;
       return std::nullopt;
     case VK_SUBOPTIMAL_KHR:
     default:
@@ -91,7 +76,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   }
 
   VK_UNWRAP(vkResetFences, ctx.device.vk_device, 1, &frame.synchro.render_fence);
-  VK_UNWRAP(vkResetCommandPool, ctx.device.vk_device, graphic_command_pools[frame_id % MAX_FRAMES_IN_FLIGHT], 0);
+  VK_UNWRAP(vkResetCommandPool, ctx.device.vk_device, graphic_command_pools[frame_id_mod], 0);
   VK_UNWRAP(frame.cmd.begin);
   frame.descriptor_allocator.reset(ctx.device.vk_device);
 
@@ -99,7 +84,7 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   debug_info.set_frame_id(frame.cmd.vk_cmd, frame_id);
 
   // TODO: better from external images
-  frame.frm.get_image(ImageRessourceId::Swapchain) = ImageRessource::from_external_image(
+  frame.frm->get_image_ressource(swapchain_handle) = ImageRessource::from_external_image(
       ctx.swapchain.images[frame.swapchain_image_index], ctx.swapchain.image_views[frame.swapchain_image_index],
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, ctx.swapchain.extent);
 
@@ -118,13 +103,14 @@ auto tr::renderer::VulkanEngine::start_frame() -> std::optional<Frame> {
   return frame;
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-void tr::renderer::VulkanEngine::end_frame(Frame&& frame) {
+void tr::renderer::VulkanEngine::end_frame(Frame&& frame_) {
+  Frame frame = std::move(frame_);  // NOLINT
+
   debug_info.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_PRESENT_TOP);
 
   ImageMemoryBarrier::submit<1>(frame.cmd.vk_cmd,
                                 {{
-                                    frame.frm.get_image(ImageRessourceId::Swapchain).prepare_barrier(SyncPresent),
+                                    frame.frm->get_image_ressource(swapchain_handle).prepare_barrier(SyncPresent),
                                 }});
 
   VK_UNWRAP(frame.cmd.end);
@@ -151,18 +137,11 @@ void tr::renderer::VulkanEngine::rebuild_swapchain() {
   spdlog::info("rebuilding swapchain");
 
   sync();
+  rm.clear_pool_if([](const ImageDefinition& infos) { return infos.depends_on(ImageDependency::Swapchain); },
+                   [this](ImageRessource& res) { res.tie(lifetime.swapchain); });
   lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
+
   ctx.rebuild_swapchain(lifetime.swapchain, window);
-
-  for (auto& image_storage : rm.image_storages()) {
-    if (image_storage.definition.depends_on_swapchain()) {
-      image_storage.invalidated = true;
-    }
-  }
-  rm.has_invalidated = true;
-
-  rm.get_image_storage(ImageRessourceId::Swapchain)
-      .from_external_images(ctx.swapchain.images, ctx.swapchain.image_views, ctx.swapchain.extent);
 }
 
 void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char*> required_instance_extensions,
@@ -214,34 +193,13 @@ void tr::renderer::VulkanEngine::init(tr::Options& options, std::span<const char
                                                            }});
   }
 
-  // Rm could take care of this
-  for (const auto& def : image_definition) {
-    rm.define_image(def);
-  }
-  for (const auto& def : buffer_definition) {
-    rm.define_buffer(def);
-  }
-
-  auto ib = image_builder();
-  for (auto& image_storage : rm.image_storages()) {
-    if ((image_storage.definition.flags & IMAGE_OPTION_FLAG_EXTERNAL_BIT) != 0) {
-      continue;
-    }
-
-    image_storage.init(ib);
-  }
-
-  auto bb = buffer_builder();
-  for (auto& buffer_storage : rm.buffer_storages()) {
-    buffer_storage.init(lifetime.global, bb);
-  }
-
   debug_info.gpu_timestamps =
       decltype(debug_info.gpu_timestamps)::init(lifetime.global, ctx.device, ctx.physical_device);
 
   for (auto& synchro : frame_synchronisation_pool) {
     synchro = FrameSynchro::init(lifetime.global, ctx.device.vk_device);
   }
+  swapchain_handle = rm.register_external_image(SWAPCHAIN);
 }
 
 auto tr::renderer::VulkanEngine::start_transfer() -> Transferer {
@@ -277,9 +235,17 @@ tr::renderer::VulkanEngine::~VulkanEngine() {
   for (std::size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vkFreeCommandBuffers(ctx.device.vk_device, graphic_command_pools[i], 1, &graphics_command_buffers[i].vk_cmd);
   }
-
-  for (const auto& image_storage : rm.image_storages()) {
-    image_storage.tie(lifetime.global);
+  for (auto& pool : rm.get_image_pools()) {
+    for (auto& data : pool.image_storage) {
+      data.tie(lifetime.global);
+    }
+    pool.image_storage.clear();
+  }
+  for (auto& pool : rm.get_buffer_pools()) {
+    for (auto& data : pool.data_storage) {
+      data.tie(lifetime.global);
+    }
+    pool.data_storage.clear();
   }
 
   lifetime.swapchain.cleanup(ctx.device.vk_device, allocator);
@@ -294,4 +260,14 @@ tr::renderer::VulkanEngine::~VulkanEngine() {
 
   instance_deletion_stack.cleanup(ctx.instance.vk_instance);
   vkDestroyInstance(ctx.instance.vk_instance, nullptr);
+}
+
+void tr::renderer::VulkanEngine::sync() {
+  VK_UNWRAP(vkDeviceWaitIdle, ctx.device.vk_device);
+  for (auto& f : frame_ressource_data) {
+    if (f) {
+      rm.release_frame_data(std::move(*f));
+      f.reset();
+    }
+  }
 }

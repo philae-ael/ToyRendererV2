@@ -6,6 +6,7 @@
 #include <shaderc/shaderc.h>
 #include <spdlog/spdlog.h>
 #include <sys/types.h>
+#include <utils/misc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
@@ -21,9 +22,9 @@
 #include "../frame.h"
 #include "../mesh.h"
 #include "../pipeline.h"
+#include "../ressource_definition.h"
 #include "../vulkan_engine.h"
 #include "shadow_map.h"
-#include "utils/misc.h"
 
 const std::array vert_spv_default = std::to_array<uint32_t>({
 #include "shaders/deferred.vert.inc"
@@ -39,8 +40,17 @@ struct PushConstant {
   float padding = 0.0;
 };
 
-void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
+void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
                                   Lifetime &setup_lifetime) {
+  gbuffer_handles = {
+      rm.register_transient_image(GBUFFER_0),
+      rm.register_transient_image(GBUFFER_1),
+      rm.register_transient_image(GBUFFER_2),
+      rm.register_transient_image(GBUFFER_3),
+  };
+  rendered_handle = rm.register_transient_image(RENDERED);
+  shadow_map_handle = rm.register_transient_image(SHADOW_MAP);
+
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetIncluder(std::make_unique<FileIncluder>("./ToyRenderer/shaders"));
@@ -89,7 +99,7 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
   });
 
   const auto color_formats = std::to_array<VkFormat>({
-      rm.image_definition(ImageRessourceId::Rendered).vk_format(ctx.swapchain),
+      RENDERED.definition.vk_format(ctx.swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
@@ -157,18 +167,26 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, const 
 void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
 
-  ImageMemoryBarrier::submit<6>(
-      frame.cmd.vk_cmd,
-      {{
-          frame.frm.get_image(ImageRessourceId::Rendered).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::GBuffer0).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer1).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer2).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::GBuffer3).prepare_barrier(SyncFragmentStorageRead),
-          frame.frm.get_image(ImageRessourceId::ShadowMap).prepare_barrier(SyncFragmentStorageRead),
-      }});
+  std::array<utils::types::not_null_pointer<ImageRessource>, 4> gbuffer_ressource{
+      frame.frm->get_image_ressource(gbuffer_handles[0]),
+      frame.frm->get_image_ressource(gbuffer_handles[1]),
+      frame.frm->get_image_ressource(gbuffer_handles[2]),
+      frame.frm->get_image_ressource(gbuffer_handles[3]),
+  };
+  ImageRessource &rendered_ressource{frame.frm->get_image_ressource(rendered_handle)};
+  ImageRessource &shadow_map_ressource{frame.frm->get_image_ressource(shadow_map_handle)};
+
+  ImageMemoryBarrier::submit<6>(frame.cmd.vk_cmd,
+                                {{
+                                    rendered_ressource.invalidate().prepare_barrier(SyncColorAttachmentOutput),
+                                    gbuffer_ressource[0]->prepare_barrier(SyncFragmentStorageRead),
+                                    gbuffer_ressource[1]->prepare_barrier(SyncFragmentStorageRead),
+                                    gbuffer_ressource[2]->prepare_barrier(SyncFragmentStorageRead),
+                                    gbuffer_ressource[3]->prepare_barrier(SyncFragmentStorageRead),
+                                    shadow_map_ressource.prepare_barrier(SyncFragmentStorageRead),
+                                }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
-      frame.frm.get_image(ImageRessourceId::Rendered).as_attachment(ImageClearOpDontCare{}),
+      rendered_ressource.as_attachment(ImageClearOpDontCare{}),
   };
 
   const auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
@@ -177,22 +195,22 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
       .image_info({{
           {
               .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer0).view,
+              .imageView = gbuffer_ressource[0]->view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
           {
               .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer1).view,
+              .imageView = gbuffer_ressource[1]->view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
           {
               .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer2).view,
+              .imageView = gbuffer_ressource[2]->view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
           {
               .sampler = VK_NULL_HANDLE,
-              .imageView = frame.frm.get_image(ImageRessourceId::GBuffer3).view,
+              .imageView = gbuffer_ressource[3]->view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
       }})
@@ -202,7 +220,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
       .image_info({{
           {
               .sampler = shadow_map_sampler,
-              .imageView = frame.frm.get_image(ImageRessourceId::ShadowMap).view,
+              .imageView = shadow_map_ressource.view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
       }})

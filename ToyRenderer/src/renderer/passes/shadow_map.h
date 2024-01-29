@@ -8,7 +8,6 @@
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
-#include "../ressources.h"
 #include "utils/cast.h"
 
 namespace tr::renderer {
@@ -20,6 +19,10 @@ struct ShadowMap {
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
 
+  image_ressource_handle rendered_handle{};
+  image_ressource_handle shadow_map_handle{};
+  buffer_ressource_handle shadow_camera_handle{};
+
   static constexpr std::array set_0 = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
@@ -29,8 +32,7 @@ struct ShadowMap {
           .build(),
   });
 
-  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
-      -> ShadowMap;
+  void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
 
   void start_draw(Frame &frame) const;
   void end_draw(VkCommandBuffer cmd) const;

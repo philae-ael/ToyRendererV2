@@ -12,6 +12,7 @@
 #include "../vulkan_engine.h"
 #include "frustrum_culling.h"
 #include "utils/misc.h"
+#include "utils/types.h"
 
 const std::array vert_spv_default = std::to_array<uint32_t>({
 #include "shaders/gbuffer.vert.inc"
@@ -21,8 +22,17 @@ const std::array frag_spv_default = std::to_array<uint32_t>({
 #include "shaders/gbuffer.frag.inc"
 });
 
-auto tr::renderer::GBuffer::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
-                                 Lifetime &setup_lifetime) -> GBuffer {
+void tr::renderer::GBuffer::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
+                                 Lifetime &setup_lifetime) {
+  gbuffer_handles = {
+      rm.register_transient_image(GBUFFER_0),
+      rm.register_transient_image(GBUFFER_1),
+      rm.register_transient_image(GBUFFER_2),
+      rm.register_transient_image(GBUFFER_3),
+  };
+  depth_handle = rm.register_transient_image(DEPTH);
+  camera_handle = rm.register_transient_buffer(CAMERA);
+
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetGenerateDebugInfo();
@@ -70,20 +80,19 @@ auto tr::renderer::GBuffer::init(Lifetime &lifetime, VulkanContext &ctx, const R
   });
 
   const std::array<VkFormat, 4> color_formats{
-      rm.image_definition(ImageRessourceId::GBuffer0).vk_format(ctx.swapchain),
-      rm.image_definition(ImageRessourceId::GBuffer1).vk_format(ctx.swapchain),
-      rm.image_definition(ImageRessourceId::GBuffer2).vk_format(ctx.swapchain),
-      rm.image_definition(ImageRessourceId::GBuffer3).vk_format(ctx.swapchain),
+      GBUFFER_0.definition.vk_format(ctx.swapchain),
+      GBUFFER_1.definition.vk_format(ctx.swapchain),
+      GBUFFER_2.definition.vk_format(ctx.swapchain),
+      GBUFFER_3.definition.vk_format(ctx.swapchain),
   };
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  auto pipeline_rendering_create_info =
-      PipelineRenderingBuilder{}
-          .color_attachment_formats(color_formats)
-          .depth_attachment(rm.image_definition(ImageRessourceId::Depth).vk_format(ctx.swapchain))
-          .build();
+  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
+                                            .color_attachment_formats(color_formats)
+                                            .depth_attachment(DEPTH.definition.vk_format(ctx.swapchain))
+                                            .build();
 
-  const auto descriptor_set_layouts = std::to_array({
+  descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_0).build(ctx.device.vk_device),
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::GBuffer::set_1).build(ctx.device.vk_device),
   });
@@ -95,31 +104,29 @@ auto tr::renderer::GBuffer::init(Lifetime &lifetime, VulkanContext &ctx, const R
       },
   });
 
-  const auto layout = PipelineLayoutBuilder{}
-                          .set_layouts(descriptor_set_layouts)
-                          .push_constant_ranges(push_constant_ranges)
-                          .build(ctx.device.vk_device);
-  VkPipeline pipeline = PipelineBuilder{}
-                            .stages(shader_stages)
-                            .layout_(layout)
-                            .pipeline_rendering_create_info(&pipeline_rendering_create_info)
-                            .vertex_input_state(&vertex_input_state)
-                            .input_assembly_state(&input_assembly_state)
-                            .viewport_state(&viewport_state)
-                            .rasterization_state(&rasterizer_state)
-                            .multisample_state(&multisampling_state)
-                            .depth_stencil_state(&depth_state)
-                            .color_blend_state(&color_blend_state)
-                            .dynamic_state(&dynamic_state_state)
-                            .build(ctx.device.vk_device);
+  pipeline_layout = PipelineLayoutBuilder{}
+                        .set_layouts(descriptor_set_layouts)
+                        .push_constant_ranges(push_constant_ranges)
+                        .build(ctx.device.vk_device);
+  pipeline = PipelineBuilder{}
+                 .stages(shader_stages)
+                 .layout_(pipeline_layout)
+                 .pipeline_rendering_create_info(&pipeline_rendering_create_info)
+                 .vertex_input_state(&vertex_input_state)
+                 .input_assembly_state(&input_assembly_state)
+                 .viewport_state(&viewport_state)
+                 .rasterization_state(&rasterizer_state)
+                 .multisample_state(&multisampling_state)
+                 .depth_stencil_state(&depth_state)
+                 .color_blend_state(&color_blend_state)
+                 .dynamic_state(&dynamic_state_state)
+                 .build(ctx.device.vk_device);
 
   lifetime.tie(DeviceHandle::Pipeline, pipeline);
-  lifetime.tie(DeviceHandle::PipelineLayout, layout);
+  lifetime.tie(DeviceHandle::PipelineLayout, pipeline_layout);
   for (auto descriptor_set_layout : descriptor_set_layouts) {
     lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
   }
-
-  return {descriptor_set_layouts, layout, pipeline};
 }
 
 void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
@@ -128,30 +135,32 @@ void tr::renderer::GBuffer::end_draw(VkCommandBuffer cmd) const {
 }
 
 void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const {
-  ImageMemoryBarrier::submit<5>(
-      frame.cmd.vk_cmd,
-      {{
-          frame.frm.get_image(ImageRessourceId::GBuffer0).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::GBuffer1).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::GBuffer2).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::GBuffer3).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::Depth).invalidate().prepare_barrier(SyncLateDepth),
-      }});
+  std::array<utils::types::not_null_pointer<ImageRessource>, 4> gbuffer_ressource{
+      frame.frm->get_image_ressource(gbuffer_handles[0]),
+      frame.frm->get_image_ressource(gbuffer_handles[1]),
+      frame.frm->get_image_ressource(gbuffer_handles[2]),
+      frame.frm->get_image_ressource(gbuffer_handles[3]),
+  };
+  ImageRessource &depth_ressource{frame.frm->get_image_ressource(depth_handle)};
+
+  ImageMemoryBarrier::submit<5>(frame.cmd.vk_cmd,
+                                {{
+                                    gbuffer_ressource[0]->invalidate().prepare_barrier(SyncColorAttachmentOutput),
+                                    gbuffer_ressource[1]->invalidate().prepare_barrier(SyncColorAttachmentOutput),
+                                    gbuffer_ressource[2]->invalidate().prepare_barrier(SyncColorAttachmentOutput),
+                                    gbuffer_ressource[3]->invalidate().prepare_barrier(SyncColorAttachmentOutput),
+                                    depth_ressource.invalidate().prepare_barrier(SyncLateDepth),
+                                }});
 
   const std::array attachments = utils::to_array<VkRenderingAttachmentInfo>({
-      frame.frm.get_image(ImageRessourceId::GBuffer0)
-          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-      frame.frm.get_image(ImageRessourceId::GBuffer1)
-          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-      frame.frm.get_image(ImageRessourceId::GBuffer2)
-          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
-      frame.frm.get_image(ImageRessourceId::GBuffer3)
-          .as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      gbuffer_ressource[0]->as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      gbuffer_ressource[1]->as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      gbuffer_ressource[2]->as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
+      gbuffer_ressource[3]->as_attachment(VkClearValue{.color = {.float32 = {0.0, 0.0, 0.0, 0.0}}}),
   });
 
   const VkRenderingAttachmentInfo depthAttachment =
-      frame.frm.get_image(ImageRessourceId::Depth)
-          .as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
+      depth_ressource.as_attachment(VkClearValue{.depthStencil = {.depth = 1., .stencil = 0}});
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -179,7 +188,7 @@ void tr::renderer::GBuffer::start_draw(Frame &frame, VkRect2D render_area) const
   vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
   vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-  const auto &b = frame.frm.get_buffer(BufferRessourceId::Camera);
+  const auto &b = frame.frm->get_buffer_ressource(camera_handle);
   const VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
 
   const auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
@@ -215,12 +224,22 @@ void tr::renderer::GBuffer::draw_mesh(Frame &frame, const Frustum &frustum, cons
                 .imageView = surface.material->base_color_texture.view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
+        }})
+        .write(frame.ctx->ctx.device.vk_device);
+    DescriptorUpdater{descriptor, 1}
+        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .image_info({{
             {
                 .sampler = default_ressources.sampler,
                 .imageView =
                     surface.material->metallic_roughness_texture.value_or(default_ressources.metallic_roughness).view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
+        }})
+        .write(frame.ctx->ctx.device.vk_device);
+    DescriptorUpdater{descriptor, 2}
+        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        .image_info({{
             {
                 .sampler = default_ressources.sampler,
                 .imageView = surface.material->normal_texture.value_or(default_ressources.normal_map).view,

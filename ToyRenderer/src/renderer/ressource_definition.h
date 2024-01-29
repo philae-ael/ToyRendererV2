@@ -1,13 +1,12 @@
 #pragma once
 
+#include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
-#include <array>
-
 #include "../camera.h"
+#include "../registry.h"
 #include "mesh.h"
 #include "ressources.h"
-#include "utils/cast.h"
 
 namespace tr::renderer {
 
@@ -20,126 +19,141 @@ struct DefaultRessources {
   ImageRessource normal_map;
 };
 
-static constexpr std::array image_definition = utils::to_array<tr::renderer::ImageRessourceDefinition>({
-    {
+constexpr ImageRessourceDefinition SWAPCHAIN{
+    .id = ImageRessourceId::Swapchain,
+    .definition =
         {
-            .flags = IMAGE_OPTION_FLAG_EXTERNAL_BIT,
+            .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            .size = FramebufferExtent{},
-            .format = FramebufferFormat{},
+            .size = {SwapchainExtent{}},
+            .format = {SwapchainFormat{}},
             .debug_name = "swapchain",
         },
-        ImageRessourceId::Swapchain,
-    },
-    {
+    .scope = RessourceScope::Extern,
+};
+
+constexpr ImageRessourceDefinition RENDERED{
+    .id = ImageRessourceId::Rendered,
+    .definition =
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            .size = InternalResolution{},
-            .format = FramebufferFormat{},
+            .size = {InternalResolutionExtent{}},
+            .format = {SwapchainFormat{}},
             .debug_name = "rendered",
         },
-        ImageRessourceId::Rendered,
-    },
-    {
+    .scope = RessourceScope::Transient,
+};
+
+constexpr ImageRessourceDefinition GBUFFER_0{
+    .id = ImageRessourceId::GBuffer0,
+    .definition =
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = InternalResolution{},
-            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .size = {InternalResolutionExtent{}},
+            .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer0 (RGB: color, A: roughness)",
         },
-        ImageRessourceId::GBuffer0,
-    },
-    {
-        // RGB: normal, A: metallic
+    .scope = RessourceScope::Transient,
+};
+
+constexpr ImageRessourceDefinition GBUFFER_1{
+    .id = ImageRessourceId::GBuffer1,
+    .definition =
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = InternalResolution{},
-            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .size = {InternalResolutionExtent{}},
+            .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer1 (RGB: normal, A: metallic)",
         },
-        ImageRessourceId::GBuffer1,
-    },
-    {
-        // RGB: ViewDir
+    .scope = RessourceScope::Transient,
+};
+
+constexpr ImageRessourceDefinition GBUFFER_2{
+    .id = ImageRessourceId::GBuffer2,
+    .definition =
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = InternalResolution{},
-            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .size = {InternalResolutionExtent{}},
+            .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer2 (RGB: viewDir)",
         },
-        ImageRessourceId::GBuffer2,
-    },
-    {
-        // RGB: ViewDir
+    .scope = RessourceScope::Transient,
+};
+
+constexpr ImageRessourceDefinition GBUFFER_3{
+    .id = ImageRessourceId::GBuffer3,
+    .definition =
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .size = InternalResolution{},
-            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .size = {InternalResolutionExtent{}},
+            .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer3 (RGB: Position)",
         },
-        ImageRessourceId::GBuffer3,
-    },
-    {
+    .scope = RessourceScope::Transient,
+};
+constexpr ImageRessourceDefinition DEPTH{
+    .id = ImageRessourceId::Depth,
+    .definition =
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .size = InternalResolution{},
-            .format = VK_FORMAT_D16_UNORM,
+            .size = {InternalResolutionExtent{}},
+            .format = {StaticFormat{VK_FORMAT_D16_UNORM}},
             .debug_name = "Depth",
         },
-        ImageRessourceId::Depth,
-    },
-    {
+    .scope = RessourceScope::Transient,
+};
+
+constexpr ImageRessourceDefinition SHADOW_MAP{
+    .id = ImageRessourceId::ShadowMap,
+    .definition =
         {
             .flags = 0,
             .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            .size = shadow_map_extent,
-            .format = VK_FORMAT_D16_UNORM,
+            .size = {CVarExtent{shadow_map_extent}},
+            .format = {StaticFormat{VK_FORMAT_D16_UNORM}},
             .debug_name = "Shadow Map",
         },
-        ImageRessourceId::ShadowMap,
-    },
-});
+    .scope = RessourceScope::Transient,
+};
 
-static constexpr std::array
-    buffer_definition =
-        utils::to_array<tr::renderer::BufferRessourceDefinition>(
-            {
-                {
-                    .definition =
-                        {
-                            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(CameraInfo)), 256),
-                            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-                            .debug_name = "camera uniform",
-                        },
-                    .id = BufferRessourceId::Camera,
-                },
-                {
-                    .definition =
-                        {
-                            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(CameraInfo)), 256),
-                            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
-                            .debug_name = "shadow camera uniforms",
-                        },
-                    .id = BufferRessourceId::ShadowCamera,
-                },
-                {
-                    .definition =
-                        {
-                            .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(Vertex)) * 3 * 1024, 256),
-                            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT | BUFFER_OPTION_FLAG_CREATE_MAPPED_BIT,
-                            .debug_name = "debug vertices",
-                        },
-                    .id = BufferRessourceId::DebugVertices,
-                },
+static constexpr BufferRessourceDefinition CAMERA{
+    .id = BufferRessourceId::Camera,
+    .definition =
+        {
+            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(CameraInfo)), 256),
+            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
+            .debug_name = "camera uniform",
+        },
+    .scope = RessourceScope::Transient,
+};
+static constexpr BufferRessourceDefinition SHADOW_CAMERA{
+    .id = BufferRessourceId::ShadowCamera,
+    .definition =
+        {
+            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(CameraInfo)), 256),
+            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT,
+            .debug_name = "shadow camera uniforms",
+        },
+    .scope = RessourceScope::Transient,
+};
 
-            });
+static constexpr BufferRessourceDefinition DEBUG_VERTICES{
+    .id = BufferRessourceId::DebugVertices,
+    .definition =
+        {
+            .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            .size = utils::align<uint32_t>(utils::narrow_cast<uint32_t>(sizeof(Vertex)) * 3 * 1024, 256),
+            .flags = BUFFER_OPTION_FLAG_CPU_TO_GPU_BIT | BUFFER_OPTION_FLAG_CREATE_MAPPED_BIT,
+            .debug_name = "debug vertices",
+        },
+    .scope = RessourceScope::Transient,
+};
 }  // namespace tr::renderer

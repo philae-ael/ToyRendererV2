@@ -9,6 +9,7 @@
 #include "passes/gbuffer.h"
 #include "passes/present.h"
 #include "passes/shadow_map.h"
+#include "ressource_manager.h"
 #include "uploader.h"
 #include "vulkan_engine.h"
 
@@ -30,6 +31,11 @@ struct RenderGraph {
   } passes;
 
   DefaultRessources default_ressources{};
+
+  image_ressource_handle swapchain_handle{};
+  image_ressource_handle rendered_handle{};
+  buffer_ressource_handle camera_handle{};
+  buffer_ressource_handle shadow_camera_handle{};
 };
 
 }  // namespace tr::renderer

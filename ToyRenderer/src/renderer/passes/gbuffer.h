@@ -11,7 +11,6 @@
 #include "../frame.h"
 #include "../mesh.h"
 #include "../ressource_definition.h"
-#include "../ressources.h"
 #include "frustrum_culling.h"
 #include "utils/cast.h"
 
@@ -21,6 +20,10 @@ struct GBuffer {
   std::array<VkDescriptorSetLayout, 2> descriptor_set_layouts{};
   VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
   VkPipeline pipeline = VK_NULL_HANDLE;
+
+  std::array<image_ressource_handle, 4> gbuffer_handles{};
+  image_ressource_handle depth_handle{};
+  buffer_ressource_handle camera_handle{};
 
   static constexpr std::array set_0 = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
@@ -35,19 +38,31 @@ struct GBuffer {
       DescriptorSetLayoutBindingBuilder{}
           .binding_(0)
           .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(3)
+          .descriptor_count(1)
+          .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
+          .build(),
+      DescriptorSetLayoutBindingBuilder{}
+          .binding_(1)
+          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+          .descriptor_count(1)
+          .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
+          .build(),
+      DescriptorSetLayoutBindingBuilder{}
+          .binding_(2)
+          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+          .descriptor_count(1)
           .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(),
   });
 
-  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
-      -> GBuffer;
+  void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
 
   void start_draw(Frame &frame, VkRect2D render_area) const;
   void end_draw(VkCommandBuffer cmd) const;
 
   template <utils::types::range_of<const Mesh &> Range>
-  void draw(Frame &frame, VkRect2D render_area, const Camera &cam, Range meshes, DefaultRessources default_ressources) const {
+  void draw(Frame &frame, VkRect2D render_area, const Camera &cam, Range meshes,
+            DefaultRessources default_ressources) const {
     const DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
 
     start_draw(frame, render_area);

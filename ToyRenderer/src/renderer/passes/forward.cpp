@@ -38,8 +38,13 @@ struct PushConstant {
   float padding = 0.0;
 };
 
-void tr::renderer::Forward::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
+void tr::renderer::Forward::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
                                  Lifetime &setup_lifetime) {
+  shadow_map_handle = rm.register_transient_image(SHADOW_MAP);
+  rendered_handle = rm.register_transient_image(RENDERED);
+  depth_handle = rm.register_transient_image(DEPTH);
+  camera_handle = rm.register_transient_buffer(CAMERA);
+
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetIncluder(std::make_unique<FileIncluder>("./ToyRenderer/shaders"));
@@ -89,15 +94,14 @@ void tr::renderer::Forward::init(Lifetime &lifetime, VulkanContext &ctx, const R
   });
 
   const auto color_formats = std::to_array<VkFormat>({
-      rm.image_definition(ImageRessourceId::Rendered).vk_format(ctx.swapchain),
+      RENDERED.definition.vk_format(ctx.swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  auto pipeline_rendering_create_info =
-      PipelineRenderingBuilder{}
-          .color_attachment_formats(color_formats)
-          .depth_attachment(rm.image_definition(ImageRessourceId::Depth).vk_format(ctx.swapchain))
-          .build();
+  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}
+                                            .color_attachment_formats(color_formats)
+                                            .depth_attachment(DEPTH.definition.vk_format(ctx.swapchain))
+                                            .build();
 
   descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Forward::set_0).build(ctx.device.vk_device),
@@ -166,6 +170,8 @@ void tr::renderer::Forward::init(Lifetime &lifetime, VulkanContext &ctx, const R
 
 void tr::renderer::Forward::draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
                                       const DefaultRessources &default_ressources) const {
+  auto &shadow_map_ressource = frame.frm->get_image_ressource(shadow_map_handle);
+
   const VkDeviceSize offset = 0;
   vkCmdBindVertexBuffers(frame.cmd.vk_cmd, 0, 1, &mesh.buffers.vertices.buffer, &offset);
   if (mesh.buffers.indices) {
@@ -205,7 +211,7 @@ void tr::renderer::Forward::draw_mesh(Frame &frame, const Frustum &frustum, cons
         .image_info({{
             {
                 .sampler = shadow_map_sampler,
-                .imageView = frame.frm.get_image(ImageRessourceId::ShadowMap).view,
+                .imageView = shadow_map_ressource.view,
                 .imageLayout = SyncFragmentStorageRead.layout,
             },
         }})
@@ -229,19 +235,20 @@ void tr::renderer::Forward::end_draw(VkCommandBuffer cmd) const {
 
 void tr::renderer::Forward::start_draw(Frame &frame, VkRect2D render_area) const {
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Forward");
+  auto &rendered_ressource = frame.frm->get_image_ressource(rendered_handle);
+  auto &depth_ressource = frame.frm->get_image_ressource(depth_handle);
+  auto &shadow_map_ressource = frame.frm->get_image_ressource(shadow_map_handle);
 
-  ImageMemoryBarrier::submit<3>(
-      frame.cmd.vk_cmd, {{
-                            frame.frm.get_image(ImageRessourceId::Rendered).prepare_barrier(SyncColorAttachmentOutput),
-                            frame.frm.get_image(ImageRessourceId::ShadowMap).prepare_barrier(SyncFragmentStorageRead),
-                            frame.frm.get_image(ImageRessourceId::Depth).prepare_barrier(SyncLateDepth),
-                        }});
+  ImageMemoryBarrier::submit<3>(frame.cmd.vk_cmd, {{
+                                                      rendered_ressource.prepare_barrier(SyncColorAttachmentOutput),
+                                                      shadow_map_ressource.prepare_barrier(SyncFragmentStorageRead),
+                                                      depth_ressource.prepare_barrier(SyncLateDepth),
+                                                  }});
   const std::array<VkRenderingAttachmentInfo, 1> attachments{
-      frame.frm.get_image(ImageRessourceId::Rendered).as_attachment(ImageClearOpLoad{}),
+      rendered_ressource.as_attachment(ImageClearOpLoad{}),
   };
 
-  const VkRenderingAttachmentInfo depthAttachment =
-      frame.frm.get_image(ImageRessourceId::Depth).as_attachment(ImageClearOpLoad{});
+  const VkRenderingAttachmentInfo depthAttachment = depth_ressource.as_attachment(ImageClearOpLoad{});
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -269,7 +276,7 @@ void tr::renderer::Forward::start_draw(Frame &frame, VkRect2D render_area) const
   vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
   vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-  const auto &b = frame.frm.get_buffer(BufferRessourceId::Camera);
+  const auto &b = frame.frm->get_buffer_ressource(camera_handle);
   const VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
 
   const auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);

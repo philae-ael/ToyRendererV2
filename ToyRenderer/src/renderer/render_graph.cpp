@@ -16,12 +16,11 @@
 
 void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera) const {
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_DRAW_TOP);
-  auto internal_extent = frame.frm.get_image(ImageRessourceId::Rendered).extent;
-  auto swapchain_extent = frame.frm.get_image(ImageRessourceId::Swapchain).extent;
+  auto internal_extent = frame.frm->get_image_ressource(rendered_handle).extent;
+  auto swapchain_extent = frame.frm->get_image_ressource(swapchain_handle).extent;
 
   const auto camInfo = camera.cameraInfo();
-  frame.frm.update_buffer<CameraInfo>(frame.ctx->allocator, BufferRessourceId::Camera,
-                                      [&](CameraInfo* info) { *info = camInfo; });
+  frame.frm->update_buffer<CameraInfo>(frame.ctx->allocator, camera_handle, [&](CameraInfo* info) { *info = camInfo; });
 
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, GPU_TIMESTAMP_INDEX_TOP);
 
@@ -58,9 +57,9 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
 void tr::renderer::RenderGraph::reinit_passes(tr::renderer::VulkanEngine& engine) {
   Lifetime setup_lifetime;
   Debug::global().init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
-  passes.gbuffer = GBuffer::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
-  passes.shadow_map = ShadowMap::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
-  passes.present = Present::init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.gbuffer.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.shadow_map.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.present.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.deferred.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.forward.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
 
@@ -68,6 +67,11 @@ void tr::renderer::RenderGraph::reinit_passes(tr::renderer::VulkanEngine& engine
 }
 void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transferer& t) {
   reinit_passes(engine);
+
+  swapchain_handle = engine.rm.register_external_image(SWAPCHAIN);
+  rendered_handle = engine.rm.register_transient_image(RENDERED);
+  camera_handle = engine.rm.register_transient_buffer(CAMERA);
+  shadow_camera_handle = engine.rm.register_transient_buffer(SHADOW_CAMERA);
 
   {
     const VkSamplerCreateInfo sampler_create_info{
@@ -98,8 +102,8 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
     default_ressources.metallic_roughness = engine.image_builder().build_image({
         .flags = 0,
         .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .size = VkExtent2D{1, 1},
-        .format = VK_FORMAT_R8G8_UNORM,
+        .size = {StaticExtent{1, 1}},
+        .format = {StaticFormat{VK_FORMAT_R8G8_UNORM}},
         .debug_name = "default metallic_roughness_texture",
     });
     default_ressources.metallic_roughness.tie(engine.lifetime.global);
@@ -107,8 +111,8 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
     default_ressources.normal_map = engine.image_builder().build_image({
         .flags = 0,
         .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .size = VkExtent2D{1, 1},
-        .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+        .size = {StaticExtent{1, 1}},
+        .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
         .debug_name = "default normal_texture",
     });
     default_ressources.normal_map.tie(engine.lifetime.global);

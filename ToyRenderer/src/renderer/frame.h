@@ -7,8 +7,9 @@
 #include "descriptors.h"
 #include "device.h"
 #include "queue.h"
-#include "ressources.h"
+#include "ressource_manager.h"
 #include "timeline_info.h"
+#include "utils/types.h"
 
 namespace tr::renderer {
 struct FrameRessourceManager;
@@ -26,7 +27,7 @@ struct Frame {
   FrameSynchro synchro;
   OneTimeCommandBuffer cmd;
   DescriptorAllocator descriptor_allocator;
-  FrameRessourceManager frm;
+  utils::types::not_null_pointer<tr::renderer::FrameRessourceData> frm;
 
   const VulkanEngine *ctx;
 

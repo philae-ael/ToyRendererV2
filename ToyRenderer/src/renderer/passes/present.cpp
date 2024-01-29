@@ -6,6 +6,7 @@
 #include <glm/fwd.hpp>
 
 #include "../pipeline.h"
+#include "../ressource_definition.h"
 #include "../vulkan_engine.h"
 
 const std::array vert_spv_default = std::to_array<uint32_t>({
@@ -16,8 +17,11 @@ const std::array frag_spv_default = std::to_array<uint32_t>({
 #include "shaders/present.frag.inc"
 });
 
-auto tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
-                                 Lifetime &setup_lifetime) -> Present {
+void tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
+                                 Lifetime &setup_lifetime) {
+  swapchain_handle = rm.register_external_image(SWAPCHAIN);
+  rendered_handle = rm.register_transient_image(RENDERED);
+
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetGenerateDebugInfo();
@@ -60,31 +64,30 @@ auto tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, const R
   });
 
   const auto color_formats = std::to_array<VkFormat>({
-      rm.image_definition(ImageRessourceId::Swapchain).vk_format(ctx.swapchain),
+      SWAPCHAIN.definition.vk_format(ctx.swapchain),
   });
 
   const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
   auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
 
-  const auto descriptor_set_layouts = std::to_array({
+  descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Present::bindings).build(ctx.device.vk_device),
   });
-  const auto layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(ctx.device.vk_device);
-  VkPipeline pipeline = PipelineBuilder{}
-                            .stages(shader_stages)
-                            .layout_(layout)
-                            .pipeline_rendering_create_info(&pipeline_rendering_create_info)
-                            .vertex_input_state(&vertex_input_state)
-                            .input_assembly_state(&input_assembly_state)
-                            .viewport_state(&viewport_state)
-                            .rasterization_state(&rasterizer_state)
-                            .multisample_state(&multisampling_state)
-                            .depth_stencil_state(&depth_state)
-                            .color_blend_state(&color_blend_state)
-                            .dynamic_state(&dynamic_state_state)
-                            .build(ctx.device.vk_device);
+  pipeline_layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(ctx.device.vk_device);
+  pipeline = PipelineBuilder{}
+                 .stages(shader_stages)
+                 .layout_(pipeline_layout)
+                 .pipeline_rendering_create_info(&pipeline_rendering_create_info)
+                 .vertex_input_state(&vertex_input_state)
+                 .input_assembly_state(&input_assembly_state)
+                 .viewport_state(&viewport_state)
+                 .rasterization_state(&rasterizer_state)
+                 .multisample_state(&multisampling_state)
+                 .depth_stencil_state(&depth_state)
+                 .color_blend_state(&color_blend_state)
+                 .dynamic_state(&dynamic_state_state)
+                 .build(ctx.device.vk_device);
 
-  VkSampler shadow_map_sampler = VK_NULL_HANDLE;
   const VkSamplerCreateInfo sampler_create_info{
       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
       .pNext = nullptr,
@@ -105,28 +108,28 @@ auto tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, const R
       .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
       .unnormalizedCoordinates = VK_FALSE,
   };
-  VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &shadow_map_sampler);
+  VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &scalling_sampler);
 
   lifetime.tie(DeviceHandle::Pipeline, pipeline);
-  lifetime.tie(DeviceHandle::PipelineLayout, layout);
-  lifetime.tie(DeviceHandle::Sampler, shadow_map_sampler);
+  lifetime.tie(DeviceHandle::PipelineLayout, pipeline_layout);
+  lifetime.tie(DeviceHandle::Sampler, scalling_sampler);
   for (auto descriptor_set_layout : descriptor_set_layouts) {
     lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
   }
-
-  return {descriptor_set_layouts, layout, pipeline, shadow_map_sampler};
 }
+
 void tr::renderer::Present::draw(Frame &frame, VkRect2D render_area) const {
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Present");
 
-  ImageMemoryBarrier::submit<2>(
-      frame.cmd.vk_cmd,
-      {{
-          frame.frm.get_image(ImageRessourceId::Swapchain).invalidate().prepare_barrier(SyncColorAttachmentOutput),
-          frame.frm.get_image(ImageRessourceId::Rendered).prepare_barrier(SyncFragmentStorageRead),
-      }});
+  auto &swapchain = frame.frm->get_image_ressource(swapchain_handle);
+  auto &rendered = frame.frm->get_image_ressource(rendered_handle);
+
+  ImageMemoryBarrier::submit<2>(frame.cmd.vk_cmd, {{
+                                                      swapchain.invalidate().prepare_barrier(SyncColorAttachmentOutput),
+                                                      rendered.prepare_barrier(SyncFragmentStorageRead),
+                                                  }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
-      frame.frm.get_image(ImageRessourceId::Swapchain).as_attachment(ImageClearOpDontCare{}),
+      swapchain.as_attachment(ImageClearOpDontCare{}),
   };
 
   const auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
@@ -135,7 +138,7 @@ void tr::renderer::Present::draw(Frame &frame, VkRect2D render_area) const {
       .image_info({{
           {
               .sampler = scalling_sampler,
-              .imageView = frame.frm.get_image(ImageRessourceId::Rendered).view,
+              .imageView = rendered.view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
       }})

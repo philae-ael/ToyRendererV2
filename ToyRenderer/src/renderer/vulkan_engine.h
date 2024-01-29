@@ -17,10 +17,10 @@
 #include "descriptors.h"
 #include "device.h"
 #include "frame.h"
+#include "ressource_manager.h"
 #include "ressources.h"
 #include "surface.h"
 #include "uploader.h"
-#include "utils.h"
 #include "utils/data/static_stack.h"
 
 namespace tr::system {
@@ -58,7 +58,7 @@ class VulkanEngine {
     end_transfer(std::move(transferer));
   }
 
-  void sync() const { VK_UNWRAP(vkDeviceWaitIdle, ctx.device.vk_device); }
+  void sync();
   void imgui() { debug_info.imgui(*this); }
 
   [[nodiscard]] auto image_builder() const -> ImageBuilder { return {ctx.device.vk_device, allocator, &ctx.swapchain}; }
@@ -79,7 +79,10 @@ class VulkanEngine {
 
   VulkanContext ctx;
   VmaAllocator allocator = nullptr;
-  RessourceManager rm{};
+  tr::renderer::RessourceManager rm{};
+  std::array<std::optional<tr::renderer::FrameRessourceData>, MAX_FRAMES_IN_FLIGHT> frame_ressource_data{};
+  image_ressource_handle swapchain_handle{};
+
   mutable VulkanEngineDebugInfo debug_info;
 
  private:

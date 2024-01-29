@@ -7,7 +7,6 @@
 #include "../context.h"
 #include "../descriptors.h"
 #include "../frame.h"
-#include "../ressources.h"
 #include "utils/cast.h"
 
 namespace tr::renderer {
@@ -17,6 +16,8 @@ struct Present {
   VkPipeline pipeline = VK_NULL_HANDLE;
 
   VkSampler scalling_sampler = VK_NULL_HANDLE;
+  image_ressource_handle swapchain_handle{};
+  image_ressource_handle rendered_handle{};
 
   static constexpr std::array bindings = utils::to_array({
       DescriptorSetLayoutBindingBuilder{}
@@ -28,8 +29,7 @@ struct Present {
 
   });
 
-  static auto init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm, Lifetime &setup_lifetime)
-      -> Present;
+  void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
 
   void draw(Frame &frame, VkRect2D render_area) const;
 };

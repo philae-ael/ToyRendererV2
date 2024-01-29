@@ -84,6 +84,8 @@ add_executable(ToyRenderer
     src/renderer/ressource_definition.h
     src/renderer/ressources.cpp
     src/renderer/ressources.h
+    src/renderer/ressource_manager.cpp
+    src/renderer/ressource_manager.h
     src/renderer/surface.cpp
     src/renderer/surface.h
     src/renderer/swapchain.cpp

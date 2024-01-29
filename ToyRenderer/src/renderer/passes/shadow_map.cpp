@@ -16,8 +16,12 @@ const std::array vert_spv_default = std::to_array<uint32_t>({
 #include "shaders/shadow_map.vert.inc"
 });
 
-auto tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, const RessourceManager &rm,
-                                   Lifetime &setup_lifetime) -> ShadowMap {
+void tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
+                                   Lifetime &setup_lifetime) {
+  rendered_handle = rm.register_transient_image(RENDERED);
+  shadow_map_handle = rm.register_transient_image(SHADOW_MAP);
+  shadow_camera_handle = rm.register_buffer(SHADOW_CAMERA);
+
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetGenerateDebugInfo();
@@ -53,11 +57,9 @@ auto tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, const
   const auto depth_state = DepthStateTestAndWriteOpLess.build();
 
   auto pipeline_rendering_create_info =
-      PipelineRenderingBuilder{}
-          .depth_attachment(rm.image_definition(ImageRessourceId::ShadowMap).vk_format(ctx.swapchain))
-          .build();
+      PipelineRenderingBuilder{}.depth_attachment(SHADOW_MAP.definition.vk_format(ctx.swapchain)).build();
 
-  const auto descriptor_set_layouts = std::to_array({
+  descriptor_set_layouts = std::to_array({
       tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::ShadowMap::set_0).build(ctx.device.vk_device),
   });
   const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
@@ -68,30 +70,28 @@ auto tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, const
       },
   });
 
-  const auto layout = PipelineLayoutBuilder{}
-                          .set_layouts(descriptor_set_layouts)
-                          .push_constant_ranges(push_constant_ranges)
-                          .build(ctx.device.vk_device);
-  VkPipeline pipeline = PipelineBuilder{}
-                            .stages(shader_stages)
-                            .layout_(layout)
-                            .pipeline_rendering_create_info(&pipeline_rendering_create_info)
-                            .vertex_input_state(&vertex_input_state)
-                            .input_assembly_state(&input_assembly_state)
-                            .viewport_state(&viewport_state)
-                            .rasterization_state(&rasterizer_state)
-                            .multisample_state(&multisampling_state)
-                            .depth_stencil_state(&depth_state)
-                            .dynamic_state(&dynamic_state_state)
-                            .build(ctx.device.vk_device);
+  pipeline_layout = PipelineLayoutBuilder{}
+                        .set_layouts(descriptor_set_layouts)
+                        .push_constant_ranges(push_constant_ranges)
+                        .build(ctx.device.vk_device);
+  pipeline = PipelineBuilder{}
+                 .stages(shader_stages)
+                 .layout_(pipeline_layout)
+                 .pipeline_rendering_create_info(&pipeline_rendering_create_info)
+                 .vertex_input_state(&vertex_input_state)
+                 .input_assembly_state(&input_assembly_state)
+                 .viewport_state(&viewport_state)
+                 .rasterization_state(&rasterizer_state)
+                 .multisample_state(&multisampling_state)
+                 .depth_stencil_state(&depth_state)
+                 .dynamic_state(&dynamic_state_state)
+                 .build(ctx.device.vk_device);
 
   lifetime.tie(DeviceHandle::Pipeline, pipeline);
-  lifetime.tie(DeviceHandle::PipelineLayout, layout);
+  lifetime.tie(DeviceHandle::PipelineLayout, pipeline_layout);
   for (auto descriptor_set_layout : descriptor_set_layouts) {
     lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
   }
-
-  return {descriptor_set_layouts, layout, pipeline};
 }
 void tr::renderer::ShadowMap::end_draw(VkCommandBuffer cmd) const {
   utils::ignore_unused(this);
@@ -99,7 +99,7 @@ void tr::renderer::ShadowMap::end_draw(VkCommandBuffer cmd) const {
 }
 
 void tr::renderer::ShadowMap::start_draw(Frame &frame) const {
-  auto &shadow_map = frame.frm.get_image(ImageRessourceId::ShadowMap);
+  auto &shadow_map = frame.frm->get_image_ressource(shadow_map_handle);
   ImageMemoryBarrier::submit<1>(frame.cmd.vk_cmd, {{
                                                       shadow_map.invalidate().prepare_barrier(SyncLateDepth),
                                                   }});
@@ -134,18 +134,6 @@ void tr::renderer::ShadowMap::start_draw(Frame &frame) const {
   vkCmdSetViewport(frame.cmd.vk_cmd, 0, 1, &viewport);
   vkCmdSetScissor(frame.cmd.vk_cmd, 0, 1, &render_area);
   vkCmdBindPipeline(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-  const auto &b = frame.frm.get_buffer(BufferRessourceId::Camera);
-  const VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
-
-  const auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
-  DescriptorUpdater{camera_descriptor, 0}
-      .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-      .buffer_info({&buffer_info, 1})
-      .write(frame.ctx->ctx.device.vk_device);
-
-  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &camera_descriptor,
-                          0, nullptr);
 }
 
 void tr::renderer::ShadowMap::draw_mesh(Frame &frame, const Mesh &mesh) const {
@@ -171,10 +159,10 @@ void tr::renderer::ShadowMap::draw(Frame &frame, const DirectionalLight &light, 
 
   start_draw(frame);
 
-  frame.frm.update_buffer<CameraInfo>(frame.ctx->allocator, BufferRessourceId::ShadowCamera,
-                                      [&](CameraInfo *info) { *info = light.camera_info(); });
+  frame.frm->update_buffer<CameraInfo>(frame.ctx->allocator, shadow_camera_handle,
+                                       [&](CameraInfo *info) { *info = light.camera_info(); });
 
-  const auto &b = frame.frm.get_buffer(BufferRessourceId::ShadowCamera);
+  const auto &b = frame.frm->get_buffer_ressource(shadow_camera_handle);
   const VkDescriptorBufferInfo buffer_info{b.buffer, 0, b.size};
   const auto camera_descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
   DescriptorUpdater{camera_descriptor, 0}
@@ -210,7 +198,11 @@ void tr::renderer::ShadowMap::imgui(RessourceManager &rm) const {
       for (const auto &size : shadow_map_sizes) {
         if (ImGui::Selectable(size.first, current_shadow_map_size.width == size.second)) {
           shadow_map_extent.save({size.second, size.second});
-          rm.invalidate_image(ImageRessourceId::ShadowMap);
+          // TODO: does not work
+          /* rm.clear_pool_if([](const ImageDefinition &def) { return def.depends_on(ImageDependency::CVAR); }, */
+          /*                  [](const auto &) { */
+          /*                    // TODO: Lifetime */
+          /*                  }); */
         }
       }
       ImGui::EndCombo();

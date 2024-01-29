@@ -1,5 +1,10 @@
 
 #include "imgui.h"
+
+#include <vulkan/vulkan_core.h>
+
+#include "../renderer/ressource_definition.h"
+
 void tr::system::Imgui::init(GLFWwindow *window, renderer::VulkanEngine &engine) {
   ImGui::CreateContext();
   ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -49,6 +54,7 @@ void tr::system::Imgui::init(GLFWwindow *window, renderer::VulkanEngine &engine)
 
   engine.lifetime.global.tie(renderer::DeviceHandle::DescriptorPool, imgui_pool);
   valid = true;
+  swapchain_handle = engine.rm.register_external_image(renderer::SWAPCHAIN);
 }
 
 auto tr::system::Imgui::start_frame(renderer::Frame &frame) const -> bool {
@@ -71,7 +77,7 @@ void tr::system::Imgui::draw(renderer::Frame &frame) const {
   renderer::DebugCmdScope const scope{frame.cmd.vk_cmd, "Imgui"};
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, renderer::GPU_TIMESTAMP_INDEX_IMGUI_TOP);
 
-  const auto &swapchain_ressource = frame.frm.get_image(renderer::ImageRessourceId::Swapchain);
+  const auto &swapchain_ressource = frame.frm->get_image_ressource(swapchain_handle);
   VkRenderingAttachmentInfo const colorAttachment{
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
       .pNext = nullptr,
