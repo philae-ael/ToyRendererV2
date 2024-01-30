@@ -1,18 +1,21 @@
 #pragma once
 
+#include <shaderc/shaderc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <filesystem>
 #include <shaderc/shaderc.hpp>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "deletion_stack.h"
 #include "utils.h"
+#include "utils/assert.h"
 #include "utils/cast.h"
 namespace tr::renderer {
+
+struct ShaderDefininition;
 
 struct Shader {
   static auto init_from_spv(Lifetime& lifetime, VkDevice, std::span<const uint32_t>) -> Shader;
@@ -34,6 +37,48 @@ struct Shader {
   }
 };
 
+struct ShaderDefininition {
+  shaderc_shader_kind kind;
+  std::string entry_point;
+
+  std::filesystem::path runtime_path;
+  std::vector<uint32_t> compile_time_spv;
+
+  auto build(Lifetime& lifetime, VkDevice device, shaderc::Compiler& compiler,
+             const shaderc::CompileOptions& options) const -> Shader {
+    const auto spv = Shader::compile(compiler, kind, options, runtime_path).value_or(compile_time_spv);
+    return Shader::init_from_spv(lifetime, device, spv);
+  }
+
+  auto pipeline_shader_stage(Lifetime& lifetime, VkDevice device, shaderc::Compiler& compiler,
+                             const shaderc::CompileOptions& options) const -> VkPipelineShaderStageCreateInfo {
+    auto s = build(lifetime, device, compiler, options);
+    VkShaderStageFlagBits stage{};
+    switch (kind) {
+      case shaderc_glsl_default_vertex_shader:
+      case shaderc_vertex_shader:
+        stage = VK_SHADER_STAGE_VERTEX_BIT;
+        break;
+      case shaderc_glsl_default_fragment_shader:
+      case shaderc_fragment_shader:
+        stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        break;
+      default:
+        TR_ASSERT(false, "not implemented");
+    }
+
+    return VkPipelineShaderStageCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .stage = stage,
+        .module = s.module,
+        .pName = entry_point.c_str(),
+        .pSpecializationInfo = nullptr,
+    };
+  }
+};
+
 class FileIncluder : public shaderc::CompileOptions::IncluderInterface {
  public:
   explicit FileIncluder(std::filesystem::path base_path_) : base_path(std::move(base_path_)) {}
@@ -43,7 +88,7 @@ class FileIncluder : public shaderc::CompileOptions::IncluderInterface {
 
  private:
   [[nodiscard]] auto FindReadableFilepath(const std::string& filename) const -> std::string;
-  auto FindRelativeReadableFilepath(const std::string& requesting_file, const std::string& filename) const
+  [[nodiscard]] auto FindRelativeReadableFilepath(const std::string& requesting_file, const std::string& filename) const
       -> std::string;
 
   std::filesystem::path base_path;

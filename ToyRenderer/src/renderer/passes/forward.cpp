@@ -23,15 +23,6 @@
 #include "../vulkan_engine.h"
 #include "shadow_map.h"
 #include "utils/misc.h"
-
-const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/forward.vert.inc"
-});
-
-const std::array frag_spv_default = std::to_array<uint32_t>({
-#include "shaders/forward.frag.inc"
-});
-
 struct PushConstant {
   tr::CameraInfo info;
   glm::vec3 color;
@@ -40,6 +31,14 @@ struct PushConstant {
 
 void tr::renderer::Forward::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
                                  Lifetime &setup_lifetime) {
+  const std::array vert_spv_default = std::to_array<uint32_t>({
+#include "shaders/forward.vert.inc"
+  });
+
+  const std::array frag_spv_default = std::to_array<uint32_t>({
+#include "shaders/forward.frag.inc"
+  });
+
   shadow_map_handle = rm.register_transient_image(SHADOW_MAP);
   rendered_handle = rm.register_transient_image(RENDERED);
   depth_handle = rm.register_transient_image(DEPTH);

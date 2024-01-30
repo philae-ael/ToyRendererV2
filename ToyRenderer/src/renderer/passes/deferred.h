@@ -1,5 +1,6 @@
 #pragma once
 
+#include <shaderc/shaderc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
@@ -8,19 +9,15 @@
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
+#include "pass.h"
 #include "utils/cast.h"
 
 namespace tr::renderer {
 
 struct Deferred {
-  std::array<VkDescriptorSetLayout, 1> descriptor_set_layouts{};
-  VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+  PassInfo pass_info;
   VkPipeline pipeline = VK_NULL_HANDLE;
   VkSampler shadow_map_sampler = VK_NULL_HANDLE;
-
-  std::array<image_ressource_handle, 4> gbuffer_handles{};
-  image_ressource_handle rendered_handle{};
-  image_ressource_handle shadow_map_handle{};
 
   bool pcf_enable = true;
   uint8_t pcf_iter_count = 3;
@@ -39,7 +36,6 @@ struct Deferred {
           .descriptor_count(1)
           .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(),
-
   });
 
   void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);

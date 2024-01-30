@@ -10,7 +10,6 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <filesystem>
 #include <glm/fwd.hpp>
 #include <memory>
 #include <optional>
@@ -24,15 +23,8 @@
 #include "../pipeline.h"
 #include "../ressource_definition.h"
 #include "../vulkan_engine.h"
+#include "pass.h"
 #include "shadow_map.h"
-
-const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/deferred.vert.inc"
-});
-
-const std::array frag_spv_default = std::to_array<uint32_t>({
-#include "shaders/deferred.frag.inc"
-});
 
 struct PushConstant {
   tr::CameraInfo info;
@@ -40,19 +32,80 @@ struct PushConstant {
   float padding = 0.0;
 };
 
-void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
-                                  Lifetime &setup_lifetime) {
-  gbuffer_handles = {
-      rm.register_transient_image(GBUFFER_0),
-      rm.register_transient_image(GBUFFER_1),
-      rm.register_transient_image(GBUFFER_2),
-      rm.register_transient_image(GBUFFER_3),
-  };
-  rendered_handle = rm.register_transient_image(RENDERED);
-  shadow_map_handle = rm.register_transient_image(SHADOW_MAP);
+namespace tr::renderer {
 
+constexpr std::array deferred_frag_spv = std::to_array<uint32_t>({
+#include "shaders/deferred.frag.inc"
+});
+constexpr std::array deferred_vert_spv = std::to_array<uint32_t>({
+#include "shaders/deferred.vert.inc"
+});
+
+const PassDefinition deferred_pass{
+    .shaders =
+        {
+            ShaderDefininition{
+                .kind = shaderc_glsl_fragment_shader,
+                .entry_point = "main",
+                .runtime_path = "./ToyRenderer/shaders/deferred.frag",
+                .compile_time_spv = {deferred_frag_spv.begin(), deferred_frag_spv.end()},
+            },
+            ShaderDefininition{
+                .kind = shaderc_glsl_vertex_shader,
+                .entry_point = "main",
+                .runtime_path = "./ToyRenderer/shaders/deferred.vert",
+                .compile_time_spv = {deferred_vert_spv.begin(), deferred_vert_spv.end()},
+            },
+        },
+    .descriptor_sets =
+        {
+            {
+                DescriptorSetLayoutBindingBuilder{}
+                    .binding_(0)
+                    .descriptor_type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+                    .descriptor_count(4)
+                    .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .build(),
+                DescriptorSetLayoutBindingBuilder{}
+                    .binding_(1)
+                    .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                    .descriptor_count(1)
+                    .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .build(),
+            },
+        },
+    .push_constants =
+        {
+            {
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .offset = 0,
+                .size = sizeof(PushConstant),
+            },
+        },
+    .inputs =
+        {
+            .images = {GBUFFER_0, GBUFFER_1, GBUFFER_2, GBUFFER_3, SHADOW_MAP},
+            .buffers = {CAMERA},
+        },
+    .outputs =
+        {
+            .color_attachments = {ColorAttachment{RENDERED, PipelineColorBlendStateAllColorNoBlend.build()}},
+            .depth_attachement = {},
+            .buffers = {},
+        },
+};
+
+constexpr BasicPipelineDefinition deferred_pipeline{
+    .vertex_input_state = PipelineVertexInputStateBuilder{}.build(),
+    .input_assembly_state = PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build(),
+    .rasterizer_state = PipelineRasterizationStateBuilder{}.build(),
+    .depth_state = DepthStateTestAndWriteOpLess.build(),
+};
+
+void Deferred::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime) {
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
+
   options.SetIncluder(std::make_unique<FileIncluder>("./ToyRenderer/shaders"));
   options.SetGenerateDebugInfo();
   options.SetSourceLanguage(shaderc_source_language_glsl);
@@ -63,77 +116,9 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, Ressou
   }
   options.AddMacroDefinition("SHADOW_BIAS", std::format("{}", shadow_bias));
 
-  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling deferred shader") {
-    const auto frag_spv =
-        Shader::compile(compiler, shaderc_glsl_fragment_shader, options, "./ToyRenderer/shaders/deferred.frag");
-    const auto vert_spv =
-        Shader::compile(compiler, shaderc_glsl_vertex_shader, options, "./ToyRenderer/shaders/deferred.vert");
+  pass_info = deferred_pass.build(lifetime, ctx, rm, setup_lifetime, compiler, options);
+  pipeline = deferred_pipeline.build(lifetime, ctx, pass_info);
 
-    const auto frag = Shader::init_from_spv(setup_lifetime, ctx.device.vk_device,
-                                            frag_spv ? std::span{*frag_spv} : std::span{frag_spv_default});
-    const auto vert = Shader::init_from_spv(setup_lifetime, ctx.device.vk_device,
-                                            vert_spv ? std::span{*vert_spv} : std::span{vert_spv_default});
-
-    return std::to_array({
-        frag.pipeline_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, "main"),
-        vert.pipeline_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, "main"),
-    });
-  };
-
-  const std::array<VkDynamicState, 2> dynamic_states = {
-      VK_DYNAMIC_STATE_SCISSOR,
-      VK_DYNAMIC_STATE_VIEWPORT,
-  };
-  const auto dynamic_state_state = PipelineDynamicStateBuilder{}.dynamic_state(dynamic_states).build();
-
-  const auto vertex_input_state = PipelineVertexInputStateBuilder{}.build();
-  const auto input_assembly_state =
-      PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
-  const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
-  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.build();
-  const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
-  const auto depth_state = DepthStateTestAndWriteOpLess.build();
-
-  const auto color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState>({
-      PipelineColorBlendStateAllColorNoBlend.build(),
-  });
-
-  const auto color_formats = std::to_array<VkFormat>({
-      RENDERED.definition.vk_format(ctx.swapchain),
-  });
-
-  const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
-
-  descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Deferred::bindings).build(ctx.device.vk_device),
-  });
-  const auto push_constant_ranges = std::to_array<VkPushConstantRange>({
-      {
-          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .offset = 0,
-          .size = sizeof(PushConstant),
-      },
-  });
-  pipeline_layout = PipelineLayoutBuilder{}
-                        .set_layouts(descriptor_set_layouts)
-                        .push_constant_ranges(push_constant_ranges)
-                        .build(ctx.device.vk_device);
-  pipeline = PipelineBuilder{}
-                 .stages(shader_stages)
-                 .layout_(pipeline_layout)
-                 .pipeline_rendering_create_info(&pipeline_rendering_create_info)
-                 .vertex_input_state(&vertex_input_state)
-                 .input_assembly_state(&input_assembly_state)
-                 .viewport_state(&viewport_state)
-                 .rasterization_state(&rasterizer_state)
-                 .multisample_state(&multisampling_state)
-                 .depth_stencil_state(&depth_state)
-                 .color_blend_state(&color_blend_state)
-                 .dynamic_state(&dynamic_state_state)
-                 .build(ctx.device.vk_device);
-
-  shadow_map_sampler = VK_NULL_HANDLE;
   const VkSamplerCreateInfo sampler_create_info{
       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
       .pNext = nullptr,
@@ -155,26 +140,20 @@ void tr::renderer::Deferred::init(Lifetime &lifetime, VulkanContext &ctx, Ressou
       .unnormalizedCoordinates = VK_FALSE,
   };
   VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &shadow_map_sampler);
-
-  lifetime.tie(DeviceHandle::Pipeline, pipeline);
-  lifetime.tie(DeviceHandle::PipelineLayout, pipeline_layout);
   lifetime.tie(DeviceHandle::Sampler, shadow_map_sampler);
-  for (auto descriptor_set_layout : descriptor_set_layouts) {
-    lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
-  }
 }
 
-void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
+void Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Deferred");
 
   std::array<utils::types::not_null_pointer<ImageRessource>, 4> gbuffer_ressource{
-      frame.frm->get_image_ressource(gbuffer_handles[0]),
-      frame.frm->get_image_ressource(gbuffer_handles[1]),
-      frame.frm->get_image_ressource(gbuffer_handles[2]),
-      frame.frm->get_image_ressource(gbuffer_handles[3]),
+      frame.frm->get_image_ressource(pass_info.inputs.images[0]),
+      frame.frm->get_image_ressource(pass_info.inputs.images[1]),
+      frame.frm->get_image_ressource(pass_info.inputs.images[2]),
+      frame.frm->get_image_ressource(pass_info.inputs.images[3]),
   };
-  ImageRessource &rendered_ressource{frame.frm->get_image_ressource(rendered_handle)};
-  ImageRessource &shadow_map_ressource{frame.frm->get_image_ressource(shadow_map_handle)};
+  ImageRessource &shadow_map_ressource{frame.frm->get_image_ressource(pass_info.inputs.images[4])};
+  ImageRessource &rendered_ressource{frame.frm->get_image_ressource(pass_info.outputs.color_attachments[0])};
 
   ImageMemoryBarrier::submit<6>(frame.cmd.vk_cmd,
                                 {{
@@ -189,7 +168,7 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
       rendered_ressource.as_attachment(ImageClearOpDontCare{}),
   };
 
-  const auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
+  const auto descriptor = frame.allocate_descriptor(pass_info.descriptor_set_layouts[0]);
   DescriptorUpdater{descriptor, 0}
       .type(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
       .image_info({{
@@ -226,8 +205,8 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
       }})
       .write(frame.ctx->ctx.device.vk_device);
 
-  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor, 0,
-                          nullptr);
+  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pass_info.pipeline_layout, 0, 1,
+                          &descriptor, 0, nullptr);
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -262,14 +241,15 @@ void tr::renderer::Deferred::draw(Frame &frame, VkRect2D render_area, std::span<
         light.color,
     };
 
-    vkCmdPushConstants(frame.cmd.vk_cmd, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(data), &data);
+    vkCmdPushConstants(frame.cmd.vk_cmd, pass_info.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(data),
+                       &data);
     vkCmdDraw(frame.cmd.vk_cmd, 3, 1, 0, 0);
   }
 
   vkCmdEndRendering(frame.cmd.vk_cmd);
 }
 
-auto tr::renderer::Deferred::imgui() -> bool {
+auto Deferred::imgui() -> bool {
   bool rebuild = false;
 
   if (ImGui::CollapsingHeader("Deferred", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -309,3 +289,4 @@ auto tr::renderer::Deferred::imgui() -> bool {
   }
   return rebuild;
 }
+}  // namespace tr::renderer

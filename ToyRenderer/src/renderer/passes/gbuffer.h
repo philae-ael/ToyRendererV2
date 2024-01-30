@@ -3,57 +3,19 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
-#include <array>
-
 #include "../../camera.h"
 #include "../context.h"
-#include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
 #include "../ressource_definition.h"
 #include "frustrum_culling.h"
-#include "utils/cast.h"
+#include "pass.h"
 
 namespace tr::renderer {
 
 struct GBuffer {
-  std::array<VkDescriptorSetLayout, 2> descriptor_set_layouts{};
-  VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+  PassInfo pass_info;
   VkPipeline pipeline = VK_NULL_HANDLE;
-
-  std::array<image_ressource_handle, 4> gbuffer_handles{};
-  image_ressource_handle depth_handle{};
-  buffer_ressource_handle camera_handle{};
-
-  static constexpr std::array set_0 = utils::to_array({
-      DescriptorSetLayoutBindingBuilder{}
-          .binding_(0)
-          .descriptor_type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-          .descriptor_count(1)
-          .stages(VK_SHADER_STAGE_VERTEX_BIT)
-          .build(),
-  });
-
-  static constexpr std::array set_1 = utils::to_array({
-      DescriptorSetLayoutBindingBuilder{}
-          .binding_(0)
-          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(1)
-          .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
-          .build(),
-      DescriptorSetLayoutBindingBuilder{}
-          .binding_(1)
-          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(1)
-          .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
-          .build(),
-      DescriptorSetLayoutBindingBuilder{}
-          .binding_(2)
-          .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-          .descriptor_count(1)
-          .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
-          .build(),
-  });
 
   void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
 

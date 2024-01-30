@@ -12,12 +12,12 @@
 #include "../ressource_definition.h"
 #include "../vulkan_engine.h"
 
-const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/shadow_map.vert.inc"
-});
-
 void tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
                                    Lifetime &setup_lifetime) {
+  const std::array vert_spv_default = std::to_array<uint32_t>({
+#include "shaders/shadow_map.vert.inc"
+  });
+
   rendered_handle = rm.register_transient_image(RENDERED);
   shadow_map_handle = rm.register_transient_image(SHADOW_MAP);
   shadow_camera_handle = rm.register_buffer(SHADOW_CAMERA);

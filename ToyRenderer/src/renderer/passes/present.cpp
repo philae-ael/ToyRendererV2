@@ -8,85 +8,77 @@
 #include "../pipeline.h"
 #include "../ressource_definition.h"
 #include "../vulkan_engine.h"
+#include "pass.h"
 
-const std::array vert_spv_default = std::to_array<uint32_t>({
+namespace tr::renderer {
+constexpr std::array present_vert_spv = std::to_array<uint32_t>({
 #include "shaders/present.vert.inc"
 });
 
-const std::array frag_spv_default = std::to_array<uint32_t>({
+constexpr std::array present_frag_spv = std::to_array<uint32_t>({
 #include "shaders/present.frag.inc"
 });
 
-void tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
-                                 Lifetime &setup_lifetime) {
-  swapchain_handle = rm.register_external_image(SWAPCHAIN);
-  rendered_handle = rm.register_transient_image(RENDERED);
+const PassDefinition present_pass{
+    .shaders =
+        {
+            ShaderDefininition{
+                .kind = shaderc_glsl_fragment_shader,
+                .entry_point = "main",
+                .runtime_path = "./ToyRenderer/shaders/present.frag",
+                .compile_time_spv = {present_frag_spv.begin(), present_frag_spv.end()},
+            },
+            ShaderDefininition{
+                .kind = shaderc_glsl_vertex_shader,
+                .entry_point = "main",
+                .runtime_path = "./ToyRenderer/shaders/present.vert",
+                .compile_time_spv = {present_vert_spv.begin(), present_vert_spv.end()},
+            },
+        },
+    .descriptor_sets =
+        {
+            {
+                DescriptorSetLayoutBindingBuilder{}
+                    .binding_(0)
+                    .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                    .descriptor_count(1)
+                    .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .build(),
+            },
+        },
+    .push_constants = {},
+    .inputs =
+        {
+            .images = {RENDERED},
+            .buffers = {},
+        },
+    .outputs =
+        {
+            .color_attachments =
+                {
+                    ColorAttachment{SWAPCHAIN, PipelineColorBlendStateAllColorNoBlend.build()},
+                },
+            .depth_attachement = DEPTH,
+            .buffers = {},
+        },
+};
 
+constexpr BasicPipelineDefinition present_pipeline{
+    .vertex_input_state = PipelineVertexInputStateBuilder{}.build(),
+    .input_assembly_state = PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build(),
+    .rasterizer_state = PipelineRasterizationStateBuilder{}.build(),
+    .depth_state = DepthStateTestAndWriteOpLess.build(),
+};
+
+void Present::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime) {
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetGenerateDebugInfo();
   options.SetSourceLanguage(shaderc_source_language_glsl);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-  const auto shader_stages = TIMED_INLINE_LAMBDA("Compiling present shader") {
-    const auto vert_spv =
-        Shader::compile(compiler, shaderc_glsl_vertex_shader, options, "./ToyRenderer/shaders/present.vert");
-    const auto frag_spv =
-        Shader::compile(compiler, shaderc_glsl_fragment_shader, options, "./ToyRenderer/shaders/present.frag");
-
-    const auto vert = Shader::init_from_spv(setup_lifetime, ctx.device.vk_device,
-                                            vert_spv ? std::span{*vert_spv} : std::span{vert_spv_default});
-    const auto frag = Shader::init_from_spv(setup_lifetime, ctx.device.vk_device,
-                                            frag_spv ? std::span{*frag_spv} : std::span{frag_spv_default});
-
-    return std::to_array({
-        vert.pipeline_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, "main"),
-        frag.pipeline_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, "main"),
-    });
-  };
-
-  const std::array<VkDynamicState, 2> dynamic_states = {
-      VK_DYNAMIC_STATE_SCISSOR,
-      VK_DYNAMIC_STATE_VIEWPORT,
-  };
-  const auto dynamic_state_state = PipelineDynamicStateBuilder{}.dynamic_state(dynamic_states).build();
-
-  const auto vertex_input_state = PipelineVertexInputStateBuilder{}.build();
-  const auto input_assembly_state =
-      PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
-  const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
-  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.build();
-  const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
-  const auto depth_state = DepthStateTestAndWriteOpLess.build();
-
-  const auto color_blend_attchment_states = std::to_array<VkPipelineColorBlendAttachmentState>({
-      PipelineColorBlendStateAllColorNoBlend.build(),
-  });
-
-  const auto color_formats = std::to_array<VkFormat>({
-      SWAPCHAIN.definition.vk_format(ctx.swapchain),
-  });
-
-  const auto color_blend_state = PipelineColorBlendStateBuilder{}.attachments(color_blend_attchment_states).build();
-  auto pipeline_rendering_create_info = PipelineRenderingBuilder{}.color_attachment_formats(color_formats).build();
-
-  descriptor_set_layouts = std::to_array({
-      tr::renderer::DescriptorSetLayoutBuilder{}.bindings(tr::renderer::Present::bindings).build(ctx.device.vk_device),
-  });
-  pipeline_layout = PipelineLayoutBuilder{}.set_layouts(descriptor_set_layouts).build(ctx.device.vk_device);
-  pipeline = PipelineBuilder{}
-                 .stages(shader_stages)
-                 .layout_(pipeline_layout)
-                 .pipeline_rendering_create_info(&pipeline_rendering_create_info)
-                 .vertex_input_state(&vertex_input_state)
-                 .input_assembly_state(&input_assembly_state)
-                 .viewport_state(&viewport_state)
-                 .rasterization_state(&rasterizer_state)
-                 .multisample_state(&multisampling_state)
-                 .depth_stencil_state(&depth_state)
-                 .color_blend_state(&color_blend_state)
-                 .dynamic_state(&dynamic_state_state)
-                 .build(ctx.device.vk_device);
+  pass_info = present_pass.build(lifetime, ctx, rm, setup_lifetime, compiler, options);
+  pipeline = present_pipeline.build(lifetime, ctx, pass_info);
 
   const VkSamplerCreateInfo sampler_create_info{
       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -108,21 +100,15 @@ void tr::renderer::Present::init(Lifetime &lifetime, VulkanContext &ctx, Ressour
       .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
       .unnormalizedCoordinates = VK_FALSE,
   };
-  VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &scalling_sampler);
-
-  lifetime.tie(DeviceHandle::Pipeline, pipeline);
-  lifetime.tie(DeviceHandle::PipelineLayout, pipeline_layout);
-  lifetime.tie(DeviceHandle::Sampler, scalling_sampler);
-  for (auto descriptor_set_layout : descriptor_set_layouts) {
-    lifetime.tie(DeviceHandle::DescriptorSetLayout, descriptor_set_layout);
-  }
+  VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &sampler);
+  lifetime.tie(DeviceHandle::Sampler, sampler);
 }
 
-void tr::renderer::Present::draw(Frame &frame, VkRect2D render_area) const {
+void Present::draw(Frame &frame, VkRect2D render_area) const {
   const DebugCmdScope scope(frame.cmd.vk_cmd, "Present");
 
-  auto &swapchain = frame.frm->get_image_ressource(swapchain_handle);
-  auto &rendered = frame.frm->get_image_ressource(rendered_handle);
+  auto &rendered = frame.frm->get_image_ressource(pass_info.inputs.images[0]);
+  auto &swapchain = frame.frm->get_image_ressource(pass_info.outputs.color_attachments[0]);
 
   ImageMemoryBarrier::submit<2>(frame.cmd.vk_cmd, {{
                                                       swapchain.invalidate().prepare_barrier(SyncColorAttachmentOutput),
@@ -132,20 +118,20 @@ void tr::renderer::Present::draw(Frame &frame, VkRect2D render_area) const {
       swapchain.as_attachment(ImageClearOpDontCare{}),
   };
 
-  const auto descriptor = frame.allocate_descriptor(descriptor_set_layouts[0]);
+  const auto descriptor = frame.allocate_descriptor(pass_info.descriptor_set_layouts[0]);
   DescriptorUpdater{descriptor, 0}
       .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
       .image_info({{
           {
-              .sampler = scalling_sampler,
+              .sampler = sampler,
               .imageView = rendered.view,
               .imageLayout = SyncFragmentStorageRead.layout,
           },
       }})
       .write(frame.ctx->ctx.device.vk_device);
 
-  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor, 0,
-                          nullptr);
+  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pass_info.pipeline_layout, 0, 1,
+                          &descriptor, 0, nullptr);
 
   const VkRenderingInfo render_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -177,3 +163,5 @@ void tr::renderer::Present::draw(Frame &frame, VkRect2D render_area) const {
 
   vkCmdEndRendering(frame.cmd.vk_cmd);
 }
+
+}  // namespace tr::renderer

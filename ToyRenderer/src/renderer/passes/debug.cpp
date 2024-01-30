@@ -13,15 +13,14 @@
 #include "utils/assert.h"
 #include "utils/cast.h"
 
-const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/debug.vert.inc"
-});
-
-const std::array frag_spv_default = std::to_array<uint32_t>({
-#include "shaders/debug.frag.inc"
-});
-
 void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime) {
+  const std::array vert_spv_default = std::to_array<uint32_t>({
+#include "shaders/debug.vert.inc"
+  });
+
+  const std::array frag_spv_default = std::to_array<uint32_t>({
+#include "shaders/debug.frag.inc"
+  });
   rendered_handle = rm.register_transient_image(RENDERED);
   depth_handle = rm.register_transient_image(DEPTH);
   camera_handle = rm.register_transient_buffer(CAMERA);

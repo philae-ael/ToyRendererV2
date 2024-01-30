@@ -72,6 +72,8 @@ add_executable(ToyRenderer
     src/renderer/passes/frustrum_culling.h
     src/renderer/passes/gbuffer.cpp
     src/renderer/passes/gbuffer.h
+    src/renderer/passes/pass.h
+    src/renderer/passes/pass.cpp
     src/renderer/passes/present.cpp
     src/renderer/passes/present.h
     src/renderer/passes/shadow_map.cpp
