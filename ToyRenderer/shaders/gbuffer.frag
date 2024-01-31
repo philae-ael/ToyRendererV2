@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_nonuniform_qualifier: require
 
 layout(location = 0) in mat3 TBN;
 layout(location = 3) in vec3 fragViewDir;
@@ -11,14 +12,20 @@ layout(location = 1) out vec4 g2;
 layout(location = 2) out vec4 g3;
 layout(location = 3) out vec4 g4;
 
-layout(set = 1, binding = 0) uniform sampler2D[] color_tex;
-layout(set = 1, binding = 1) uniform sampler2D[] roughness_metallic_tex;
-layout(set = 1, binding = 2) uniform sampler2D[] normal_tex;
+layout(set = 1, binding = 0) uniform sampler common_sampler;
+layout(set = 1, binding = 1) uniform texture2D[] images;
+
+layout(push_constant) uniform indices{
+    layout(offset = 64)
+    uint albedo_idx;
+    uint normal_idx;
+    uint roughness_metallic_idx;
+};
 
 void main() {
-    vec4 albedo = texture(color_tex[0], fragUV1);
-    vec4 roughness_metallic = texture(roughness_metallic_tex[0], fragUV1);
-    vec3 normal = normalize(TBN * (texture(normal_tex[0], fragUV1) * 2.0 - 1.0).rgb);
+    vec4 albedo = texture(sampler2D(images[albedo_idx], common_sampler), fragUV1);
+    vec4 roughness_metallic = texture(sampler2D(images[roughness_metallic_idx], common_sampler), fragUV1);
+    vec3 normal = normalize(TBN * (texture(sampler2D(images[normal_idx], common_sampler), fragUV1) * 2.0 - 1.0).rgb);
 
     if (albedo.a < 0.9) {
             discard;

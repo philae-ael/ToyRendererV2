@@ -1,5 +1,7 @@
 #include "ressource_manager.h"
 
+#include <vulkan/vulkan_core.h>
+
 #include <cstddef>
 #include <optional>
 
@@ -19,21 +21,29 @@ auto find_or_push_back(std::vector<T>& v, D d, Proj proj, Ctor ctor) -> std::siz
 auto tr::renderer::RessourceManager::acquire_frame_data(ImageBuilder& ib, BufferBuilder& bb) -> FrameRessourceData {
   FrameRessourceData frame_data;
 
-  frame_data.images.reserve(transient_images.size() + storage_images.size() + external_images.size());
+  frame_data.descriptor_image_infos.reserve(transient_images.size() + storage_images.size() + external_images.size());
   frame_data.image_ressource.reserve(transient_images.size() + storage_images.size() + external_images.size());
-  frame_data.transient_images_offset = frame_data.images.size();
+  frame_data.transient_images_offset = frame_data.descriptor_image_infos.size();
   for (const auto& [id, pool_id] : transient_images) {
     const auto data = image_pools[pool_id].get(ib);
-    frame_data.images.emplace_back(data.image);
+    frame_data.descriptor_image_infos.emplace_back(VkDescriptorImageInfo{
+        .sampler = VK_NULL_HANDLE,
+        .imageView = data.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    });
     frame_data.image_ressource.emplace_back(data);
   }
-  frame_data.storage_images_offset = frame_data.images.size();
-  for (const auto& [id, _, data] : storage_images) {
-    frame_data.images.emplace_back(data.image);
+  frame_data.storage_images_offset = frame_data.descriptor_image_infos.size();
+  for (const auto& data : storage_images) {
+    frame_data.descriptor_image_infos.emplace_back(VkDescriptorImageInfo{
+        .sampler = VK_NULL_HANDLE,
+        .imageView = data.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    });
     frame_data.image_ressource.emplace_back(data);
   }
-  frame_data.external_images_offset = frame_data.images.size();
-  frame_data.images.resize(frame_data.images.size() + external_images.size());
+  frame_data.external_images_offset = frame_data.descriptor_image_infos.size();
+  frame_data.descriptor_image_infos.resize(frame_data.descriptor_image_infos.size() + external_images.size());
   frame_data.image_ressource.resize(frame_data.image_ressource.size() + external_images.size());
 
   frame_data.buffer_ressource.reserve(transient_buffers.size() + storage_buffers.size() + external_buffers.size());
@@ -66,21 +76,11 @@ void tr::renderer::RessourceManager::release_frame_data(FrameRessourceData&& fra
   }
 }
 
-auto tr::renderer::RessourceManager::register_storage_image(ImageRessourceDefinition def,
-                                                            std::optional<ImageRessource> data)
-    -> image_ressource_handle {
-  const auto i = find_or_push_back(
-      storage_images, def.id, [](const auto& s) { return std::get<ImageRessourceId>(s); },
-      [def](const auto id) {
-        return std::tuple{id, def.definition, ImageRessource{}};
-      });
-
-  if (data) {
-    std::get<ImageRessource>(storage_images[i]) = *data;
-  }
+auto tr::renderer::RessourceManager::register_storage_image(ImageRessource res) -> image_ressource_handle {
+  storage_images.push_back(res);
 
   return ImageRessourceInfo{
-      static_cast<uint16_t>(i),
+      static_cast<uint16_t>(storage_images.size() - 1),
       RessourceScope::Storage,
   }
       .into_handle();

@@ -25,9 +25,6 @@
 #include <glm/mat4x4.hpp>
 #include <glm/matrix.hpp>
 #include <glm/vector_relational.hpp>
-#include <limits>
-#include <memory>
-#include <mutex>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -38,6 +35,7 @@
 
 #include "renderer/deletion_stack.h"
 #include "renderer/mesh.h"
+#include "renderer/ressource_manager.h"
 #include "renderer/ressources.h"
 #include "renderer/synchronisation.h"
 #include "renderer/uploader.h"
@@ -46,7 +44,8 @@ template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
 
 auto load_texture(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t,
-                  const fastgltf::Image& image, std::string_view debug_name) -> tr::renderer::ImageRessource {
+                  tr::renderer::RessourceManager& rm, const fastgltf::Image& image, std::string_view debug_name)
+    -> std::pair<tr::renderer::ImageRessource, tr::renderer::image_ressource_handle> {
   uint32_t width = 0;
   uint32_t height = 0;
   std::span<const std::byte> image_data;
@@ -91,35 +90,44 @@ auto load_texture(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& 
       t.graphics_cmd.vk_cmd, {{
                                  image_ressource.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
                              }});
-  return image_ressource;
+  return {image_ressource, rm.register_storage_image(image_ressource)};
 }
 
 auto load_materials(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::renderer::Transferer& t,
-                    const fastgltf::Asset& asset) -> std::vector<std::shared_ptr<tr::renderer::Material>> {
-  std::vector<std::shared_ptr<tr::renderer::Material>> materials;
+                    tr::renderer::RessourceManager& rm, const fastgltf::Asset& asset)
+    -> std::vector<tr::renderer::Material> {
+  std::vector<tr::renderer::Material> materials;
 
   for (const auto& material : asset.materials) {
-    auto mat = std::make_shared<tr::renderer::Material>();
+    tr::renderer::Material mat{};
 
     TR_ASSERT(material.pbrData.baseColorTexture, "no base color texture, not supported");
     const auto& color_texture = asset.textures[material.pbrData.baseColorTexture->textureIndex];
     TR_ASSERT(color_texture.imageIndex, "no image index, not supported");
-    mat->base_color_texture = load_texture(lifetime, ib, t, asset.images[*color_texture.imageIndex], "base color");
+    auto [albedo_texture, albedo_handle] =
+        load_texture(lifetime, ib, t, rm, asset.images[*color_texture.imageIndex], "base color");
+    mat.albedo_texture = albedo_texture;
+    mat.handles.albedo_handle = albedo_handle;
 
     if (material.pbrData.metallicRoughnessTexture) {
       const auto& metallic_roughness_texture = asset.textures[material.pbrData.metallicRoughnessTexture->textureIndex];
       TR_ASSERT(metallic_roughness_texture.imageIndex, "no image index, not supported");
-      mat->metallic_roughness_texture =
-          load_texture(lifetime, ib, t, asset.images[*metallic_roughness_texture.imageIndex], "metal roughness");
+      auto [metallic_roughness_tex, metallic_roughness_handle] =
+          load_texture(lifetime, ib, t, rm, asset.images[*metallic_roughness_texture.imageIndex], "metal roughness");
+      mat.metallic_roughness_texture = metallic_roughness_tex;
+      mat.handles.metallic_roughness_handle = metallic_roughness_handle;
     }
 
     if (material.normalTexture) {
       const auto& normal_texture = asset.textures[material.normalTexture->textureIndex];
       TR_ASSERT(normal_texture.imageIndex, "no image index, not supported");
-      mat->normal_texture = load_texture(lifetime, ib, t, asset.images[*normal_texture.imageIndex], "normal map");
+      auto [normal_tex, normal_handle] =
+          load_texture(lifetime, ib, t, rm, asset.images[*normal_texture.imageIndex], "normal map");
+      mat.normal_texture = normal_tex;
+      mat.handles.normal_handle = normal_handle;
     }
 
-    materials.push_back(std::move(mat));
+    materials.push_back(mat);
   }
   return materials;
 }
@@ -170,7 +178,7 @@ void load_attribute(const fastgltf::Asset& asset, const fastgltf::Accessor& acce
 }
 
 auto load_primitive(const fastgltf::Primitive& primitive, const fastgltf::Asset& asset, std::vector<uint32_t>& indices,
-                    std::vector<tr::renderer::Vertex>& vertices, std::shared_ptr<tr::renderer::Material> material)
+                    std::vector<tr::renderer::Vertex>& vertices, tr::renderer::MaterialHandles material)
     -> tr::renderer::GeoSurface {
   const auto vertex_idx_offset = utils::narrow_cast<uint32_t>(vertices.size());
   const auto index_idx_offset = utils::narrow_cast<uint32_t>(indices.size());
@@ -256,13 +264,13 @@ auto load_primitive(const fastgltf::Primitive& primitive, const fastgltf::Asset&
   return {
       .start = utils::narrow_cast<uint32_t>(index_idx_offset),
       .count = utils::narrow_cast<uint32_t>(count),
-      .material = std::move(material),
+      .material = material,
       .bounding_box = bounding_box,
   };
 }
 
 auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
-                 const fastgltf::Asset& asset, std::span<std::shared_ptr<tr::renderer::Material>> materials)
+                 const fastgltf::Asset& asset, std::span<const tr::renderer::Material> materials)
     -> std::vector<tr::renderer::Mesh> {
   std::vector<tr::renderer::Mesh> meshes;
   for (const auto& scene : asset.scenes) {
@@ -293,7 +301,7 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
         TR_ASSERT(primitive.materialIndex, "material needed");
 
         asset_mesh.surfaces.push_back(
-            load_primitive(primitive, asset, indices, vertices, materials[*primitive.materialIndex]));
+            load_primitive(primitive, asset, indices, vertices, materials[*primitive.materialIndex].handles));
       }
 
       auto vertices_bytes = std::as_bytes(std::span(vertices));
@@ -323,8 +331,8 @@ auto load_meshes(tr::renderer::Lifetime& lifetime, tr::renderer::BufferBuilder& 
   return meshes;
 }
 auto load(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::renderer::BufferBuilder& bb,
-          tr::renderer::Transferer& t, const fastgltf::Asset& asset)
-    -> std::pair<std::vector<std::shared_ptr<tr::renderer::Material>>, std::vector<tr::renderer::Mesh>> {
+          tr::renderer::Transferer& t, tr::renderer::RessourceManager& rm, const fastgltf::Asset& asset)
+    -> std::pair<std::vector<tr::renderer::Material>, std::vector<tr::renderer::Mesh>> {
   {
     const auto err = fastgltf::validate(asset);
     TR_ASSERT(err == fastgltf::Error::None, "Invalid GLTF: {} {}", fastgltf::getErrorName(err),
@@ -332,7 +340,7 @@ auto load(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::
   }
 
   // TODO: use an id rather than a pointer -> Allows to sort and more
-  std::vector<std::shared_ptr<tr::renderer::Material>> materials = load_materials(lifetime, ib, t, asset);
+  std::vector<tr::renderer::Material> materials = load_materials(lifetime, ib, t, rm, asset);
   return {
       materials,
       load_meshes(lifetime, bb, t, asset, materials),
@@ -341,8 +349,8 @@ auto load(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::
 
 auto tr::Gltf::load_from_file(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib,
                               tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
-                              const std::filesystem::path& path)
-    -> std::pair<std::vector<std::shared_ptr<tr::renderer::Material>>, std::vector<tr::renderer::Mesh>> {
+                              tr::renderer::RessourceManager& rm, const std::filesystem::path& path)
+    -> std::pair<std::vector<tr::renderer::Material>, std::vector<tr::renderer::Mesh>> {
   fastgltf::Parser parser;
   fastgltf::GltfDataBuffer data;
   fastgltf::Asset asset;
@@ -374,7 +382,7 @@ auto tr::Gltf::load_from_file(tr::renderer::Lifetime& lifetime, tr::renderer::Im
                 fastgltf::getErrorMessage(err));
     }
   }
-  return load(lifetime, ib, bb, t, asset);
+  return load(lifetime, ib, bb, t, rm, asset);
 }
 
 template <>

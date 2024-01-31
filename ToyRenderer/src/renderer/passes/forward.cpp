@@ -189,18 +189,23 @@ void tr::renderer::Forward::draw_mesh(Frame &frame, const Frustum &frustum, cons
         .image_info({{
             {
                 .sampler = default_ressources.sampler,
-                .imageView = surface.material->base_color_texture.view,
+                .imageView = frame.frm->get_image_ressource(surface.material.albedo_handle).view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             {
                 .sampler = default_ressources.sampler,
-                .imageView =
-                    surface.material->metallic_roughness_texture.value_or(default_ressources.metallic_roughness).view,
+                .imageView = frame.frm
+                                 ->get_image_ressource(surface.material.metallic_roughness_handle.value_or(
+                                     default_ressources.metallic_roughness_handle))
+                                 .view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
             {
                 .sampler = default_ressources.sampler,
-                .imageView = surface.material->normal_texture.value_or(default_ressources.normal_map).view,
+                .imageView = frame.frm
+                                 ->get_image_ressource(
+                                     surface.material.normal_handle.value_or(default_ressources.normal_map_handle))
+                                 .view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             },
         }})

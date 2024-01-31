@@ -7,11 +7,11 @@
 #include <glm/ext/vector_float4.hpp>
 #include <glm/fwd.hpp>
 #include <glm/mat4x4.hpp>
-#include <memory>
 #include <optional>
 #include <vector>
 
 #include "../camera.h"
+#include "ressource_manager.h"
 #include "ressources.h"
 #include "vertex.h"
 
@@ -48,10 +48,16 @@ inline constexpr std::array<VkVertexInputBindingDescription, 1> Vertex::bindings
         },
     });
 
+struct MaterialHandles {
+  image_ressource_handle albedo_handle;
+  std::optional<image_ressource_handle> normal_handle;
+  std::optional<image_ressource_handle> metallic_roughness_handle;
+};
 struct Material {
-  tr::renderer::ImageRessource base_color_texture{};
+  tr::renderer::ImageRessource albedo_texture{};
   std::optional<tr::renderer::ImageRessource> metallic_roughness_texture;
   std::optional<tr::renderer::ImageRessource> normal_texture;
+  MaterialHandles handles{};
 };
 
 struct AABB {
@@ -71,7 +77,7 @@ struct AABB {
 struct GeoSurface {
   uint32_t start;
   uint32_t count;
-  std::shared_ptr<Material> material;
+  MaterialHandles material;
   AABB bounding_box;
 };
 

@@ -5,7 +5,9 @@
 
 #include <array>
 #include <cstdint>
+#include <glm/ext/matrix_float4x4.hpp>
 #include <glm/mat4x4.hpp>
+#include <vector>
 
 #include "../mesh.h"
 #include "../pipeline.h"
@@ -53,20 +55,14 @@ const PassDefinition gbuffer_pass{
             {
                 DescriptorSetLayoutBindingBuilder{}
                     .binding_(0)
-                    .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                    .descriptor_type(VK_DESCRIPTOR_TYPE_SAMPLER)
                     .descriptor_count(1)
                     .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build(),
                 DescriptorSetLayoutBindingBuilder{}
                     .binding_(1)
-                    .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                    .descriptor_count(1)
-                    .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
-                    .build(),
-                DescriptorSetLayoutBindingBuilder{}
-                    .binding_(2)
-                    .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                    .descriptor_count(1)
+                    .descriptor_type(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+                    .descriptor_count(1024)
                     .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build(),
             },
@@ -77,6 +73,11 @@ const PassDefinition gbuffer_pass{
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                 .offset = 0,
                 .size = sizeof(glm::mat4x4),
+            },
+            {
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .offset = sizeof(glm::mat4x4),
+                .size = 3 * sizeof(uint32_t),
             },
         },
     .inputs =
@@ -123,7 +124,7 @@ void GBuffer::end_draw(VkCommandBuffer cmd) const {
   vkCmdEndRendering(cmd);
 }
 
-void GBuffer::start_draw(Frame &frame, VkRect2D render_area) const {
+void GBuffer::start_draw(Frame &frame, VkRect2D render_area, const DefaultRessources &default_ressources) const {
   std::array<utils::types::not_null_pointer<ImageRessource>, 4> gbuffer_ressource{
       frame.frm->get_image_ressource(pass_info.outputs.color_attachments[0]),
       frame.frm->get_image_ressource(pass_info.outputs.color_attachments[1]),
@@ -188,6 +189,26 @@ void GBuffer::start_draw(Frame &frame, VkRect2D render_area) const {
 
   vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pass_info.pipeline_layout, 0, 1,
                           &camera_descriptor, 0, nullptr);
+
+  const auto tex_descriptor = frame.allocate_descriptor(pass_info.descriptor_set_layouts[1]);
+  DescriptorUpdater{tex_descriptor, 0}
+      .type(VK_DESCRIPTOR_TYPE_SAMPLER)
+      .image_info({{
+          VkDescriptorImageInfo{
+              .sampler = default_ressources.sampler,
+              .imageView = VK_NULL_HANDLE,
+              .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+          },
+      }})
+      .write(frame.ctx->ctx.device.vk_device);
+  DescriptorUpdater{tex_descriptor, 1}
+      .type(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+      .image_info(std::span{frame.frm->descriptor_image_infos}.subspan(0, frame.frm->external_images_offset))
+      .write(frame.ctx->ctx.device.vk_device);
+
+  std::array descrs{camera_descriptor, tex_descriptor};
+  vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pass_info.pipeline_layout, 0,
+                          descrs.size(), descrs.data(), 0, nullptr);
 }
 
 void GBuffer::draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
@@ -203,41 +224,19 @@ void GBuffer::draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
 
   std::span<const GeoSurface> const surfaces = mesh.surfaces;
   for (const auto &surface : FrustrumCulling::filter(frustum, surfaces)) {
-    auto descriptor = frame.allocate_descriptor(pass_info.descriptor_set_layouts[1]);
-
-    DescriptorUpdater{descriptor, 0}
-        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        .image_info({{
-            {
-                .sampler = default_ressources.sampler,
-                .imageView = surface.material->base_color_texture.view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            },
-        }})
-        .write(frame.ctx->ctx.device.vk_device);
-    DescriptorUpdater{descriptor, 1}
-        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        .image_info({{
-            {
-                .sampler = default_ressources.sampler,
-                .imageView =
-                    surface.material->metallic_roughness_texture.value_or(default_ressources.metallic_roughness).view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            },
-        }})
-        .write(frame.ctx->ctx.device.vk_device);
-    DescriptorUpdater{descriptor, 2}
-        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        .image_info({{
-            {
-                .sampler = default_ressources.sampler,
-                .imageView = surface.material->normal_texture.value_or(default_ressources.normal_map).view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            },
-        }})
-        .write(frame.ctx->ctx.device.vk_device);
-    vkCmdBindDescriptorSets(frame.cmd.vk_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pass_info.pipeline_layout, 1, 1,
-                            &descriptor, 0, nullptr);
+    const struct {
+      uint32_t albedo_idx;
+      uint32_t normal_idx;
+      uint32_t metallic_roughness_idx;
+    } idx{
+        .albedo_idx = frame.frm->image_index(surface.material.albedo_handle),
+        .normal_idx =
+            frame.frm->image_index(surface.material.normal_handle.value_or(default_ressources.normal_map_handle)),
+        .metallic_roughness_idx = frame.frm->image_index(
+            surface.material.metallic_roughness_handle.value_or(default_ressources.metallic_roughness_handle)),
+    };
+    vkCmdPushConstants(frame.cmd.vk_cmd, pass_info.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(glm::mat4x4),
+                       sizeof(idx), &idx);
 
     if (mesh.buffers.indices) {
       vkCmdDrawIndexed(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0, 0);

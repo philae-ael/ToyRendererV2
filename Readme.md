@@ -14,6 +14,7 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
 - [ ] Mesh shaders
 - [ ] Occlusion CPU & GPU
 - [ ] MIPMAPS
+- [ ] LODs
 - [X] Frustrum culling
     - [X] AABB bounding box 
         - [ ] works but still buggy at the extremities of Sponza for big objects, the 8 rather than only 2 extremities should be tested, or something else idk
@@ -29,18 +30,21 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
     - [ ] IBL
 - [X]  Forward (not used)
     - [ ] for transparent objects only
-- [ ] Bindless textures
+- [X] "Bindless" textures / indexed textures (Partial, for deferred only)
 - [ ] Ambient Occlusion
     - [ ] SSAO
+    - [ ] A more complex thing like voxel based or something like that?
 - [ ] Shadows
     - [X] Basic Directionnal lights
     - [X] Percentage closer filtering
         - [ ] A better filtering pattern
     - [ ] Point lights
     - [ ] Shadow Cascade
+    - [ ] Adapt projection to camera
 - [ ] Antialising
     - [ ] FXAA
     - [ ] TAA 
+    - [ ] MSAA for forward
 - [ ] More
     - [ ] Fog!
     - [ ] (basic) clothes simulation!
@@ -51,7 +55,7 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
 - [FastGLTF](https://github.com/spnda/fastgltf)
 - [GLFW](https://github.com/glfw/glfw)
 - [GLM](https://github.com/g-truc/glm)
-- [JsonCpp]() for reading / writing (for storing CVARS mainly)
+- [JsonCpp]() for reading / writing registry.json (for storing CVARS mainly)
 - [Stbimage](https://github.com/nothings/stb)
 - [Shaderc](https://github.com/google/shaderc) to recompile shaders during execution
 - [VMA](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)

@@ -52,7 +52,8 @@ tr::App::App(tr::Options options_) : options(options_) {
       }
       auto bb = subsystems.engine.buffer_builder();
       auto ib = subsystems.engine.image_builder();
-      const auto [_, scene] = Gltf::load_from_file(subsystems.engine.lifetime.global, ib, bb, t, scene_name);
+      const auto [_, scene] =
+          Gltf::load_from_file(subsystems.engine.lifetime.global, ib, bb, t, subsystems.engine.rm, scene_name);
       meshes.insert(meshes.end(), scene.begin(), scene.end());
 
       std::size_t surface_count = 0;

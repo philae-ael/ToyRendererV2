@@ -6,6 +6,7 @@
 #include "../camera.h"
 #include "../registry.h"
 #include "mesh.h"
+#include "ressource_manager.h"
 #include "ressources.h"
 
 namespace tr::renderer {
@@ -16,7 +17,9 @@ CVAR_EXTENT2D(shadow_map_extent, 1024, 1024)
 struct DefaultRessources {
   VkSampler sampler;
   ImageRessource metallic_roughness;
+  image_ressource_handle metallic_roughness_handle;
   ImageRessource normal_map;
+  image_ressource_handle normal_map_handle;
 };
 
 constexpr ImageRessourceDefinition SWAPCHAIN{
@@ -50,7 +53,7 @@ constexpr ImageRessourceDefinition GBUFFER_0{
     .definition =
         {
             .flags = 0,
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             .size = {InternalResolutionExtent{}},
             .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer0 (RGB: color, A: roughness)",
@@ -63,7 +66,7 @@ constexpr ImageRessourceDefinition GBUFFER_1{
     .definition =
         {
             .flags = 0,
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             .size = {InternalResolutionExtent{}},
             .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer1 (RGB: normal, A: metallic)",
@@ -76,7 +79,7 @@ constexpr ImageRessourceDefinition GBUFFER_2{
     .definition =
         {
             .flags = 0,
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             .size = {InternalResolutionExtent{}},
             .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer2 (RGB: viewDir)",
@@ -89,7 +92,7 @@ constexpr ImageRessourceDefinition GBUFFER_3{
     .definition =
         {
             .flags = 0,
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             .size = {InternalResolutionExtent{}},
             .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "GBuffer3 (RGB: Position)",
@@ -101,7 +104,7 @@ constexpr ImageRessourceDefinition DEPTH{
     .definition =
         {
             .flags = 0,
-            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             .size = {InternalResolutionExtent{}},
             .format = {StaticFormat{VK_FORMAT_D16_UNORM}},
             .debug_name = "Depth",

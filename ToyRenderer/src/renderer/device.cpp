@@ -185,6 +185,9 @@ auto tr::renderer::Device::init(const PhysicalDevice& infos) -> Device {
   vulkan12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
   vulkan12_features.pNext = nullptr;
   vulkan12_features.hostQueryReset = VK_TRUE;
+  vulkan12_features.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+  vulkan12_features.descriptorBindingPartiallyBound = VK_TRUE;
+  vulkan12_features.runtimeDescriptorArray = VK_TRUE;
 
   VkPhysicalDeviceVulkan13Features vulkan13_features{};
   vulkan13_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,

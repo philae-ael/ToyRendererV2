@@ -10,6 +10,7 @@
 
 #include "ressources.h"
 #include "utils/assert.h"
+#include "utils/cast.h"
 
 namespace tr::renderer {
 
@@ -41,7 +42,7 @@ struct BufferRessourceInfo {
 };
 
 struct FrameRessourceData {
-  std::vector<VkImage> images;
+  std::vector<VkDescriptorImageInfo> descriptor_image_infos;
   std::vector<ImageRessource> image_ressource;
   std::size_t transient_images_offset{};
   std::size_t storage_images_offset{};
@@ -52,22 +53,23 @@ struct FrameRessourceData {
   std::size_t storage_buffers_offset{};
   std::size_t external_buffers_offset{};
 
-  [[nodiscard]] auto image_index(image_ressource_handle handle) const -> std::size_t {
+  [[nodiscard]] auto image_index(image_ressource_handle handle) const -> uint32_t {
     const auto info = ImageRessourceInfo::from_handle(handle);
     switch (info.scope) {
       case RessourceScope::Transient:
-        return info.index + transient_images_offset;
+        return utils::narrow_cast<uint32_t>(info.index + transient_images_offset);
       case RessourceScope::Extern:
-        return info.index + external_images_offset;
+        return utils::narrow_cast<uint32_t>(info.index + external_images_offset);
       case RessourceScope::Storage:
-        return info.index + storage_images_offset;
+        return utils::narrow_cast<uint32_t>(info.index + storage_images_offset);
       default:
         break;
     }
     TR_ASSERT(false, "unreachable");
   }
-
-  auto get_image(image_ressource_handle handle) -> VkImage& { return images[image_index(handle)]; }
+  auto get_image_infos(image_ressource_handle handle) -> VkDescriptorImageInfo& {
+    return descriptor_image_infos[image_index(handle)];
+  }
   auto get_image_ressource(image_ressource_handle handle) -> ImageRessource& {
     return image_ressource[image_index(handle)];
   }
@@ -151,8 +153,7 @@ class RessourceManager {
   }
 
   // Those setup functions should all be idempotent!
-  auto register_storage_image(ImageRessourceDefinition def, std::optional<ImageRessource> data = std::nullopt)
-      -> image_ressource_handle;
+  auto register_storage_image(ImageRessource res) -> image_ressource_handle;
   auto register_external_image(ImageRessourceDefinition def) -> image_ressource_handle;
   auto register_transient_image(ImageRessourceDefinition def) -> image_ressource_handle;
   auto register_image(ImageRessourceDefinition def) -> image_ressource_handle {
@@ -161,8 +162,6 @@ class RessourceManager {
         return register_transient_image(def);
       case RessourceScope::Extern:
         return register_external_image(def);
-      case RessourceScope::Storage:
-        return register_storage_image(def);
       default:
         break;
     }
@@ -194,7 +193,7 @@ class RessourceManager {
   std::vector<ImagePool> image_pools;
   std::vector<ImageRessourceDefinition> external_images;
   std::vector<std::pair<ImageRessourceId, std::size_t>> transient_images;
-  std::vector<std::tuple<ImageRessourceId, ImageDefinition, ImageRessource>> storage_images;
+  std::vector<ImageRessource> storage_images;
 
   std::vector<BufferPool> buffer_pools;
   std::vector<BufferRessourceDefinition> external_buffers;

@@ -19,7 +19,7 @@ struct GBuffer {
 
   void init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime);
 
-  void start_draw(Frame &frame, VkRect2D render_area) const;
+  void start_draw(Frame &frame, VkRect2D render_area, const DefaultRessources &default_ressources) const;
   void end_draw(VkCommandBuffer cmd) const;
 
   template <utils::types::range_of<const Mesh &> Range>
@@ -27,7 +27,7 @@ struct GBuffer {
             DefaultRessources default_ressources) const {
     const DebugCmdScope scope(frame.cmd.vk_cmd, "GBuffer");
 
-    start_draw(frame, render_area);
+    start_draw(frame, render_area, default_ressources);
 
     // TODO: not needed every frame ! only when camera changes
     auto fr = Frustum::from_camera(cam);

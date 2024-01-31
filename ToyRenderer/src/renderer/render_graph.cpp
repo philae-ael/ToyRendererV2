@@ -106,6 +106,8 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
         .format = {StaticFormat{VK_FORMAT_R8G8_UNORM}},
         .debug_name = "default metallic_roughness_texture",
     });
+    default_ressources.metallic_roughness_handle =
+        engine.rm.register_storage_image(default_ressources.metallic_roughness);
     default_ressources.metallic_roughness.tie(engine.lifetime.global);
 
     default_ressources.normal_map = engine.image_builder().build_image({
@@ -115,6 +117,7 @@ void tr::renderer::RenderGraph::init(tr::renderer::VulkanEngine& engine, Transfe
         .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
         .debug_name = "default normal_texture",
     });
+    default_ressources.normal_map_handle = engine.rm.register_storage_image(default_ressources.normal_map);
     default_ressources.normal_map.tie(engine.lifetime.global);
 
     ImageMemoryBarrier::submit<2>(
