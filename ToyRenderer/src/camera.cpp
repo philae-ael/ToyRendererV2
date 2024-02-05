@@ -1,7 +1,13 @@
 #include "camera.h"
 
-#include <glm/fwd.hpp>
-#include <glm/mat4x4.hpp>
+#include <glm/ext/matrix_clip_space.hpp>         // for perspective
+#include <glm/ext/quaternion_trigonometric.hpp>  // for angleAxis
+#include <glm/fwd.hpp>                           // for vec3, mat4, quat
+#include <glm/gtc/matrix_transform.hpp>          // for identity, translate
+#include <glm/gtc/quaternion.hpp>                // for operator*, qua
+#include <glm/gtx/quaternion.hpp>                // for toMat4, rotate
+#include <glm/mat4x4.hpp>                        // for operator*, mat
+#include <glm/vec3.hpp>                          // for operator*, operator+
 
 namespace tr {
 

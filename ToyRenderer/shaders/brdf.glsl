@@ -11,6 +11,7 @@ struct PixelData {
     float perceptualRoughness;
     float metallic;
     float shadow;
+    float ao;
 };
 
 // Mainly from https://google.github.io/filament/Filament.html

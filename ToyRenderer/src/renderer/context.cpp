@@ -1,5 +1,14 @@
 #include "context.h"
 
+#include "../options.h"
+#include "surface.h"
+
+namespace tr::renderer {
+struct Lifetime;
+}  // namespace tr::renderer
+
+struct GLFWwindow;
+
 auto tr::renderer::VulkanContext::init(Lifetime& swapchain_lifetime, tr::Options& options,
                                        std::span<const char*> required_instance_extensions, GLFWwindow* w)
     -> VulkanContext {

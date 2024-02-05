@@ -1,44 +1,53 @@
 #include "deferred.h"
 
-#include <bits/getopt_core.h>
-#include <imgui.h>
-#include <shaderc/env.h>
-#include <shaderc/shaderc.h>
-#include <spdlog/spdlog.h>
-#include <sys/types.h>
-#include <utils/misc.h>
-#include <vulkan/vulkan_core.h>
+#include <imgui.h>               // for BeginCombo, Button, Checkbox
+#include <shaderc/env.h>         // for shaderc_env_version_vulkan_1_3
+#include <shaderc/shaderc.h>     // for shaderc_glsl_fragment_shader
+#include <vulkan/vulkan_core.h>  // for VkShaderStageFlagBits, VkDescri...
 
-#include <array>
-#include <glm/fwd.hpp>
-#include <memory>
-#include <optional>
-#include <shaderc/shaderc.hpp>
-#include <string>
+#include <algorithm>            // for copy, max
+#include <array>                // for array, to_array
+#include <filesystem>           // for path
+#include <format>               // for format
+#include <glm/fwd.hpp>          // for vec3
+#include <memory>               // for allocator, make_unique
+#include <optional>             // for nullopt, optional
+#include <shaderc/shaderc.hpp>  // for CompileOptions, Compiler
+#include <utility>              // for pair
+#include <vector>               // for vector
 
-#include "../debug.h"
-#include "../descriptors.h"
-#include "../frame.h"
-#include "../mesh.h"
-#include "../pipeline.h"
-#include "../ressource_definition.h"
-#include "../vulkan_engine.h"
-#include "pass.h"
-#include "shadow_map.h"
+#include "../../camera.h"             // for CameraInfo
+#include "../buffer.h"                // for OneTimeCommandBuffer
+#include "../context.h"               // for VulkanContext
+#include "../debug.h"                 // for DebugCmdScope
+#include "../deletion_stack.h"        // for DeviceHandle, Lifetime
+#include "../descriptors.h"           // for DescriptorSetLayoutBindingBuilder
+#include "../device.h"                // for Device
+#include "../frame.h"                 // for Frame
+#include "../mesh.h"                  // for DirectionalLight
+#include "../pipeline.h"              // for ShaderDefininition, PipelineCol...
+#include "../ressource_definition.h"  // for RENDERED, CAMERA, GBUFFER_0
+#include "../ressource_manager.h"     // for FrameRessourceData
+#include "../ressources.h"            // for ImageRessource, BufferRessource...
+#include "../synchronisation.h"       // for SyncFragmentStorageRead, SyncInfo
+#include "../utils.h"                 // for VK_UNWRAP
+#include "../vulkan_engine.h"         // for VulkanEngine
+#include "pass.h"                     // for ColorAttachment, PassInfo, Basi...
+#include "utils/cast.h"               // for narrow_cast, to_array
+#include "utils/types.h"              // for not_null_pointer, debouncer
 
-struct PushConstant {
+namespace tr::renderer {
+struct DeferredPushConstant {
   tr::CameraInfo info;
   glm::vec3 color;
   float padding = 0.0;
 };
 
-namespace tr::renderer {
-
 constexpr std::array deferred_frag_spv = std::to_array<uint32_t>({
-#include "shaders/deferred.frag.inc"
+#include "shaders/deferred.frag.inc"  // IWYU pragma: keep
 });
 constexpr std::array deferred_vert_spv = std::to_array<uint32_t>({
-#include "shaders/deferred.vert.inc"
+#include "shaders/deferred.vert.inc"  // IWYU pragma: keep
 });
 
 const PassDefinition deferred_pass{
@@ -69,7 +78,7 @@ const PassDefinition deferred_pass{
                 DescriptorSetLayoutBindingBuilder{}
                     .binding_(1)
                     .descriptor_type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                    .descriptor_count(1)
+                    .descriptor_count(2)
                     .stages(VK_SHADER_STAGE_FRAGMENT_BIT)
                     .build(),
             },
@@ -79,12 +88,12 @@ const PassDefinition deferred_pass{
             {
                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
                 .offset = 0,
-                .size = sizeof(PushConstant),
+                .size = sizeof(DeferredPushConstant),
             },
         },
     .inputs =
         {
-            .images = {GBUFFER_0, GBUFFER_1, GBUFFER_2, GBUFFER_3, SHADOW_MAP},
+            .images = {GBUFFER_0, GBUFFER_1, GBUFFER_2, GBUFFER_3, SHADOW_MAP, AO},
             .buffers = {CAMERA},
         },
     .outputs =
@@ -139,8 +148,8 @@ void Deferred::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm
       .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
       .unnormalizedCoordinates = VK_FALSE,
   };
-  VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &shadow_map_sampler);
-  lifetime.tie(DeviceHandle::Sampler, shadow_map_sampler);
+  VK_UNWRAP(vkCreateSampler, ctx.device.vk_device, &sampler_create_info, nullptr, &sampler);
+  lifetime.tie(DeviceHandle::Sampler, sampler);
 }
 
 void Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const DirectionalLight> lights) const {
@@ -153,16 +162,18 @@ void Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const Directio
       frame.frm->get_image_ressource(pass_info.inputs.images[3]),
   };
   ImageRessource &shadow_map_ressource{frame.frm->get_image_ressource(pass_info.inputs.images[4])};
+  ImageRessource &ao_ressource{frame.frm->get_image_ressource(pass_info.inputs.images[5])};
   ImageRessource &rendered_ressource{frame.frm->get_image_ressource(pass_info.outputs.color_attachments[0])};
 
-  ImageMemoryBarrier::submit<6>(frame.cmd.vk_cmd,
+  ImageMemoryBarrier::submit<7>(frame.cmd.vk_cmd,
                                 {{
                                     rendered_ressource.invalidate().prepare_barrier(SyncColorAttachmentOutput),
                                     gbuffer_ressource[0]->prepare_barrier(SyncFragmentStorageRead),
                                     gbuffer_ressource[1]->prepare_barrier(SyncFragmentStorageRead),
                                     gbuffer_ressource[2]->prepare_barrier(SyncFragmentStorageRead),
                                     gbuffer_ressource[3]->prepare_barrier(SyncFragmentStorageRead),
-                                    shadow_map_ressource.prepare_barrier(SyncFragmentStorageRead),
+                                    shadow_map_ressource.prepare_barrier(SyncFragmentShaderReadOnly),
+                                    ao_ressource.prepare_barrier(SyncFragmentShaderReadOnly),
                                 }});
   std::array<VkRenderingAttachmentInfo, 1> attachments{
       rendered_ressource.as_attachment(ImageClearOpDontCare{}),
@@ -198,9 +209,14 @@ void Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const Directio
       .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
       .image_info({{
           {
-              .sampler = shadow_map_sampler,
+              .sampler = sampler,
               .imageView = shadow_map_ressource.view,
-              .imageLayout = SyncFragmentStorageRead.layout,
+              .imageLayout = SyncFragmentShaderReadOnly.layout,
+          },
+          {
+              .sampler = sampler,
+              .imageView = ao_ressource.view,
+              .imageLayout = SyncFragmentShaderReadOnly.layout,
           },
       }})
       .write(frame.ctx->ctx.device.vk_device);
@@ -236,7 +252,7 @@ void Deferred::draw(Frame &frame, VkRect2D render_area, std::span<const Directio
 
   // TODO: use a vertex buffer
   for (const auto light : lights) {
-    PushConstant data{
+    DeferredPushConstant data{
         light.camera_info(),
         light.color,
     };

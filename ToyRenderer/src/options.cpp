@@ -1,22 +1,21 @@
 #include "options.h"
 
 #include <spdlog/spdlog.h>
-#include <utils/types.h>
 #include <vulkan/vulkan_core.h>
 
 #include <algorithm>
 #include <array>
 #include <charconv>
-#include <cstddef>
 #include <cstdlib>
 #include <format>
 #include <iostream>
 #include <list>
 #include <map>
-#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <utility>
 
 struct CliParser;
 
@@ -220,7 +219,7 @@ void entry_usage(const Entry *entry, std::size_t args_space) {
       std::cout << std::format(" (can be repeated)");
       break;
     case Entry::Kind::Choice: {
-      std::string s;
+      std::string s{};
       for (std::size_t i = 0; i < entry->choice_entry.choices.size(); i++) {
         auto &choice = entry->choice_entry.choices[i];
 
@@ -272,70 +271,69 @@ auto tr::Options::from_args(std::span<const char *> args) -> tr::Options {
   Options ret{};
 
   std::size_t verbose_count = 0;
-  const std::array
-      entries =
-          std::to_array<Entry>(
-              {
-                  {
-                      {'h', "help", "display this message", "Misc"},
-                      Entry::Kind::Custom,
-                      {.custom_entry = {usage, nullptr}},
-                  },
-                  {
-                      {'v', "verbose", "increase the verbosity of the ouput", "Debug"},
-                      Entry::Kind::Count,
-                      {.count_entry = {&verbose_count}},
-                  },
-                  {
-                      {0, "renderdoc", "enable attach to renderdoc", "Debug"},
-                      Entry::Kind::Boolean,
-                      {.bool_entry = {&ret.debug.renderdoc, false}},
-                  },
-                  {
-                      {0, "no-renderdoc", "disable attach to renderdoc", "Debug"},
-                      Entry::Kind::Boolean,
-                      {.bool_entry = {&ret.debug.renderdoc, true}},
-                  },
-                  {
-                      {'l', "validation-layers", "enable the validation layers", "Debug"},
-                      Entry::Kind::Boolean,
-                      {.bool_entry = {&ret.debug.validations_layers, false}},
-                  },
-                  {
-                      {0, "no-validation-layers", "disable the validation layers", "Debug"},
-                      Entry::Kind::Boolean,
-                      {.bool_entry = {&ret.debug.validations_layers, true}},
-                  },
-                  {
-                      {'p', "present-mode", "chose the present-mode", "Config"},
-                      Entry::Kind::Choice,
-                      {.choice_entry =
-                           {
-                               reinterpret_cast<int *>(&ret.config.prefered_present_mode),
-                               {{
-                                   {"immediate", VK_PRESENT_MODE_IMMEDIATE_KHR},
-                                   {"fifo", VK_PRESENT_MODE_FIFO_KHR},
-                                   {"mailbox", VK_PRESENT_MODE_MAILBOX_KHR},
-                                   {"relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
-                               }},
-                           }},
-                  },
-                  {
-                      {'i', "imgui", "enable imgui", "Debug"},
-                      Entry::Kind::Boolean,
-                      {.bool_entry = {&ret.debug.imgui, false}},
-                  },
-                  {
-                      {0, "no-imgui", "disable imgui", "Debug"},
-                      Entry::Kind::Boolean,
-                      {.bool_entry = {&ret.debug.imgui, true}},
-                  },
-                  {
-                      {0, "scene", "load scene", "Scene"},
-                      Entry::Kind::String,
-                      {.string_entry = {&ret.scene}},
-                  },
-              });
+  std::array present_mode_entries = std::to_array<const std::pair<std::string_view, int>>({
+      {"immediate", VK_PRESENT_MODE_IMMEDIATE_KHR},
+      {"fifo", VK_PRESENT_MODE_FIFO_KHR},
+      {"mailbox", VK_PRESENT_MODE_MAILBOX_KHR},
+      {"relaxed", VK_PRESENT_MODE_FIFO_RELAXED_KHR},
+
+  });
+  const std::array entries = std::to_array<Entry>({
+      {
+          {'h', "help", "display this message", "Misc"},
+          Entry::Kind::Custom,
+          {.custom_entry = {usage, nullptr}},
+      },
+      {
+          {'v', "verbose", "increase the verbosity of the ouput", "Debug"},
+          Entry::Kind::Count,
+          {.count_entry = {&verbose_count}},
+      },
+      {
+          {0, "renderdoc", "enable attach to renderdoc", "Debug"},
+          Entry::Kind::Boolean,
+          {.bool_entry = {&ret.debug.renderdoc, false}},
+      },
+      {
+          {0, "no-renderdoc", "disable attach to renderdoc", "Debug"},
+          Entry::Kind::Boolean,
+          {.bool_entry = {&ret.debug.renderdoc, true}},
+      },
+      {
+          {'l', "validation-layers", "enable the validation layers", "Debug"},
+          Entry::Kind::Boolean,
+          {.bool_entry = {&ret.debug.validations_layers, false}},
+      },
+      {
+          {0, "no-validation-layers", "disable the validation layers", "Debug"},
+          Entry::Kind::Boolean,
+          {.bool_entry = {&ret.debug.validations_layers, true}},
+      },
+      {
+          {'p', "present-mode", "chose the present-mode", "Config"},
+          Entry::Kind::Choice,
+          {.choice_entry =
+               {
+                   reinterpret_cast<int *>(&ret.config.prefered_present_mode),
+                   present_mode_entries,
+               }},
+      },
+      {
+          {'i', "imgui", "enable imgui", "Debug"},
+          Entry::Kind::Boolean,
+          {.bool_entry = {&ret.debug.imgui, false}},
+      },
+      {
+          {0, "no-imgui", "disable imgui", "Debug"},
+          Entry::Kind::Boolean,
+          {.bool_entry = {&ret.debug.imgui, true}},
+      },
+      {
+          {0, "scene", "load scene", "Scene"},
+          Entry::Kind::String,
+          {.string_entry = {&ret.scene}},
+      },
+  });
   CliParser parser{.program_name = "ToyRenderer", .message = "Done by me with love <3", .entries = entries};
 
   if (const ParseResult result = parser.parse(args); result != ParseResult::Ok) {

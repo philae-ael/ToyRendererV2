@@ -1,17 +1,27 @@
 #pragma once
 
-#include <imgui.h>
+#include <stdint.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
+#include <span>
 
 #include "../descriptors.h"
-#include "../frame.h"
-#include "../mesh.h"
 #include "utils/cast.h"
 
+namespace tr {
+namespace renderer {
+class RessourceManager;
+enum class buffer_ressource_handle : uint32_t;
+struct DirectionalLight;
+struct Frame;
+struct Lifetime;
+struct Mesh;
+enum class image_ressource_handle : uint32_t;
+}  // namespace renderer
+}  // namespace tr
+
 namespace tr::renderer {
-struct DefaultRessources;
 struct VulkanContext;
 
 struct ShadowMap {

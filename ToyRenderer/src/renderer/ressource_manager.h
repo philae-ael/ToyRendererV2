@@ -1,11 +1,16 @@
 #ifndef RESSOURCE_MANAGER_H
 #define RESSOURCE_MANAGER_H
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <span>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include "ressources.h"

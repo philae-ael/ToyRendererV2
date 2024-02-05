@@ -1,44 +1,66 @@
 #include "gltf.h"
 
-#include <spdlog/spdlog.h>
-#include <stb_image.h>
-#include <utils/assert.h>
-#include <utils/cast.h>
-#include <utils/misc.h>
-#include <vulkan/vulkan_core.h>
+#include <spdlog/spdlog.h>       // for debug, warn
+#include <stb_image.h>           // for stbi_load_from_memory, stbi_uc
+#include <utils/assert.h>        // for TR_ASSERT
+#include <utils/cast.h>          // for narrow_cast
+#include <utils/misc.h>          // for INLINE_LAMBDA, overloaded
+#include <vulkan/vulkan_core.h>  // for VkBufferUsageFlagBits, VkFormat
 
-#include <cstddef>
-#include <cstdint>
-#include <fastgltf/glm_element_traits.hpp>
+#include <algorithm>  // for max, min
+#include <array>      // for array
+#include <cstddef>    // for size_t, byte
+#include <cstdint>    // for uint32_t
 #include <fastgltf/parser.hpp>
-#include <fastgltf/tools.hpp>
-#include <fastgltf/types.hpp>
-#include <functional>
-#include <glm/detail/qualifier.hpp>
-#include <glm/ext/matrix_float2x2.hpp>
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/ext/quaternion_geometric.hpp>
-#include <glm/ext/vector_float3.hpp>
-#include <glm/fwd.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/mat4x4.hpp>
-#include <glm/matrix.hpp>
-#include <glm/vector_relational.hpp>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-#include <vector>
+#include <fastgltf/tools.hpp>            // for DefaultBufferDataAdapter
+#include <fastgltf/types.hpp>            // for Asset, OptionalWithFlagValue
+#include <format>                        // for _Sink_iter, format, format_to
+#include <functional>                    // for invoke
+#include <glm/geometric.hpp>             // for dot, normalize
+#include <glm/gtc/matrix_transform.hpp>  // for identity, scale, translate
+#include <glm/gtc/quaternion.hpp>        // for mat4_cast
+#include <glm/gtc/type_ptr.hpp>          // for make_vec3, make_mat4, make_quat
+#include <glm/mat2x2.hpp>                // for operator*, mat2, mat
+#include <glm/mat2x3.hpp>                // for mat2x3
+#include <glm/mat4x4.hpp>                // for operator*, mat, mat4
+#include <glm/matrix.hpp>                // for inverse
+#include <glm/vec2.hpp>                  // for operator-, vec2, vec
+#include <glm/vec3.hpp>                  // for operator-, vec3, operator*, vec
+#include <glm/vec4.hpp>                  // for vec4, vec
+#include <glm/vector_relational.hpp>     // for all, lessThanEqual
+#include <limits>                        // for numeric_limits
+#include <mutex>                         // for once_flag, call_once
+#include <optional>                      // for optional
+#include <span>                          // for span, as_bytes
+#include <string>                        // for hash, operator==, basic_string
+#include <string_view>                   // for basic_string_view, string_view
+#include <unordered_map>                 // for unordered_map, operator==
+#include <utility>                       // for pair, move, forward
+#include <variant>                       // for visit
+#include <vector>                        // for vector
 
-#include "renderer/deletion_stack.h"
-#include "renderer/mesh.h"
-#include "renderer/ressource_manager.h"
-#include "renderer/ressources.h"
-#include "renderer/synchronisation.h"
-#include "renderer/uploader.h"
+#include "renderer/buffer.h"             // for OneTimeCommandBuffer
+#include "renderer/mesh.h"               // for Vertex, Material, Mesh, GeoS...
+#include "renderer/ressource_manager.h"  // for RessourceManager
+#include "renderer/ressources.h"         // for ImageRessource, BufferRessource
+#include "renderer/synchronisation.h"    // for ImageMemoryBarrier, SyncFrag...
+#include "renderer/uploader.h"           // for Transferer
+#include "renderer/vkformat.h"           // IWYU pragma: keep
+
+namespace fastgltf {
+template <>
+struct ElementTraits<glm::vec2> : ElementTraitsBase<glm::vec2, AccessorType::Vec2, float> {};
+
+template <>
+struct ElementTraits<glm::vec3> : ElementTraitsBase<glm::vec3, AccessorType::Vec3, float> {};
+
+template <>
+struct ElementTraits<glm::vec4> : ElementTraitsBase<glm::vec4, AccessorType::Vec4, float> {};
+}  // namespace fastgltf
+
+namespace tr::renderer {
+struct Lifetime;
+}  // namespace tr::renderer
 
 template <class T>
 concept has_bytes = requires(T a) { std::span(a.bytes); };
@@ -81,15 +103,11 @@ auto load_texture(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& 
   });
   image_ressource.tie(lifetime);
 
-  tr::renderer::ImageMemoryBarrier::submit<1>(t.cmd.vk_cmd,
-                                              {{
-                                                  image_ressource.prepare_barrier(tr::renderer::SyncImageTransfer),
-                                              }});
+  tr::renderer::ImageMemoryBarrier::submit<1>(
+      t.cmd.vk_cmd, {{image_ressource.invalidate().prepare_barrier(tr::renderer::SyncImageTransfer)}});
   t.upload_image(image_ressource, {{0, 0}, {width, height}}, image_data, 4);
   tr::renderer::ImageMemoryBarrier::submit<1>(
-      t.graphics_cmd.vk_cmd, {{
-                                 image_ressource.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly),
-                             }});
+      t.graphics_cmd.vk_cmd, {{image_ressource.prepare_barrier(tr::renderer::SyncFragmentShaderReadOnly)}});
   return {image_ressource, rm.register_storage_image(image_ressource)};
 }
 
@@ -349,13 +367,15 @@ auto load(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib, tr::
 
 auto tr::Gltf::load_from_file(tr::renderer::Lifetime& lifetime, tr::renderer::ImageBuilder& ib,
                               tr::renderer::BufferBuilder& bb, tr::renderer::Transferer& t,
-                              tr::renderer::RessourceManager& rm, const std::filesystem::path& path)
+                              tr::renderer::RessourceManager& rm, std::string_view path)
     -> std::pair<std::vector<tr::renderer::Material>, std::vector<tr::renderer::Mesh>> {
   fastgltf::Parser parser;
   fastgltf::GltfDataBuffer data;
   fastgltf::Asset asset;
 
-  TR_ASSERT(data.loadFromFile(path), "can't load file {}", path.string());
+  std::filesystem::path path_ = path;
+
+  TR_ASSERT(data.loadFromFile(path), "can't load file {}", path);
 
   {
     auto loaded = [&] {
@@ -364,9 +384,9 @@ auto tr::Gltf::load_from_file(tr::renderer::Lifetime& lifetime, tr::renderer::Im
 
       switch (fastgltf::determineGltfFileType(&data)) {
         case fastgltf::GltfType::glTF:
-          return parser.loadGLTF(&data, path.parent_path(), options);
+          return parser.loadGLTF(&data, path_.parent_path(), options);
         case fastgltf::GltfType::GLB:
-          return parser.loadBinaryGLTF(&data, path.parent_path(), options);
+          return parser.loadBinaryGLTF(&data, path_.parent_path(), options);
         case fastgltf::GltfType::Invalid:
           break;
       }

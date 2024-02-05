@@ -3,6 +3,12 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <memory>
+
+#include "context.h"
+#include "debug.h"
+#include "deletion_stack.h"
+#include "utils.h"
 #include "vulkan_engine.h"
 
 auto tr::renderer::FrameSynchro::init(Lifetime& lifetime, VkDevice device) -> FrameSynchro {

@@ -1,11 +1,14 @@
 #pragma once
 
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_vulkan.h>
-#include <vulkan/vulkan_core.h>
+#include <cstdint>
 
-#include "../renderer/vulkan_engine.h"
+namespace tr::renderer {
+class VulkanEngine;
+enum class image_ressource_handle : uint32_t;
+struct Frame;
+}  // namespace tr::renderer
+
+struct GLFWwindow;
 
 namespace tr::system {
 

@@ -8,6 +8,7 @@
 #include "mesh.h"
 #include "ressource_manager.h"
 #include "ressources.h"
+#include "utils/misc.h"
 
 namespace tr::renderer {
 
@@ -43,6 +44,19 @@ constexpr ImageRessourceDefinition RENDERED{
             .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             .size = {InternalResolutionExtent{}},
             .format = {SwapchainFormat{}},
+            .debug_name = "rendered",
+        },
+    .scope = RessourceScope::Transient,
+};
+
+constexpr ImageRessourceDefinition AO{
+    .id = ImageRessourceId::AO,
+    .definition =
+        {
+            .flags = 0,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            .size = {InternalResolutionExtent{}},
+            .format = {StaticFormat{VK_FORMAT_R32G32B32A32_SFLOAT}},
             .debug_name = "rendered",
         },
     .scope = RessourceScope::Transient,

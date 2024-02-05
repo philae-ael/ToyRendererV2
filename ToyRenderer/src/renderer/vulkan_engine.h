@@ -1,31 +1,33 @@
 #pragma once
 
-#include <imgui.h>
-#include <spdlog/spdlog.h>
-#include <utils/assert.h>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
+#include <cstdint>
 #include <optional>
+#include <span>
 #include <utility>
 
 #include "constants.h"
 #include "context.h"
 #include "debug.h"
 #include "deletion_stack.h"
-#include "descriptors.h"
 #include "device.h"
 #include "frame.h"
 #include "ressource_manager.h"
 #include "ressources.h"
-#include "surface.h"
 #include "uploader.h"
 #include "utils/data/static_stack.h"
 
-namespace tr::system {
-class Imgui;
-}
+namespace tr {
+namespace renderer {
+class DescriptorAllocator;
+struct OneTimeCommandBuffer;
+}  // namespace renderer
+struct Options;
+}  // namespace tr
+struct GLFWwindow;
 
 namespace tr::renderer {
 class VulkanEngine {

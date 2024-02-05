@@ -1,19 +1,28 @@
 #pragma once
 
-#include <shaderc/shaderc.h>
+#include <stdint.h>
 #include <vulkan/vulkan_core.h>
 
-#include "../context.h"
-#include "../frame.h"
-#include "../mesh.h"
+#include <span>
+
 #include "pass.h"
+
+namespace tr {
+namespace renderer {
+class RessourceManager;
+struct DirectionalLight;
+struct Frame;
+struct Lifetime;
+struct VulkanContext;
+}  // namespace renderer
+}  // namespace tr
 
 namespace tr::renderer {
 
 struct Deferred {
   PassInfo pass_info;
   VkPipeline pipeline = VK_NULL_HANDLE;
-  VkSampler shadow_map_sampler = VK_NULL_HANDLE;
+  VkSampler sampler = VK_NULL_HANDLE;
 
   bool pcf_enable = true;
   uint8_t pcf_iter_count = 3;

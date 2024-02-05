@@ -1,29 +1,41 @@
 #include "gbuffer.h"
 
-#include <spdlog/spdlog.h>
-#include <vulkan/vulkan_core.h>
+#include <shaderc/env.h>         // for shaderc_env_version_vulkan_1_3
+#include <shaderc/shaderc.h>     // for shaderc_glsl_fragment_shader
+#include <vulkan/vulkan_core.h>  // for VkShaderStageFlagBits, VkDescri...
 
-#include <array>
-#include <cstdint>
-#include <glm/ext/matrix_float4x4.hpp>
-#include <glm/mat4x4.hpp>
-#include <vector>
+#include <array>                // for array, to_array
+#include <cstdint>              // for uint32_t
+#include <glm/fwd.hpp>          // for mat4x4
+#include <optional>             // for optional
+#include <shaderc/shaderc.hpp>  // for CompileOptions, Compiler
+#include <span>                 // for span
+#include <vector>               // for vector, allocator
 
-#include "../mesh.h"
-#include "../pipeline.h"
-#include "../vulkan_engine.h"
-#include "frustrum_culling.h"
-#include "pass.h"
-#include "utils/misc.h"
-#include "utils/types.h"
+#include "../context.h"               // for VulkanContext
+#include "../descriptors.h"           // for DescriptorSetLayoutBindingBuilder
+#include "../device.h"                // for Device
+#include "../frame.h"                 // for Frame
+#include "../mesh.h"                  // for GeoSurface, MaterialHandles, Mesh
+#include "../pipeline.h"              // for PipelineColorBlendAttachmentSta...
+#include "../ressource_definition.h"  // for GBUFFER_0, GBUFFER_1, GBUFFER_2
+#include "../ressource_manager.h"     // for FrameRessourceData
+#include "../ressources.h"            // for BufferRessourceDefinition, Imag...
+#include "../synchronisation.h"       // for SyncColorAttachmentOutput, Sync...
+#include "../vulkan_engine.h"         // for VulkanEngine
+#include "frustrum_culling.h"         // for FrustrumCulling
+#include "pass.h"                     // for ColorAttachment, PassInfo, Basi...
+#include "utils/cast.h"               // for narrow_cast, to_array
+#include "utils/misc.h"               // for ignore_unused
+#include "utils/types.h"              // for not_null_pointer
 
 namespace tr::renderer {
 constexpr std::array gbuffer_vert_spv = std::to_array<uint32_t>({
-#include "shaders/gbuffer.vert.inc"
+#include "shaders/gbuffer.vert.inc"  // IWYU pragma: keep
 });
 
 constexpr std::array gbuffer_frag_spv = std::to_array<uint32_t>({
-#include "shaders/gbuffer.frag.inc"
+#include "shaders/gbuffer.frag.inc"  // IWYU pragma: keep
 });
 
 const PassDefinition gbuffer_pass{

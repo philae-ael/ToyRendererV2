@@ -1,15 +1,21 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
 #include "../../camera.h"
-#include "../context.h"
+#include "../buffer.h"
+#include "../debug.h"
 #include "../frame.h"
-#include "../mesh.h"
 #include "../ressource_definition.h"
 #include "frustrum_culling.h"
 #include "pass.h"
+
+namespace tr::renderer {
+class RessourceManager;
+struct Lifetime;
+struct Mesh;
+struct VulkanContext;
+}  // namespace tr::renderer
 
 namespace tr::renderer {
 

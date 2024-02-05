@@ -1,17 +1,29 @@
 #include "render_graph.h"
 
 #include <imgui.h>
+#include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <glm/ext/vector_float3.hpp>
+#include <glm/fwd.hpp>
+#include <glm/geometric.hpp>
+#include <glm/mat4x4.hpp>
 
 #include "../camera.h"
+#include "buffer.h"
+#include "context.h"
 #include "deletion_stack.h"
+#include "device.h"
+#include "frame.h"
 #include "mesh.h"
 #include "passes/debug.h"
 #include "passes/shadow_map.h"
+#include "ressource_manager.h"
 #include "ressources.h"
+#include "synchronisation.h"
 #include "timeline_info.h"
+#include "uploader.h"
+#include "utils.h"
+#include "utils/types.h"
 #include "vulkan_engine.h"
 
 void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera) const {
@@ -40,6 +52,7 @@ void tr::renderer::RenderGraph::draw(Frame& frame, std::span<const Mesh> meshes,
   frame.write_cpu_timestamp(CPU_TIMESTAMP_INDEX_SHADOW_BOTTOM);
   frame.write_gpu_timestamp(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, GPU_TIMESTAMP_INDEX_SHADOW_BOTTOM);
 
+  passes.ssao.draw(frame, {{0, 0}, internal_extent});
   passes.deferred.draw(frame, {{0, 0}, internal_extent}, lights);
 
   /* passes.forward.draw(frame, {{0, 0}, internal_extent}, camera, meshes, lights, default_ressources); */
@@ -58,6 +71,7 @@ void tr::renderer::RenderGraph::reinit_passes(tr::renderer::VulkanEngine& engine
   Lifetime setup_lifetime;
   Debug::global().init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.gbuffer.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
+  passes.ssao.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.shadow_map.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.present.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);
   passes.deferred.init(engine.lifetime.global, engine.ctx, engine.rm, setup_lifetime);

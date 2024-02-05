@@ -1,8 +1,8 @@
 #pragma once
 
-#include <glm/vec2.hpp>
+#include <glm/vec2.hpp>  // for vec2
 
-#include "../camera.h"
+#include "../camera.h"  // for CameraInput
 
 namespace tr::system {
 

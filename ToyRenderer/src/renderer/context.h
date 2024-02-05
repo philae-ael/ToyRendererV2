@@ -2,9 +2,19 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <span>
+
 #include "device.h"
 #include "instance.h"
 #include "swapchain.h"
+
+namespace tr {
+namespace renderer {
+struct Lifetime;
+}  // namespace renderer
+struct Options;
+}  // namespace tr
+struct GLFWwindow;
 
 namespace tr::renderer {
 struct VulkanContext {

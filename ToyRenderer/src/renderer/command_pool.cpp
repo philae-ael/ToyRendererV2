@@ -1,8 +1,10 @@
 #include "command_pool.h"
 
-#include <utils/assert.h>
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
+
+#include "deletion_stack.h"
 #include "device.h"
 #include "utils.h"
 

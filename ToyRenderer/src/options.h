@@ -1,16 +1,19 @@
 #pragma once
 
-#include <spdlog/common.h>
 #include <vulkan/vulkan_core.h>
 
 #include <span>
 #include <string_view>
 
+namespace spdlog::level {
+enum level_enum : int;
+}
+
 namespace tr {
 
 struct Options {
   struct {
-    spdlog::level::level_enum level = spdlog::level::info;
+    spdlog::level::level_enum level;
     bool renderdoc = false;
     bool validations_layers = false;
     bool imgui = true;

@@ -1,15 +1,10 @@
 #pragma once
 
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/ext/vector_float3.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/matrix_operation.hpp>
-#include <glm/gtx/quaternion.hpp>
-#include <glm/matrix.hpp>
-#include <glm/vec3.hpp>
-#include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>  // for mat4x4
+#include <glm/vec2.hpp>    // for vec2
+#include <glm/vec3.hpp>    // for vec3
 
-#include "utils/math.h"
+#include "utils/math.h"  // for PI_4, PI_2
 
 namespace tr {
 

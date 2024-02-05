@@ -1,7 +1,6 @@
 #include "vulkan_engine.h"
 
 #include <GLFW/glfw3.h>
-#include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <utils/cast.h>
 #include <utils/misc.h>
@@ -11,22 +10,25 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <glm/fwd.hpp>
-#include <glm/geometric.hpp>
 #include <optional>
-#include <span>
+#include <set>
 #include <vector>
 
+#include "../options.h"
+#include "buffer.h"
 #include "command_pool.h"
 #include "constants.h"
 #include "debug.h"
 #include "deletion_stack.h"
 #include "descriptors.h"
+#include "instance.h"
 #include "queue.h"
 #include "ressource_definition.h"
 #include "ressource_manager.h"
 #include "ressources.h"
+#include "surface.h"
 #include "swapchain.h"
+#include "synchronisation.h"
 #include "timeline_info.h"
 #include "timestamp.h"
 #include "uploader.h"
@@ -212,6 +214,8 @@ auto tr::renderer::VulkanEngine::start_transfer() -> Transferer {
   return {
       cmd,
       graphics_cmd,
+      ctx.physical_device.queues.transfer_family,
+      ctx.physical_device.queues.graphics_family,
       Uploader::init(allocator),
   };
 }

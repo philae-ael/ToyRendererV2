@@ -1,29 +1,42 @@
 #pragma once
 
-#include <vulkan/vulkan_core.h>
+#include <cstdint>
+#include <span>
 
-#include "../camera.h"
-#include "mesh.h"
 #include "passes/deferred.h"
 #include "passes/forward.h"
 #include "passes/gbuffer.h"
 #include "passes/present.h"
 #include "passes/shadow_map.h"
-#include "ressource_manager.h"
-#include "uploader.h"
-#include "vulkan_engine.h"
+#include "passes/ssao.h"
+#include "ressource_definition.h"
+
+namespace tr {
+namespace renderer {
+class VulkanEngine;
+enum class buffer_ressource_handle : uint32_t;
+struct Frame;
+struct Mesh;
+struct Transferer;
+enum class image_ressource_handle : uint32_t;
+}  // namespace renderer
+struct Camera;
+}  // namespace tr
 
 namespace tr::renderer {
 
-struct RenderGraph {
-  void reinit_passes(tr::renderer::VulkanEngine& engine);
+class RenderGraph {
+ public:
   void init(VulkanEngine& engine, Transferer& t);
   void draw(Frame& frame, std::span<const Mesh> meshes, const Camera& camera) const;
 
   void imgui(VulkanEngine&);
 
+ private:
+  void reinit_passes(tr::renderer::VulkanEngine& engine);
   struct {
     GBuffer gbuffer;
+    SSAO ssao;
     ShadowMap shadow_map;
     Deferred deferred;
     Forward forward;

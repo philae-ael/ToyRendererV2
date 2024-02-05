@@ -1,11 +1,11 @@
 #include "extensions.h"
 
 #include <spdlog/spdlog.h>
-#include <utils/assert.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
-#include <tuple>
+#include <utility>
+#include <variant>
 
 // Some magic for loading extension
 // funny but unreadable

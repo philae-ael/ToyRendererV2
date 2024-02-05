@@ -1,22 +1,42 @@
 #include "present.h"
 
-#include <vulkan/vulkan_core.h>
+#include <shaderc/env.h>         // for shaderc_env_version_vulkan_1_3
+#include <shaderc/shaderc.h>     // for shaderc_glsl_fragment_shader
+#include <vulkan/vulkan_core.h>  // for VkDescriptorType, VkShaderStage...
 
-#include <array>
-#include <glm/fwd.hpp>
+#include <algorithm>            // for copy, max
+#include <array>                // for array, to_array
+#include <cstdint>              // for uint32_t
+#include <filesystem>           // for path
+#include <optional>             // for optional
+#include <shaderc/shaderc.hpp>  // for CompileOptions, Compiler
+#include <vector>               // for vector, allocator
 
-#include "../pipeline.h"
-#include "../ressource_definition.h"
-#include "../vulkan_engine.h"
-#include "pass.h"
+#include "../buffer.h"                // for OneTimeCommandBuffer
+#include "../context.h"               // for VulkanContext
+#include "../debug.h"                 // for DebugCmdScope
+#include "../deletion_stack.h"        // for DeviceHandle, Lifetime
+#include "../descriptors.h"           // for DescriptorSetLayoutBindingBuilder
+#include "../device.h"                // for Device
+#include "../frame.h"                 // for Frame
+#include "../pipeline.h"              // for ShaderDefininition, PipelineCol...
+#include "../ressource_definition.h"  // for SWAPCHAIN, RENDERED, DEPTH
+#include "../ressource_manager.h"     // for FrameRessourceData
+#include "../ressources.h"            // for ImageRessourceDefinition, Image...
+#include "../synchronisation.h"       // for SyncFragmentStorageRead, SyncInfo
+#include "../utils.h"                 // for VK_UNWRAP
+#include "../vulkan_engine.h"         // for VulkanEngine
+#include "pass.h"                     // for ColorAttachment, PassInfo, Basi...
+#include "utils/cast.h"               // for narrow_cast
+#include "utils/types.h"              // for not_null_pointer
 
 namespace tr::renderer {
 constexpr std::array present_vert_spv = std::to_array<uint32_t>({
-#include "shaders/present.vert.inc"
+#include "shaders/present.vert.inc"  // IWYU pragma: keep
 });
 
 constexpr std::array present_frag_spv = std::to_array<uint32_t>({
-#include "shaders/present.frag.inc"
+#include "shaders/present.frag.inc"  // IWYU pragma: keep
 });
 
 const PassDefinition present_pass{

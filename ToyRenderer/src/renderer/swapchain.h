@@ -1,13 +1,17 @@
 #pragma once
 
-#include <utils/types.h>
 #include <vulkan/vulkan_core.h>
 
 #include <vector>
 
-#include "deletion_stack.h"
-#include "device.h"
-#include "surface.h"
+namespace tr {
+namespace renderer {
+struct Device;
+struct Lifetime;
+struct PhysicalDevice;
+}  // namespace renderer
+}  // namespace tr
+struct GLFWwindow;
 
 namespace tr::renderer {
 
@@ -15,6 +19,7 @@ namespace tr::renderer {
 
 struct Swapchain {
   struct SwapchainConfig;
+
   void reinit(Lifetime& lifetime, const Device& device, const PhysicalDevice& physical_device, VkSurfaceKHR surface,
               GLFWwindow* window) {
     *this = init_with_config(lifetime, config, device, physical_device, surface, window);

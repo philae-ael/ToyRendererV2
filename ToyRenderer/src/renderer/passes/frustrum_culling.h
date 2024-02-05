@@ -1,19 +1,19 @@
 #pragma once
 
-#include <utils/types.h>
+#include <utils/types.h>  // for range_of
 
-#include <glm/common.hpp>
-#include <glm/detail/qualifier.hpp>
-#include <glm/ext/matrix_float4x4.hpp>
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/ext/vector_float3.hpp>
-#include <glm/ext/vector_float4.hpp>
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/matrix.hpp>
-#include <ranges>
+#include <cmath>                         // for tan
+#include <glm/common.hpp>                // for abs
+#include <glm/fwd.hpp>                   // for vec3, mat4
+#include <glm/geometric.hpp>             // for dot, cross
+#include <glm/gtc/matrix_transform.hpp>  // for identity
+#include <glm/mat4x4.hpp>                // for mat4
+#include <glm/vec3.hpp>                  // for vec, operator*, operator+
+#include <ranges>                        // for filter
 
-#include "../mesh.h"
-#include "utils/cast.h"
+#include "../../camera.h"  // for Camera
+#include "../mesh.h"       // for AABB, GeoSurface
+#include "utils/cast.h"    // for narrow_cast
 
 namespace tr::renderer {
 

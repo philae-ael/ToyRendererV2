@@ -1,19 +1,25 @@
 #include "swapchain.h"
 
 #include <GLFW/glfw3.h>
+#include <json/value.h>
 #include <spdlog/spdlog.h>
 #include <utils/cast.h>
 #include <vulkan/vulkan_core.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <limits>
+#include <optional>
 
 #include "../registry.h"
 #include "constants.h"
 #include "debug.h"
+#include "deletion_stack.h"
 #include "device.h"
 #include "utils.h"
+#include "vkformat.h"  // IWYU pragma: keep
 
 auto tr::renderer::Swapchain::compute_extent(GLFWwindow* window) const -> VkExtent2D {
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {

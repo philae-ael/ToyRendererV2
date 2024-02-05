@@ -67,7 +67,7 @@ struct SyncInfo {
     };
   }
 
-  constexpr auto copy() -> SyncInfo { return *this; }
+  [[nodiscard]] constexpr auto copy() const -> SyncInfo { return *this; }
   constexpr auto queue(uint32_t queue_family_index) -> SyncInfo& {
     queueFamilyIndex = queue_family_index;
     return *this;

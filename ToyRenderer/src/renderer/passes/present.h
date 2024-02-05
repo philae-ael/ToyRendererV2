@@ -2,9 +2,16 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include "../context.h"
-#include "../frame.h"
 #include "pass.h"
+
+namespace tr {
+namespace renderer {
+class RessourceManager;
+struct Frame;
+struct Lifetime;
+struct VulkanContext;
+}  // namespace renderer
+}  // namespace tr
 
 namespace tr::renderer {
 struct Present {

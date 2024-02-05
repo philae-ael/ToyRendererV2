@@ -1,28 +1,33 @@
 #include "forward.h"
 
-#include <bits/getopt_core.h>
-#include <imgui.h>
-#include <shaderc/env.h>
-#include <shaderc/shaderc.h>
-#include <spdlog/spdlog.h>
-#include <sys/types.h>
-#include <vulkan/vulkan_core.h>
+#include <imgui.h>               // for BeginCombo, Button, Checkbox
+#include <shaderc/env.h>         // for shaderc_env_version_vulkan_1_3
+#include <shaderc/shaderc.h>     // for shaderc_glsl_fragment_shader
+#include <vulkan/vulkan_core.h>  // for VkShaderStageFlagBits, VkImageL...
 
-#include <array>
-#include <filesystem>
-#include <glm/fwd.hpp>
-#include <memory>
-#include <optional>
-#include <shaderc/shaderc.hpp>
-#include <string>
+#include <array>                // for array, to_array
+#include <format>               // for format
+#include <memory>               // for allocator, make_unique
+#include <optional>             // for optional, nullopt
+#include <shaderc/shaderc.hpp>  // for CompileOptions, Compiler
+#include <utility>              // for pair
 
-#include "../debug.h"
-#include "../descriptors.h"
-#include "../frame.h"
-#include "../pipeline.h"
-#include "../vulkan_engine.h"
-#include "shadow_map.h"
-#include "utils/misc.h"
+#include "../context.h"               // for VulkanContext
+#include "../debug.h"                 // for DebugCmdScope
+#include "../deletion_stack.h"        // for DeviceHandle, Lifetime
+#include "../descriptors.h"           // for DescriptorSetLayoutBuilder, Des...
+#include "../device.h"                // for Device
+#include "../frame.h"                 // for Frame
+#include "../mesh.h"                  // for GeoSurface, MaterialHandles, Mesh
+#include "../pipeline.h"              // for PipelineBuilder, FileIncluder
+#include "../ressource_definition.h"  // for DefaultRessources, RENDERED, DEPTH
+#include "../ressource_manager.h"     // for FrameRessourceData, RessourceMa...
+#include "../ressources.h"            // for ImageRessource, BufferRessource
+#include "../synchronisation.h"       // for SyncFragmentStorageRead, SyncInfo
+#include "../utils.h"                 // for VK_UNWRAP
+#include "../vulkan_engine.h"         // for VulkanEngine
+#include "utils/misc.h"               // for ignore_unused, TIMED_INLINE_LAMBDA
+
 struct PushConstant {
   tr::CameraInfo info;
   glm::vec3 color;
@@ -32,11 +37,11 @@ struct PushConstant {
 void tr::renderer::Forward::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
                                  Lifetime &setup_lifetime) {
   const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/forward.vert.inc"
+#include "shaders/forward.vert.inc"  // IWYU pragma: keep
   });
 
   const std::array frag_spv_default = std::to_array<uint32_t>({
-#include "shaders/forward.frag.inc"
+#include "shaders/forward.frag.inc"  // IWYU pragma: keep
   });
 
   shadow_map_handle = rm.register_transient_image(SHADOW_MAP);

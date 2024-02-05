@@ -1,16 +1,28 @@
 #pragma once
 
+#include <stddef.h>
+#include <stdint.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <glm/ext/vector_float3.hpp>
+#include <glm/vec3.hpp>
+#include <span>
 #include <vector>
 
-#include "../context.h"
 #include "../descriptors.h"
-#include "../frame.h"
 #include "../vertex.h"
 #include "utils/cast.h"
+
+namespace tr {
+namespace renderer {
+class RessourceManager;
+enum class buffer_ressource_handle : uint32_t;
+struct Frame;
+struct Lifetime;
+struct VulkanContext;
+enum class image_ressource_handle : uint32_t;
+}  // namespace renderer
+}  // namespace tr
 
 namespace tr::renderer {
 

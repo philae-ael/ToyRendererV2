@@ -5,6 +5,8 @@
 #include <GLFW/glfw3.h>
 #include <utils/cast.h>
 
+#include "../camera.h"
+
 void tr::system::Input::on_input(tr::system::InputEvent event) {
   switch (event.kind) {
     case InputEventKind::Key: {

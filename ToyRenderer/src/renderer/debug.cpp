@@ -1,22 +1,31 @@
 #include "debug.h"
 
+#include <bits/types/struct_rusage.h>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
+#include <utils/cast.h>
 #include <utils/misc.h>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <format>
 #include <fstream>
 #include <optional>
+#include <ratio>
+#include <span>
 #include <utility>
 
+#include "../registry.h"
+#include "context.h"
+#include "device.h"
 #include "ressource_definition.h"
 #include "swapchain.h"
 #include "timeline_info.h"
-#include "utils/cast.h"
+#include "vkformat.h"  // IWYU pragma: keep
 #include "vulkan_engine.h"
 
 #if defined(_WIN32)
@@ -339,5 +348,11 @@ void tr::renderer::VulkanEngineDebugInfo::record_timeline(tr::renderer::VulkanEn
 #endif
 
     cpu_memory_usage.push(memory_usage);
+  }
+}
+void tr::renderer::Renderdoc::TriggerCapture() const {
+  if (rdoc_api != nullptr) {
+    rdoc_api->TriggerCapture();
+    spdlog::info("next frame will be captured");
   }
 }

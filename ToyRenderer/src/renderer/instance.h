@@ -2,11 +2,16 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm>
 #include <set>
 #include <span>
+#include <string>
 
-#include "../options.h"
 #include "deletion_stack.h"
+
+namespace tr {
+struct Options;
+}  // namespace tr
 
 namespace tr::renderer {
 

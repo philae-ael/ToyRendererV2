@@ -3,24 +3,30 @@
 #include <shaderc/shaderc.h>
 #include <vulkan/vulkan_core.h>
 
+#include <cstddef>
 #include <cstdint>
-#include <filesystem>
+#include <optional>
 #include <shaderc/shaderc.hpp>
+#include <span>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
-#include "deletion_stack.h"
 #include "utils.h"
 #include "utils/assert.h"
 #include "utils/cast.h"
-namespace tr::renderer {
 
-struct ShaderDefininition;
+namespace tr::renderer {
+struct Lifetime;
+}  // namespace tr::renderer
+
+namespace tr::renderer {
 
 struct Shader {
   static auto init_from_spv(Lifetime& lifetime, VkDevice, std::span<const uint32_t>) -> Shader;
   static auto compile(shaderc::Compiler& compiler, shaderc_shader_kind kind, const shaderc::CompileOptions& options,
-                      const std::filesystem::path& path) -> std::optional<std::vector<uint32_t>>;
+                      std::string_view path) -> std::optional<std::vector<uint32_t>>;
   VkShaderModule module;
 
   auto pipeline_shader_stage(VkShaderStageFlagBits stage, const char* entry_point) const
@@ -41,7 +47,7 @@ struct ShaderDefininition {
   shaderc_shader_kind kind;
   std::string entry_point;
 
-  std::filesystem::path runtime_path;
+  std::string_view runtime_path;
   std::vector<uint32_t> compile_time_spv;
 
   auto build(Lifetime& lifetime, VkDevice device, shaderc::Compiler& compiler,
@@ -81,7 +87,7 @@ struct ShaderDefininition {
 
 class FileIncluder : public shaderc::CompileOptions::IncluderInterface {
  public:
-  explicit FileIncluder(std::filesystem::path base_path_) : base_path(std::move(base_path_)) {}
+  explicit FileIncluder(std::string base_path_) : base_path(std::move(base_path_)) {}
   auto GetInclude(const char* requested_source, shaderc_include_type include_type, const char* requesting_source,
                   size_t include_depth) -> shaderc_include_result* override;
   void ReleaseInclude(shaderc_include_result* include_result) override;
@@ -91,7 +97,7 @@ class FileIncluder : public shaderc::CompileOptions::IncluderInterface {
   [[nodiscard]] auto FindRelativeReadableFilepath(const std::string& requesting_file, const std::string& filename) const
       -> std::string;
 
-  std::filesystem::path base_path;
+  std::string base_path;
   struct FileInfo {
     std::string full_path;
     std::vector<char> contents;

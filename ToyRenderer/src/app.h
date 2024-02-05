@@ -1,7 +1,6 @@
 #pragma once
 
 #include <utils/timer.h>
-#include <utils/types.h>
 
 #include <cstdint>
 #include <vector>
@@ -9,16 +8,29 @@
 #include "camera.h"
 #include "options.h"
 #include "renderer/mesh.h"
-#include "renderer/render_graph.h"
 #include "renderer/vulkan_engine.h"
 #include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
 
+namespace utils::types {
+template <class T>
+struct Extent2d;
+}  // namespace utils::types
+
 namespace tr {
+namespace renderer {
+class RenderGraph;
+}
 class App {
  public:
+  App(const App &) = delete;
+  App(App &&) = delete;
+  auto operator=(const App &) -> App & = delete;
+  auto operator=(App &&) -> App & = delete;
   explicit App(Options options);
+  ~App();
+
   void run();
 
   void on_resize(utils::types::Extent2d<std::uint32_t>);
@@ -45,6 +57,6 @@ class App {
   std::vector<renderer::Mesh> meshes;
   std::vector<renderer::DirectionalLight> point_lights;
 
-  renderer::RenderGraph rendergraph;
+  std::unique_ptr<renderer::RenderGraph> rendergraph;
 };
 }  // namespace tr

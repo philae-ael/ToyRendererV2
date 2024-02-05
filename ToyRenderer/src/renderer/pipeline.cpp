@@ -1,34 +1,39 @@
 #include "pipeline.h"
 
-#include <shaderc/shaderc.h>
-#include <shaderc/status.h>
-#include <spdlog/spdlog.h>
-#include <utils/asset.h>
-#include <utils/cast.h>
-#include <vulkan/vulkan_core.h>
+#include <shaderc/shaderc.h>     // for shaderc_include_result, shaderc_incl...
+#include <shaderc/status.h>      // for shaderc_compilation_status_success
+#include <spdlog/spdlog.h>       // for error
+#include <utils/asset.h>         // for read_file
+#include <utils/cast.h>          // for narrow_cast
+#include <vulkan/vulkan_core.h>  // for vkCreateShaderModule, VkStructureType
 
-#include <cstdint>
-#include <cstring>
-#include <filesystem>
-#include <optional>
-#include <shaderc/shaderc.hpp>
-#include <vector>
+#include <cstdint>              // for uint32_t
+#include <cstring>              // for strlen
+#include <filesystem>           // for path, operator/
+#include <ios>                  // for filebuf, ios_base
+#include <optional>             // for optional, nullopt
+#include <shaderc/shaderc.hpp>  // for Compiler, CompileOptions (ptr only)
+#include <string_view>
+#include <vector>  // for vector
 
-#include "utils.h"
-#include "utils/assert.h"
+#include "deletion_stack.h"  // for DeviceHandle, Lifetime
+#include "utils.h"           // for VK_UNWRAP
+#include "utils/assert.h"    // for TR_ASSERT
+#include "vkformat.h"        // IWYU pragma: keep
 
 auto tr::renderer::Shader::compile(shaderc::Compiler& compiler, shaderc_shader_kind kind,
-                                   const shaderc::CompileOptions& options, const std::filesystem::path& path)
+                                   const shaderc::CompileOptions& options, std::string_view path)
     -> std::optional<std::vector<uint32_t>> {
-  const auto data = read_file<char>(path.string());
+  const auto data = read_file<char>(path);
   if (!data) {
     return std::nullopt;
   }
 
   TR_ASSERT(compiler.IsValid(), "compiler is invalid");
+  std::filesystem::path path_ = path;
 
   const auto result =
-      compiler.CompileGlslToSpv(data->data(), data->size(), kind, path.filename().string().c_str(), "main", options);
+      compiler.CompileGlslToSpv(data->data(), data->size(), kind, path_.filename().string().c_str(), "main", options);
 
   if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
     spdlog::error("Shader error:\n{}", result.GetErrorMessage());
@@ -104,7 +109,7 @@ auto tr::renderer::FileIncluder::FindReadableFilepath(const std::string& filenam
   static const auto for_reading = std::ios_base::in;
   std::filebuf opener;
 
-  std::string prefixed_filename = base_path / filename;
+  std::string prefixed_filename = std::filesystem::path{base_path} / filename;
   if (std::filebuf{}.open(prefixed_filename, for_reading) != nullptr) {
     return prefixed_filename;
   }

@@ -4,10 +4,20 @@
 #include <cstddef>
 #include <ratio>
 #include <span>
+#include <string_view>
 
 #include "utils/math.h"
-namespace utils {
+#include "utils/misc.h"
 
+#ifdef TIMED_INLINE_LAMBDA_DISABLE
+// NOLINTNEXTLINE
+#define TIMED_INLINE_LAMBDA(name) utils::inline_lambda{} + [&]()
+#else
+// NOLINTNEXTLINE
+#define TIMED_INLINE_LAMBDA(name) utils::timed_inline_lambda{(name)} + [&]()
+#endif
+
+namespace utils {
 class Timer {
  public:
   float elapsed = 0.0;
@@ -67,6 +77,28 @@ class Timeline {
   std::size_t index1 = 0;
   std::size_t index2 = N;
   std::array<T, 2 * N> data{};
+};
+
+struct timed_inline_lambda {
+  timed_inline_lambda(const timed_inline_lambda &) = delete;
+  timed_inline_lambda(timed_inline_lambda &&) = delete;
+  auto operator=(const timed_inline_lambda &) -> timed_inline_lambda & = delete;
+  auto operator=(timed_inline_lambda &&) -> timed_inline_lambda & = delete;
+  explicit timed_inline_lambda(std::string_view name) : name(name) {}
+  std::string_view name;
+  float duration_s = 0.0;
+
+  template <class Fn>
+  auto operator+(Fn f) {
+    const auto start = std::chrono::high_resolution_clock::now();
+    DEFER {
+      const auto end = std::chrono::high_resolution_clock::now();
+      duration_s = std::chrono::duration_cast<std::chrono::duration<float>>(end - start).count();
+    };
+
+    return f();
+  }
+  ~timed_inline_lambda();
 };
 
 }  // namespace utils

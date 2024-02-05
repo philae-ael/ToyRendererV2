@@ -11,11 +11,12 @@
 #include <vector>
 
 #include "../camera.h"
-#include "ressource_manager.h"
 #include "ressources.h"
 #include "vertex.h"
 
 namespace tr::renderer {
+enum class image_ressource_handle : uint32_t;
+enum class buffer_ressource_handle : uint32_t;
 
 struct Vertex {
   glm::vec3 pos;

@@ -2,8 +2,13 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include "deletion_stack.h"
-#include "device.h"
+namespace tr {
+namespace renderer {
+struct Device;
+struct Lifetime;
+struct PhysicalDevice;
+}  // namespace renderer
+}  // namespace tr
 
 namespace tr::renderer {
 

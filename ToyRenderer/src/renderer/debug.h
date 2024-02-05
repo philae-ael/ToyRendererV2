@@ -1,13 +1,17 @@
 #pragma once
+#include <bits/chrono.h>
 #include <renderdoc.h>
-#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
+#include <string>
 
 #include "constants.h"
 #include "timeline_info.h"
 #include "timestamp.h"
+#include "utils/math.h"
 #include "utils/timer.h"
 
 namespace tr::renderer {
@@ -54,12 +58,7 @@ class DebugQueueScope {
 
 struct Renderdoc {
   static auto init() -> Renderdoc;
-  void TriggerCapture() const {
-    if (rdoc_api != nullptr) {
-      rdoc_api->TriggerCapture();
-      spdlog::info("next frame will be captured");
-    }
-  }
+  void TriggerCapture() const;
 
   RENDERDOC_API_1_1_2 *rdoc_api = nullptr;
 };

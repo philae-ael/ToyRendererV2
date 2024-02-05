@@ -1,8 +1,10 @@
 #pragma once
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <span>
 #include <utility>
@@ -10,8 +12,15 @@
 
 #include "buffer.h"
 #include "deletion_stack.h"
-#include "ressources.h"
 #include "utils/assert.h"
+#include "utils/cast.h"
+#include "utils/misc.h"
+
+namespace tr {
+namespace renderer {
+struct ImageRessource;
+}  // namespace renderer
+}  // namespace tr
 
 namespace tr::renderer {
 struct StagingBuffer {
@@ -90,6 +99,8 @@ class Uploader {
 struct Transferer {
   OneTimeCommandBuffer cmd;
   OneTimeCommandBuffer graphics_cmd;
+  uint32_t transfer_queue_family;
+  uint32_t graphics_queue_family;
   Uploader uploader;
 
   void upload_buffer(VkBuffer dst, std::size_t offset, std::span<const std::byte> src, std::size_t alignement = 1) {

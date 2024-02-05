@@ -5,8 +5,11 @@
 
 #include <cstdint>
 #include <deque>
+#include <iterator>
+#include <utility>
 
 #include "utils/assert.h"
+
 namespace tr::renderer {
 
 template <class ObjectType, class Handle = uint64_t>

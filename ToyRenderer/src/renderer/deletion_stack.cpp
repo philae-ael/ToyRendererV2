@@ -1,6 +1,5 @@
 #include "deletion_stack.h"
 
-#include <utils/assert.h>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 

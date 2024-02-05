@@ -2,17 +2,24 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
+
 #include "buffer.h"
-#include "debug.h"
 #include "descriptors.h"
 #include "device.h"
 #include "queue.h"
-#include "ressource_manager.h"
 #include "timeline_info.h"
 #include "utils/types.h"
 
+namespace tr {
+namespace renderer {
+class VulkanEngine;
+struct FrameRessourceData;
+struct Lifetime;
+}  // namespace renderer
+}  // namespace tr
+
 namespace tr::renderer {
-struct FrameRessourceManager;
 
 struct FrameSynchro {
   static auto init(Lifetime &lifetime, VkDevice device) -> FrameSynchro;

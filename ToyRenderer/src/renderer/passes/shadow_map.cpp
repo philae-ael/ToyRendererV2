@@ -1,21 +1,42 @@
 #include "shadow_map.h"
 
-#include <utils/misc.h>
-#include <vulkan/vulkan_core.h>
+#include <imgui.h>               // for BeginCombo, CollapsingHeader
+#include <shaderc/env.h>         // for shaderc_env_version_vulkan_1_3
+#include <shaderc/shaderc.h>     // for shaderc_glsl_vertex_shader, sha...
+#include <utils/misc.h>          // for ignore_unused, TIMED_INLINE_LAMBDA
+#include <vulkan/vulkan_core.h>  // for VkShaderStageFlagBits, VkDynami...
 
-#include <array>
-#include <cstdint>
-#include <glm/mat4x4.hpp>
+#include <algorithm>            // for copy, max
+#include <array>                // for array, to_array
+#include <format>               // for format
+#include <glm/fwd.hpp>          // for mat4x4
+#include <optional>             // for optional
+#include <shaderc/shaderc.hpp>  // for CompileOptions, Compiler
+#include <utility>              // for pair
+#include <vector>               // for vector
 
-#include "../mesh.h"
-#include "../pipeline.h"
-#include "../ressource_definition.h"
-#include "../vulkan_engine.h"
+#include "../../camera.h"             // for CameraInfo
+#include "../../registry.h"           // for CVarExtent2D
+#include "../buffer.h"                // for OneTimeCommandBuffer
+#include "../context.h"               // for VulkanContext
+#include "../debug.h"                 // for DebugCmdScope
+#include "../deletion_stack.h"        // for DeviceHandle, Lifetime
+#include "../descriptors.h"           // for DescriptorSetLayoutBuilder, Des...
+#include "../device.h"                // for Device
+#include "../frame.h"                 // for Frame
+#include "../mesh.h"                  // for GeoSurface, Mesh, Vertex, Direc...
+#include "../pipeline.h"              // for PipelineBuilder, PipelineLayout...
+#include "../ressource_definition.h"  // for SHADOW_MAP, shadow_map_extent
+#include "../ressource_manager.h"     // for FrameRessourceData, RessourceMa...
+#include "../ressources.h"            // for BufferRessource, ImageRessource
+#include "../synchronisation.h"       // for SyncLateDepth, ImageMemoryBarrier
+#include "../vulkan_engine.h"         // for VulkanEngine
+#include "utils/types.h"              // for not_null_pointer
 
 void tr::renderer::ShadowMap::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
                                    Lifetime &setup_lifetime) {
   const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/shadow_map.vert.inc"
+#include "shaders/shadow_map.vert.inc"  // IWYU pragma: keep
   });
 
   rendered_handle = rm.register_transient_image(RENDERED);

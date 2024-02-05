@@ -3,10 +3,16 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <span>
 
-#include "deletion_stack.h"
 #include "utils.h"
 #include "utils/cast.h"
+
+namespace tr {
+namespace renderer {
+struct Lifetime;
+}  // namespace renderer
+}  // namespace tr
 
 namespace tr::renderer {
 

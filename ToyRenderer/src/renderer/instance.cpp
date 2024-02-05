@@ -1,20 +1,27 @@
 #include "instance.h"
 
+#include <spdlog/common.h>
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
 #include <utils/cast.h>
+#include <utils/misc.h>
+#include <vulkan/vk_platform.h>
 #include <vulkan/vulkan_core.h>
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <iterator>
+#include <optional>
 #include <ranges>
 #include <string>
 #include <vector>
 
+#include "../options.h"
 #include "constants.h"
 #include "extensions.h"
 #include "utils.h"
-#include "utils/misc.h"
+#include "vkformat.h"  // IWYU pragma: keep
 
 VKAPI_ATTR auto VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                           VkDebugUtilsMessageTypeFlagsEXT messageType,

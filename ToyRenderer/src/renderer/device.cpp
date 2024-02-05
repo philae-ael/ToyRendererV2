@@ -1,10 +1,10 @@
 #include "device.h"
 
-#include <GLFW/glfw3.h>
-#include <spdlog/common.h>
 #include <spdlog/spdlog.h>
 #include <utils/assert.h>
 #include <utils/cast.h>
+#include <utils/data/static_stack.h>
+#include <utils/misc.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
@@ -12,13 +12,13 @@
 #include <optional>
 #include <ranges>
 #include <set>
+#include <utility>
 #include <vector>
 
 #include "constants.h"
 #include "debug.h"
 #include "utils.h"
-#include "utils/data/static_stack.h"
-#include "utils/misc.h"
+#include "vkformat.h"  // IWYU pragma: keep
 
 void inspect_physical_device(const VkPhysicalDeviceProperties& properties) {
   const char* device_type = "other";

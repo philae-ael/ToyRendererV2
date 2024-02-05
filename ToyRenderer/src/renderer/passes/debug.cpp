@@ -1,25 +1,39 @@
 #include "debug.h"
 
-#include <spdlog/spdlog.h>
-#include <vulkan/vulkan_core.h>
+#include <shaderc/env.h>         // for shaderc_env_version_vulkan_1_3
+#include <shaderc/shaderc.h>     // for shaderc_glsl_fragment_shader
+#include <vulkan/vulkan_core.h>  // for VkDynamicState, VkShaderStageFl...
 
-#include <cstdint>
-#include <cstring>
-#include <shaderc/shaderc.hpp>
+#include <algorithm>            // for copy, min
+#include <cstring>              // for memcpy
+#include <optional>             // for optional
+#include <shaderc/shaderc.hpp>  // for CompileOptions, Compiler
 
-#include "../pipeline.h"
-#include "../ressource_definition.h"
-#include "../vulkan_engine.h"
-#include "utils/assert.h"
-#include "utils/cast.h"
+#include "../buffer.h"                // for OneTimeCommandBuffer
+#include "../context.h"               // for VulkanContext
+#include "../debug.h"                 // for DebugCmdScope
+#include "../deletion_stack.h"        // for DeviceHandle, Lifetime
+#include "../descriptors.h"           // for DescriptorSetLayoutBuilder, Des...
+#include "../device.h"                // for Device
+#include "../frame.h"                 // for Frame
+#include "../pipeline.h"              // for PipelineBuilder, Shader, Pipeli...
+#include "../ressource_definition.h"  // for RENDERED, DEPTH, CAMERA, DEBUG_...
+#include "../ressource_manager.h"     // for FrameRessourceData, RessourceMa...
+#include "../ressources.h"            // for ImageClearOpLoad, BufferRessource
+#include "../synchronisation.h"       // for SyncColorAttachmentOutput, Sync...
+#include "../vulkan_engine.h"         // for VulkanEngine
+#include "utils/assert.h"             // for TR_ASSERT
+#include "utils/cast.h"               // for narrow_cast, to_array
+#include "utils/misc.h"               // for TIMED_INLINE_LAMBDA
+#include "utils/types.h"              // for not_null_pointer
 
 void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime) {
   const std::array vert_spv_default = std::to_array<uint32_t>({
-#include "shaders/debug.vert.inc"
+#include "shaders/debug.vert.inc"  // IWYU pragma: keep
   });
 
   const std::array frag_spv_default = std::to_array<uint32_t>({
-#include "shaders/debug.frag.inc"
+#include "shaders/debug.frag.inc"  // IWYU pragma: keep
   });
   rendered_handle = rm.register_transient_image(RENDERED);
   depth_handle = rm.register_transient_image(DEPTH);

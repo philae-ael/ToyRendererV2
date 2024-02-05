@@ -3,15 +3,29 @@
 #include <vulkan/vulkan_core.h>
 
 #include <array>
-#include <glm/ext/matrix_float4x4.hpp>
+#include <cstdint>
+#include <glm/fwd.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+#include <span>
 
-#include "../context.h"
+#include "../../camera.h"
+#include "../buffer.h"
+#include "../debug.h"
 #include "../descriptors.h"
 #include "../frame.h"
 #include "../mesh.h"
 #include "../ressource_definition.h"
 #include "frustrum_culling.h"
 #include "utils/cast.h"
+
+namespace tr::renderer {
+class RessourceManager;
+enum class buffer_ressource_handle : uint32_t;
+enum class image_ressource_handle : uint32_t;
+struct Lifetime;
+struct VulkanContext;
+}  // namespace tr::renderer
 
 namespace tr::renderer {
 

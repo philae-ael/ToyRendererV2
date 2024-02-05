@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "utils/types.h"
+
 struct GLFWwindow;
 namespace tr {
 class App;

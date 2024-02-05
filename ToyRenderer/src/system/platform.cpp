@@ -1,14 +1,17 @@
 #include "platform.h"
 
 #include <GLFW/glfw3.h>
-#include <spdlog/spdlog.h>
+#include <json/value.h>
 #include <utils/assert.h>
 
+#include <algorithm>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include "../app.h"
 #include "../registry.h"
+#include "input.h"
 #include "utils/misc.h"
 #include "utils/types.h"
 

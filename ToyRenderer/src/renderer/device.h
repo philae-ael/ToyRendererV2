@@ -2,12 +2,12 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "deletion_stack.h"
-
-struct GLFWwindow;
 
 namespace tr::renderer {
 struct QueuesInfo {

@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "ressources.h"
+#include "synchronisation.h"
+#include "utils.h"
 #include "utils/assert.h"
 #include "utils/cast.h"
 

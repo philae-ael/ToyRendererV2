@@ -4,12 +4,15 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <format>
 #include <variant>
 
+#include "../registry.h"
 #include "debug.h"
 #include "ressource_definition.h"
 #include "swapchain.h"
 #include "synchronisation.h"
+#include "utils.h"
 #include "utils/misc.h"
 
 auto tr::renderer::ImageRessource::as_attachment(

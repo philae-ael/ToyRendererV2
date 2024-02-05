@@ -6,7 +6,7 @@ layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 Fragcolor;
 
 layout(set = 0, binding = 0, rgba32f) uniform readonly image2D[4] gbuffers;
-layout(set = 0, binding = 1) uniform sampler2D shadow_map;
+layout(set = 0, binding = 1) uniform sampler2D[2] maps;
 
 layout(push_constant) uniform light{
     mat4 LightProjMatrix;
@@ -29,13 +29,13 @@ float compute_shadow(vec3 pos) {
     vec3 d = f.xyz / f.w;
 
 #ifdef PERCENTAGE_CLOSER_FILTERING
-    vec2 width = 1.0 / textureSize(shadow_map, 0).xy;
+    vec2 width = 1.0 / textureSize(maps[0], 0).xy;
 
     float s = 0;
     for(int i = -PERCENTAGE_CLOSER_FILTERING_ITER; i <= PERCENTAGE_CLOSER_FILTERING_ITER; i++){
         for(int j = -PERCENTAGE_CLOSER_FILTERING_ITER; j <= PERCENTAGE_CLOSER_FILTERING_ITER; j++){
             vec2 pos =  0.5 * d.xy + vec2(0.5) + vec2(i*width.x, j*width.y);
-            float v = texture(shadow_map, pos).x;
+            float v = texture(maps[0], pos).x;
             s += v >= (d.z - SHADOW_BIAS) ? 1.0 : 0.0;
         }
     }
@@ -43,7 +43,7 @@ float compute_shadow(vec3 pos) {
     float count = (2*PERCENTAGE_CLOSER_FILTERING_ITER + 1) * (2*PERCENTAGE_CLOSER_FILTERING_ITER+1);
     return s / count;
 #else
-    float v = texture(shadow_map, 0.5 * d.xy + vec2(0.5)).x;
+    float v = texture(maps[0], 0.5 * d.xy + vec2(0.5)).x;
     return  v >= (d.z - SHADOW_BIAS) ? 1.0 : 0.0;
 #endif
 }
@@ -57,6 +57,7 @@ PixelData getPixelData(){
     vec4 t1 = imageLoad(gbuffers[1], screen_coordinate);
     vec4 t2 = imageLoad(gbuffers[2], screen_coordinate);
     vec4 t3 = imageLoad(gbuffers[3], screen_coordinate);
+    vec4 ao = texture(maps[1], uv);
 
     // TODO: more complex packing
     pixel.albedo =  t0.xyz;
@@ -65,6 +66,7 @@ PixelData getPixelData(){
     pixel.metallic = t1.a;
     pixel.view = t2.xyz;
     pixel.pos = t3.xyz;
+    pixel.ao = ao.x;
 
     pixel.shadow = compute_shadow(pixel.pos);
 
@@ -74,6 +76,6 @@ PixelData getPixelData(){
 void main() {
     PixelData pixel = getPixelData();
 
-    vec3 color = 0.1*pixel.albedo + LightColor * direction_light(LightPosition, pixel);
+    vec3 color = 0.5*pixel.ao*pixel.albedo + LightColor * direction_light(LightPosition, pixel);
     Fragcolor = vec4(color, 1.0);
 } 

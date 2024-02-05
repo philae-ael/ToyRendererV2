@@ -3,10 +3,25 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <array>
 #include <ranges>
+#include <span>
 
+#include "../context.h"
+#include "../deletion_stack.h"
 #include "../descriptors.h"
+#include "../device.h"
+#include "../pipeline.h"
+#include "../ressource_manager.h"
+#include "../ressources.h"
 #include "utils/misc.h"
+#include "utils/timer.h"
+
+namespace shaderc {
+
+class CompileOptions;
+class Compiler;
+}  // namespace shaderc
 
 auto tr::renderer::PassDefinition::build(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm,
                                          Lifetime &setup_lifetime, shaderc::Compiler &compiler,

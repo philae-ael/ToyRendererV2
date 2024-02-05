@@ -2,13 +2,25 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <shaderc/shaderc.hpp>
+#include <cstdint>
+#include <optional>
 #include <vector>
 
-#include "../context.h"
 #include "../pipeline.h"
-#include "../ressource_manager.h"
 #include "../ressources.h"
+
+namespace shaderc {
+class CompileOptions;
+class Compiler;
+}  // namespace shaderc
+
+namespace tr::renderer {
+class RessourceManager;
+enum class buffer_ressource_handle : uint32_t;
+struct Lifetime;
+struct VulkanContext;
+enum class image_ressource_handle : uint32_t;
+}  // namespace tr::renderer
 
 namespace tr::renderer {
 

@@ -1,7 +1,4 @@
 #pragma once
-#include <spdlog/spdlog.h>
-#include <utils/assert.h>
-#include <utils/misc.h>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
@@ -34,6 +31,7 @@ enum class ImageRessourceId {
   GBuffer3,
   Depth,
   ShadowMap,
+  AO,
   MAX,
 };
 

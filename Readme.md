@@ -31,8 +31,10 @@ cmake -Bbuild -GNinja -DCMAKE_TOOLCHAIN_FILE=$(VCPKG)/scripts/buildsystems/vcpkg
 - [X]  Forward (not used)
     - [ ] for transparent objects only
 - [X] "Bindless" textures / indexed textures (Partial, for deferred only)
-- [ ] Ambient Occlusion
-    - [ ] SSAO
+- [ ] Local Illumination
+    - [X] SSAO
+- [ ] Global Illumination
+    - [X] A basic version of SSAO 
     - [ ] A more complex thing like voxel based or something like that?
 - [ ] Shadows
     - [X] Basic Directionnal lights

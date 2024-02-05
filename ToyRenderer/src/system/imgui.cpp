@@ -1,9 +1,17 @@
 
-#include "imgui.h"
+#include "./imgui.h"
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 #include <vulkan/vulkan_core.h>
 
 #include "../renderer/ressource_definition.h"
+#include "../renderer/utils.h"
+#include "../renderer/vulkan_engine.h"
+#include "utils/types.h"
+
+struct GLFWwindow;
 
 void tr::system::Imgui::init(GLFWwindow *window, renderer::VulkanEngine &engine) {
   ImGui::CreateContext();

@@ -1,7 +1,5 @@
 #include <spdlog/spdlog.h>
 
-#include <cstddef>
-
 #include "app.h"
 #include "options.h"
 #include "registry.h"
@@ -9,6 +7,11 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+#include <cstdlib>
+#include <source_location>
+#include <span>
+#include <string>
 
 [[noreturn]] void assert_violation_handler(const char* expr, const std::string& s, std::source_location loc) {
   spdlog::critical("assertion failed: {}", expr);

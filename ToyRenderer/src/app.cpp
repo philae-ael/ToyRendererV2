@@ -1,24 +1,29 @@
 #include "app.h"
 
 #include <spdlog/spdlog.h>
-#include <utils/assert.h>
 #include <utils/misc.h>
-#include <vulkan/vulkan_core.h>
 
 #include <cstddef>
 #include <cstdint>
-#include <utility>
+#include <memory>
+#include <string>
 #include <vector>
 
 #include "camera.h"
 #include "gltf.h"
 #include "options.h"
-#include "renderer/frame.h"
-#include "renderer/uploader.h"
+#include "renderer/debug.h"
+#include "renderer/render_graph.h"
 #include "system/imgui.h"
 #include "system/input.h"
 #include "system/platform.h"
+#include "utils/timer.h"
 #include "utils/types.h"
+
+namespace tr::renderer {
+struct Frame;
+struct Transferer;
+}  // namespace tr::renderer
 
 void tr::App::update() {
   const auto dt = state.frame_timer.elapsed();  // millis
@@ -40,8 +45,9 @@ tr::App::App(tr::Options options_) : options(options_) {
     subsystems.imgui.init(subsystems.platform.window, subsystems.engine);
   }
 
+  rendergraph = std::make_unique<renderer::RenderGraph>();
   subsystems.engine.transfer([&](renderer::Transferer &t) {
-    rendergraph.init(subsystems.engine, t);
+    rendergraph->init(subsystems.engine, t);
 
     TIMED_INLINE_LAMBDA("Load scene") {
       std::string scene_name;
@@ -82,11 +88,11 @@ void tr::App::run() {
     update();
 
     subsystems.engine.frame([&](renderer::Frame &frame) {
-      rendergraph.draw(frame, meshes, state.camera_controller.camera);
+      rendergraph->draw(frame, meshes, state.camera_controller.camera);
 
       if (subsystems.imgui.start_frame(frame)) {
         subsystems.engine.imgui();
-        rendergraph.imgui(subsystems.engine);
+        rendergraph->imgui(subsystems.engine);
         subsystems.imgui.draw(frame);
       }
     });
@@ -101,3 +107,4 @@ void tr::App::run() {
 
   subsystems.engine.sync();
 }
+tr::App::~App() = default;

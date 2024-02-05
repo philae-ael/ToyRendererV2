@@ -11,8 +11,8 @@
 #include "utils/cast.h"
 
 template <class T>
-auto read_file(const std::string& path) -> std::optional<std::vector<T>> {
-  std::ifstream f(path, std::ios::ate | std::ios::binary);
+auto read_file(std::string_view path) -> std::optional<std::vector<T>> {
+  std::ifstream f(std::string{path}, std::ios::ate | std::ios::binary);
 
   if (!f.is_open()) {
     spdlog::error("failed to open file {}", path);
