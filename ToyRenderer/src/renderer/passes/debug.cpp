@@ -4,8 +4,9 @@
 #include <shaderc/shaderc.h>     // for shaderc_glsl_fragment_shader
 #include <vulkan/vulkan_core.h>  // for VkDynamicState, VkShaderStageFl...
 
-#include <algorithm>            // for copy, min
-#include <cstring>              // for memcpy
+#include <algorithm>  // for copy, min
+#include <cstring>    // for memcpy
+#include <glm/ext/vector_float4.hpp>
 #include <optional>             // for optional
 #include <shaderc/shaderc.hpp>  // for CompileOptions, Compiler
 
@@ -24,7 +25,6 @@
 #include "../vulkan_engine.h"         // for VulkanEngine
 #include "utils/assert.h"             // for TR_ASSERT
 #include "utils/cast.h"               // for narrow_cast, to_array
-#include "utils/misc.h"               // for TIMED_INLINE_LAMBDA
 #include "utils/types.h"              // for not_null_pointer
 
 void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, RessourceManager &rm, Lifetime &setup_lifetime) {
@@ -77,7 +77,7 @@ void tr::renderer::Debug::init(Lifetime &lifetime, VulkanContext &ctx, Ressource
   const auto input_assembly_state =
       PipelineInputAssemblyBuilder{}.topology_(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST).build();
   const auto viewport_state = PipelineViewportStateBuilder{}.viewports_count(1).scissors_count(1).build();
-  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.cull_mode(VK_CULL_MODE_NONE).build();
+  const auto rasterizer_state = PipelineRasterizationStateBuilder{}.build();
   const auto multisampling_state = PipelineMultisampleStateBuilder{}.build();
   const auto depth_state = DepthStateTestReadOnlyOpLess.build();
 
@@ -189,4 +189,23 @@ void tr::renderer::Debug::draw(Frame &frame, VkRect2D render_area) {
   vkCmdEndRendering(frame.cmd.vk_cmd);
 
   vertices.clear();
+}
+void tr::renderer::Debug::push_aabb(const AABB &bb) {
+  const std::array<glm::vec3, 8> v{
+      glm::vec3(bb.max.x, bb.max.y, bb.max.z), glm::vec3(bb.max.x, bb.max.y, bb.min.z),
+      glm::vec3(bb.max.x, bb.min.y, bb.max.z), glm::vec3(bb.max.x, bb.min.y, bb.min.z),
+      glm::vec3(bb.min.x, bb.max.y, bb.max.z), glm::vec3(bb.min.x, bb.max.y, bb.min.z),
+      glm::vec3(bb.min.x, bb.min.y, bb.max.z), glm::vec3(bb.min.x, bb.min.y, bb.min.z),
+  };
+
+  push_triangle({{
+      DebugVertex{.pos = v[0], .color = glm::vec3(1.0, 0.0, 0.0)},
+      DebugVertex{.pos = v[1], .color = glm::vec3(1.0, 0.0, 0.0)},
+      DebugVertex{.pos = v[7], .color = glm::vec3(1.0, 0.0, 0.0)},
+  }});
+  push_triangle({{
+      DebugVertex{.pos = v[7], .color = glm::vec3(1.0, 0.0, 0.0)},
+      DebugVertex{.pos = v[2], .color = glm::vec3(1.0, 0.0, 0.0)},
+      DebugVertex{.pos = v[0], .color = glm::vec3(1.0, 0.0, 0.0)},
+  }});
 }

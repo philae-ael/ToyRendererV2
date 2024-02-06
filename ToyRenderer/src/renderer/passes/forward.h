@@ -93,8 +93,7 @@ struct Forward {
                          sizeof(data), &data);
 
       for (const auto &mesh : meshes) {
-        fr.transform = camInfo.viewMatrix * mesh.transform;
-        draw_mesh(frame, fr, mesh, default_ressources);
+        draw_mesh(frame, fr.transform(camInfo.viewMatrix * mesh.transform), mesh, default_ressources);
       }
     }
     end_draw(frame.cmd.vk_cmd);

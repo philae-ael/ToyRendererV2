@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
 #include <vulkan/vulkan_core.h>
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <glm/vec3.hpp>
 #include <span>
 #include <vector>
@@ -13,16 +13,15 @@
 #include "../vertex.h"
 #include "utils/cast.h"
 
-namespace tr {
-namespace renderer {
+namespace tr::renderer {
 class RessourceManager;
 enum class buffer_ressource_handle : uint32_t;
 struct Frame;
 struct Lifetime;
 struct VulkanContext;
 enum class image_ressource_handle : uint32_t;
-}  // namespace renderer
-}  // namespace tr
+struct AABB;
+}  // namespace tr::renderer
 
 namespace tr::renderer {
 
@@ -101,6 +100,7 @@ struct Debug {
     vertices.push_back(v[1]);
     vertices.push_back(v[2]);
   }
+  void push_aabb(const AABB &aabb);
 };
 
 }  // namespace tr::renderer

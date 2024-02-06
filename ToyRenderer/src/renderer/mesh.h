@@ -64,15 +64,6 @@ struct Material {
 struct AABB {
   glm::vec3 min;
   glm::vec3 max;
-
-  [[nodiscard]] auto transform(glm::mat4 transform_) const -> AABB {
-    const auto a = glm::vec3(transform_ * glm::vec4(min, 1.0));
-    const auto b = glm::vec3(transform_ * glm::vec4(max, 1.0));
-    return {
-        {glm::min(a.x, b.x), glm::min(a.y, b.y), glm::min(a.z, b.z)},
-        {glm::max(a.x, b.x), glm::max(a.y, b.y), glm::max(a.z, b.z)},
-    };
-  }
 };
 
 struct GeoSurface {

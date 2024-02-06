@@ -40,9 +40,7 @@ struct GBuffer {
     const auto camInfo = cam.cameraInfo();
 
     for (const auto &mesh : meshes) {
-      // TODO: find something smarter to not have to do so many mat mul
-      fr.transform = camInfo.viewMatrix * mesh.transform;
-      draw_mesh(frame, fr, mesh, default_ressources);
+      draw_mesh(frame, fr.transform(camInfo.viewMatrix * mesh.transform), mesh, default_ressources);
     }
     end_draw(frame.cmd.vk_cmd);
   }

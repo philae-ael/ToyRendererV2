@@ -1,7 +1,8 @@
 #include "gbuffer.h"
 
-#include <shaderc/env.h>         // for shaderc_env_version_vulkan_1_3
-#include <shaderc/shaderc.h>     // for shaderc_glsl_fragment_shader
+#include <shaderc/env.h>      // for shaderc_env_version_vulkan_1_3
+#include <shaderc/shaderc.h>  // for shaderc_glsl_fragment_shader
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>  // for VkShaderStageFlagBits, VkDescri...
 
 #include <array>                // for array, to_array
@@ -234,8 +235,10 @@ void GBuffer::draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
   vkCmdPushConstants(frame.cmd.vk_cmd, pass_info.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4x4),
                      &mesh.transform);
 
+  int i = 0;
   std::span<const GeoSurface> const surfaces = mesh.surfaces;
   for (const auto &surface : FrustrumCulling::filter(frustum, surfaces)) {
+    i++;
     const struct {
       uint32_t albedo_idx;
       uint32_t normal_idx;
@@ -256,5 +259,7 @@ void GBuffer::draw_mesh(Frame &frame, const Frustum &frustum, const Mesh &mesh,
       vkCmdDraw(frame.cmd.vk_cmd, surface.count, 1, surface.start, 0);
     }
   }
+
+  spdlog::trace("surface drawn: {}", i);
 }
 }  // namespace tr::renderer
